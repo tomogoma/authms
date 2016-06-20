@@ -10,8 +10,19 @@ import (
 
 var ErrorEmptyUserName = errors.New("uName cannot be empty")
 var ErrorEmptyPassword = errors.New("password cannot be empty")
+var ErrorNilHashFunc = errors.New("Hash function cannot be nil")
 
-type User struct {
+type User interface {
+	ID() int
+	UserName() string
+	FirstName() string
+	MiddleName() string
+	LastName() string
+	PreviousLogins() []login.LoginDetails
+	Token() *token.Token
+}
+
+type user struct {
 	id             int
 	userName       string
 	firstName      string
@@ -22,18 +33,20 @@ type User struct {
 	token          *token.Token
 }
 
-func (u *User) ID()             { return u.id }
-func (u *User) UserName()       { return u.userName }
-func (u *User) FirstName()      { return u.firstName }
-func (u *User) MiddleName()     { return u.middleName }
-func (u *User) LastName()       { return u.lastName }
-func (u *User) PreviousLogins() { return u.previousLogins }
-func (u *User) Token()          { return u.token }
+func (u *user) ID() int                              { return u.id }
+func (u *user) UserName() string                     { return u.userName }
+func (u *user) FirstName() string                    { return u.firstName }
+func (u *user) MiddleName() string                   { return u.middleName }
+func (u *user) LastName() string                     { return u.lastName }
+func (u *user) PreviousLogins() []login.LoginDetails { return u.previousLogins }
+func (u *user) Token() *token.Token                  { return u.token }
 
-func (u *User) SetPreviousLogins(ls []login.LoginDetails) { u.previousLogins = ls }
-func (u *User) SetToken(t *token.Token)                   { u.token = t }
+func (u *user) SetPreviousLogins(ls []login.LoginDetails) { u.previousLogins = ls }
+func (u *user) SetToken(t *token.Token)                   { u.token = t }
 
-func New(uName, fName, mName, lName, pass string) (*User, error) {
+type HashFunc func(pass string) ([]byte, error)
+
+func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error) {
 
 	if uName == "" {
 		return nil, ErrorEmptyUserName
@@ -43,20 +56,25 @@ func New(uName, fName, mName, lName, pass string) (*User, error) {
 		return nil, ErrorEmptyPassword
 	}
 
-	passHB, err := getHash(pass)
+	if hashF == nil {
+		return nil, ErrorNilHashFunc
+	}
+
+	passHB, err := hashF(pass)
 	if err != nil {
 		return nil, err
 	}
 
-	return &User{
-		userName:  uName,
-		firstName: fName,
-		lastName:  lName,
-		password:  passHB,
+	return &user{
+		userName:   uName,
+		firstName:  fName,
+		middleName: mName,
+		lastName:   lName,
+		password:   passHB,
 	}, nil
 }
 
-func getHash(pass string) ([]byte, error) {
+func Hash(pass string) ([]byte, error) {
 
 	passB := []byte(pass)
 	return bcrypt.GenerateFromPassword(passB, bcrypt.DefaultCost)

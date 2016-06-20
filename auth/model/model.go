@@ -2,9 +2,10 @@ package model
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 
-	"bitbucket.org/alkira/contactsms/kazoo/errors"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	_ "github.com/lib/pq"
 )
 
@@ -13,11 +14,6 @@ const (
 )
 
 var ErrorNilDSNFormatter = errors.New("DSNFormatter cannot be nil")
-
-type Model interface {
-	TableName() string
-	TableDesc() string
-}
 
 type DSNFormatter interface {
 	FormatDSN() string
@@ -49,7 +45,7 @@ func (d DSN) FormatDSN() string {
 func New(dsnF DSNFormatter) (*sql.DB, error) {
 
 	if dsnF == nil {
-		return ErrorNilDSNFormatter
+		return nil, ErrorNilDSNFormatter
 	}
 
 	db, err := sql.Open(driverName, dsnF.FormatDSN())
@@ -64,7 +60,7 @@ func New(dsnF DSNFormatter) (*sql.DB, error) {
 	return db, nil
 }
 
-func CreateTables(db *sql.DB, models ...Model) error {
+func CreateTables(db *sql.DB, models ...helper.Model) error {
 
 	modelsM := make(map[string]string)
 	for _, model := range models {

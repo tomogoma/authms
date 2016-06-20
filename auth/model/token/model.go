@@ -2,10 +2,10 @@ package token
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
-	"bitbucket.org/alkira/contactsms/kazoo/errors"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 )
 
@@ -93,7 +93,7 @@ func (m *Model) Save(t Token) (int, error) {
 
 func (um Model) Get(usrID int, token string) (*Token, error) {
 
-	if usrID == "" {
+	if usrID < 1 {
 		return nil, ErrorEmptyUserID
 	}
 
@@ -187,7 +187,7 @@ func (um Model) garbageCollect(quitCh chan error) {
 
 		case inserted := <-um.insCh:
 			if smallest.expiry.After(inserted.expiry) {
-				smallest = inserted
+				smallest = &inserted
 			}
 
 		case deleted := <-um.delCh:

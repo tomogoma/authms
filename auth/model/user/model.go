@@ -43,7 +43,7 @@ func (m Model) TableDesc() string {
 	`
 }
 
-func (m Model) Save(u User) (int, error) {
+func (m Model) Save(u user) (int, error) {
 
 	qStr := fmt.Sprintf(`
 		INSERT INTO %s (userName, firstName, middleName, lastName, password)
@@ -57,7 +57,7 @@ func (m Model) Save(u User) (int, error) {
 	return userid, err
 }
 
-func (m Model) Get(uName, pass string) (*User, error) {
+func (m Model) Get(uName, pass string, hashF HashFunc) (*user, error) {
 
 	qStr := fmt.Sprintf(`
 		SELECT id, userName, password, firstName, middleName, lastName
@@ -66,12 +66,12 @@ func (m Model) Get(uName, pass string) (*User, error) {
 		AND password = $2
 	`, tableName)
 
-	passHB, err := getHash(pass)
+	passHB, err := hashF(pass)
 	if err != nil {
 		return nil, err
 	}
 
-	var usr *User
+	usr := &user{}
 	err = m.db.QueryRow(qStr, uName, passHB).Scan(
 		&usr.id, &usr.userName, &usr.password,
 		&usr.firstName, &usr.middleName, &usr.lastName,

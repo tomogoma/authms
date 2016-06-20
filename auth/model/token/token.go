@@ -34,16 +34,16 @@ const (
 	LongExpType
 )
 
-func (t *Token) ID()     { return t.id }
-func (t *Token) UserID() { return t.userID }
-func (t *Token) DevID()  { return t.devID }
-func (t *Token) Token()  { return t.token }
-func (t *Token) Issue()  { return t.issue }
-func (t *Token) Expiry() { return t.expiry }
+func (t *Token) ID() int           { return t.id }
+func (t *Token) UserID() int       { return t.userID }
+func (t *Token) DevID() string     { return t.devID }
+func (t *Token) Token() string     { return t.token }
+func (t *Token) Issue() time.Time  { return t.issue }
+func (t *Token) Expiry() time.Time { return t.expiry }
 
-func New(uName, devID string, expType ExpiryType) (*Token, error) {
+func New(usrID int, devID string, expType ExpiryType) (*Token, error) {
 
-	if uName == "" {
+	if usrID < 1 {
 		return nil, ErrorEmptyUserName
 	}
 
@@ -51,7 +51,7 @@ func New(uName, devID string, expType ExpiryType) (*Token, error) {
 		return nil, ErrorEmptyDevID
 	}
 
-	token := uuid.NewV4()
+	token := uuid.NewV4().String()
 	issue := time.Now()
 	expiry := issue.Add(shortDuration)
 
@@ -63,7 +63,7 @@ func New(uName, devID string, expType ExpiryType) (*Token, error) {
 	}
 
 	return &Token{
-		userID: uName,
+		userID: usrID,
 		devID:  devID,
 		token:  token,
 		issue:  issue,

@@ -87,7 +87,7 @@ func (m *Model) Get(userName, offset, count int) ([]*LoginDetails, error) {
 	for i := 0; r.Next(); i++ {
 
 		if i == count {
-			return fmt.Errorf("Unexpected result, expected %d results currently at %d",
+			return nil, fmt.Errorf("Unexpected result, expected %d results currently at %d",
 				count, i+1)
 		}
 
