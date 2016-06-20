@@ -14,10 +14,18 @@ const (
 	longDuration   = 4320 * time.Hour
 )
 
-var ErrorEmptyUserName = errors.New("uName cannot be empty")
 var ErrorEmptyDevID = errors.New("devID cannot be empty")
 
-type Token struct {
+type Token interface {
+	ID() int
+	UserID() int
+	DevID() string
+	Token() string
+	Issue() time.Time
+	Expiry() time.Time
+}
+
+type token struct {
 	id     int
 	userID int
 	devID  string
@@ -34,24 +42,24 @@ const (
 	LongExpType
 )
 
-func (t *Token) ID() int           { return t.id }
-func (t *Token) UserID() int       { return t.userID }
-func (t *Token) DevID() string     { return t.devID }
-func (t *Token) Token() string     { return t.token }
-func (t *Token) Issue() time.Time  { return t.issue }
-func (t *Token) Expiry() time.Time { return t.expiry }
+func (t *token) ID() int           { return t.id }
+func (t *token) UserID() int       { return t.userID }
+func (t *token) DevID() string     { return t.devID }
+func (t *token) Token() string     { return t.token }
+func (t *token) Issue() time.Time  { return t.issue }
+func (t *token) Expiry() time.Time { return t.expiry }
 
-func New(usrID int, devID string, expType ExpiryType) (*Token, error) {
+func New(usrID int, devID string, expType ExpiryType) (*token, error) {
 
 	if usrID < 1 {
-		return nil, ErrorEmptyUserName
+		return nil, ErrorBadUserID
 	}
 
 	if devID == "" {
 		return nil, ErrorEmptyDevID
 	}
 
-	token := uuid.NewV4().String()
+	tknStr := uuid.NewV4().String()
 	issue := time.Now()
 	expiry := issue.Add(shortDuration)
 
@@ -62,10 +70,10 @@ func New(usrID int, devID string, expType ExpiryType) (*Token, error) {
 		expiry = issue.Add(longDuration)
 	}
 
-	return &Token{
+	return &token{
 		userID: usrID,
 		devID:  devID,
-		token:  token,
+		token:  tknStr,
 		issue:  issue,
 		expiry: expiry,
 	}, nil

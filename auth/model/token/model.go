@@ -16,13 +16,13 @@ const (
 var ErrorEmptyToken = errors.New("Token string cannot be empty")
 var ErrorExpiredToken = errors.New("Token has expired")
 var ErrorEmptyUsersTable = errors.New("users table cannot be empty")
-var ErrorEmptyUserID = errors.New("UserID cannot be empty")
+var ErrorBadUserID = errors.New("UserID cannot be empty")
 
 type Model struct {
 	db               *sql.DB
 	usersTable_IDCol string
 
-	insCh chan Token
+	insCh chan token
 	delCh chan string
 }
 
@@ -36,7 +36,7 @@ func NewModel(db *sql.DB, usersTable_IDCol string, quitCh chan error) (*Model, e
 		return nil, ErrorEmptyUsersTable
 	}
 
-	iCh := make(chan Token)
+	iCh := make(chan token)
 	dCh := make(chan string)
 
 	m := &Model{
@@ -71,7 +71,7 @@ func (m *Model) TableDesc() string {
 	`, m.usersTable_IDCol)
 }
 
-func (m *Model) Save(t Token) (int, error) {
+func (m *Model) Save(t token) (int, error) {
 
 	qStr := fmt.Sprintf(`
 		INSERT INTO %s (userID, devID, token, issue, expiry)
@@ -91,13 +91,13 @@ func (m *Model) Save(t Token) (int, error) {
 	return tokenID, nil
 }
 
-func (um Model) Get(usrID int, token string) (*Token, error) {
+func (um Model) Get(usrID int, tknStr string) (*token, error) {
 
 	if usrID < 1 {
-		return nil, ErrorEmptyUserID
+		return nil, ErrorBadUserID
 	}
 
-	if token == "" {
+	if tknStr == "" {
 		return nil, ErrorEmptyToken
 	}
 
@@ -108,17 +108,17 @@ func (um Model) Get(usrID int, token string) (*Token, error) {
 		AND token = $2
 	`, tableName)
 
-	var t *Token
-	err := um.db.QueryRow(qStr, usrID, token).Scan(
-		&t.id, &t.userID, &t.devID, &t.token, &t.issue, &t.expiry,
+	tkn := &token{}
+	err := um.db.QueryRow(qStr, usrID, tknStr).Scan(
+		&tkn.id, &tkn.userID, &tkn.devID, &tkn.token, &tkn.issue, &tkn.expiry,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	if time.Now().After(t.expiry) {
+	if time.Now().After(tkn.expiry) {
 
-		ok, err := um.Delete(token)
+		ok, err := um.Delete(tknStr)
 		if err != nil {
 			return nil, fmt.Errorf("%s ...further %s while deleting the token",
 				ErrorExpiredToken, err)
@@ -132,7 +132,7 @@ func (um Model) Get(usrID int, token string) (*Token, error) {
 		return nil, ErrorExpiredToken
 	}
 
-	return t, nil
+	return tkn, nil
 }
 
 func (um Model) Delete(token string) (bool, error) {
@@ -207,7 +207,7 @@ func (um Model) garbageCollect(quitCh chan error) {
 	quitCh <- nil
 }
 
-func (um Model) getSmallestExpiry() (*Token, error) {
+func (um Model) getSmallestExpiry() (*token, error) {
 
 	qStr := fmt.Sprintf(`
 		SELECT id, userID, devID, token, issue, expiry
@@ -215,7 +215,7 @@ func (um Model) getSmallestExpiry() (*Token, error) {
 		WHERE expiry = (SELECT MIN(date) FROM %s)
 	`, tableName, tableName)
 
-	var t *Token
+	var t *token
 	err := um.db.QueryRow(qStr).Scan(
 		&t.id, &t.userID, &t.devID, &t.token, &t.issue, &t.expiry,
 	)
