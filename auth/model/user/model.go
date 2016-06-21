@@ -77,5 +77,12 @@ func (m Model) Get(uName, pass string, hashF HashFunc) (*user, error) {
 		&usr.firstName, &usr.middleName, &usr.lastName,
 	)
 
+	if err != nil {
+		if err.Error() != helper.NoResultsErrorStr {
+			return nil, err
+		}
+		return nil, nil
+	}
+
 	return usr, err
 }

@@ -45,6 +45,10 @@ func hashF(p string) ([]byte, error) {
 	return []byte{0, 1, 2, 3, 4, 5}, nil
 }
 
+func anotherHashF(p string) ([]byte, error) {
+	return []byte{6, 7, 8, 9, 10}, nil
+}
+
 func errorHashF(p string) ([]byte, error) {
 	return nil, errorHashing
 }

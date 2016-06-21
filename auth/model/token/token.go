@@ -21,7 +21,7 @@ type Token interface {
 	UserID() int
 	DevID() string
 	Token() string
-	Issue() time.Time
+	Issued() time.Time
 	Expiry() time.Time
 }
 
@@ -30,7 +30,7 @@ type token struct {
 	userID int
 	devID  string
 	token  string
-	issue  time.Time
+	issued time.Time
 	expiry time.Time
 }
 
@@ -46,7 +46,7 @@ func (t *token) ID() int           { return t.id }
 func (t *token) UserID() int       { return t.userID }
 func (t *token) DevID() string     { return t.devID }
 func (t *token) Token() string     { return t.token }
-func (t *token) Issue() time.Time  { return t.issue }
+func (t *token) Issued() time.Time { return t.issued }
 func (t *token) Expiry() time.Time { return t.expiry }
 
 func New(usrID int, devID string, expType ExpiryType) (*token, error) {
@@ -60,21 +60,21 @@ func New(usrID int, devID string, expType ExpiryType) (*token, error) {
 	}
 
 	tknStr := uuid.NewV4().String()
-	issue := time.Now()
-	expiry := issue.Add(shortDuration)
+	issued := time.Now()
+	expiry := issued.Add(shortDuration)
 
 	switch expType {
 	case MedExpType:
-		expiry = issue.Add(mediumDuration)
+		expiry = issued.Add(mediumDuration)
 	case LongExpType:
-		expiry = issue.Add(longDuration)
+		expiry = issued.Add(longDuration)
 	}
 
 	return &token{
 		userID: usrID,
 		devID:  devID,
 		token:  tknStr,
-		issue:  issue,
+		issued: issued,
 		expiry: expiry,
 	}, nil
 }

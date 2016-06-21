@@ -7,14 +7,13 @@ import (
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
-	_ "github.com/lib/pq"
 )
 
 var db *sql.DB
 
 func TestNewModel(t *testing.T) {
 
-	newModel(t)
+	newUserModel(t)
 	defer testhelper.TearDown(db, t)
 }
 
@@ -28,13 +27,16 @@ func TestNewModel_nilDB(t *testing.T) {
 
 func TestModel_Save_n_Get(t *testing.T) {
 
-	m := newModel(t)
+	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	save(expUser, m, t)
+	if !save(expUser, m, t) {
+		return
+	}
+
 	usr, err := m.Get(expUser.UserName, expUser.Password, expUser.hashF)
 	if err != nil {
-		t.Fatalf("model.Get(): %s", err)
+		t.Fatalf("userModel.Get(): %s", err)
 	}
 
 	compareUsersShallow(usr, expUser, t)
@@ -42,40 +44,95 @@ func TestModel_Save_n_Get(t *testing.T) {
 
 func TestModel_Get_hashError(t *testing.T) {
 
-	m := newModel(t)
+	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	save(expUser, m, t)
+	if !save(expUser, m, t) {
+		return
+	}
+
 	_, err := m.Get(expUser.UserName, expUser.Password, errorHashF)
 	if err == nil || err != errorHashing {
 		t.Fatalf("expected error %s but got %s", errorHashing, err)
 	}
 }
 
-func newModel(t *testing.T) *user.Model {
+func TestModel_Get_noUsers(t *testing.T) {
 
-	db = testhelper.InstantiateDB(t)
-	m, err := user.NewModel(db)
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	usr, err := m.Get(expUser.UserName, expUser.Password, expUser.hashF)
 	if err != nil {
-		t.Fatalf("user.NewModel(): %s", err)
+		t.Fatalf("userModel.Get(): %s", err)
 	}
-	testhelper.SetUp(m, db, t)
-	return m
+
+	if usr != nil {
+		t.Fatalf("Expected nil user but got %v", usr)
+	}
 }
 
-func save(expU User, m *user.Model, t *testing.T) {
+func TestModel_Get_userNameNotInDB(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	if !save(expUser, m, t) {
+		return
+	}
+
+	usr, err := m.Get("someUserName", expUser.Password, expUser.hashF)
+	if err != nil {
+		t.Fatalf("userModel.Get(): %s", err)
+	}
+
+	if usr != nil {
+		t.Fatalf("Expected nil user but got %v", usr)
+	}
+}
+
+func TestModel_Get_passNotInDB(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	if !save(expUser, m, t) {
+		return
+	}
+
+	usr, err := m.Get(expUser.UserName, "some other password", anotherHashF)
+	if err != nil {
+		t.Fatalf("userModel.Get(): %s", err)
+	}
+
+	if usr != nil {
+		t.Fatalf("Expected nil user but got %v", usr)
+	}
+}
+
+func newUserModel(t *testing.T) *user.Model {
+
+	db = testhelper.InstantiateDB(t)
+	return testhelper.NewUserModel(db, t)
+}
+
+func save(expU User, m *user.Model, t *testing.T) bool {
 
 	u, err := user.New(expU.explodeParams())
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
+		return false
 	}
 
 	i, err := m.Save(*u)
 	if err != nil {
-		t.Fatalf("model.Save(): %s", err)
+		t.Fatalf("userModel.Save(): %s", err)
+		return false
 	}
 
 	if i < 1 {
 		t.Errorf("Expected id > 1 got %d", i)
+		return false
 	}
+	return true
 }

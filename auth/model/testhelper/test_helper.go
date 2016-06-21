@@ -6,6 +6,8 @@ import (
 	"testing"
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
+	_ "github.com/lib/pq"
 )
 
 const (
@@ -15,28 +17,51 @@ const (
 
 func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
 
+	if db == nil {
+		t.Fatalf("Found nil db while setting up")
+	}
+
 	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", dbname))
 	if err != nil {
+		TearDown(db, t)
 		t.Fatalf("creating test db: %s", err)
 	}
 
 	_, err = db.Exec(fmt.Sprintf("SET DATABASE = %s", dbname))
 	if err != nil {
+		TearDown(db, t)
 		t.Fatalf("selecting test db: %s", err)
 	}
 
-	_, err = db.Exec(fmt.Sprintf("CREATE TABLE %s (%s)", m.TableName(), m.TableDesc()))
+	_, err = db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", m.TableName(), m.TableDesc()))
 	if err != nil {
+		TearDown(db, t)
 		t.Fatalf("creating test table: %s", err)
 	}
 }
 
+func NewUserModel(db *sql.DB, t *testing.T) *user.Model {
+
+	m, err := user.NewModel(db)
+	if err != nil {
+		TearDown(db, t)
+		t.Fatalf("user.NewModel(): %s", err)
+	}
+	SetUp(m, db, t)
+	return m
+}
+
 func TearDown(db *sql.DB, t *testing.T) {
+
+	if db == nil {
+		t.Errorf("Found nil db while tearing down")
+		return
+	}
 
 	defer db.Close()
 	_, err := db.Exec(fmt.Sprintf("DROP DATABASE %s", dbname))
 	if err != nil {
-		t.Fatalf("dropping test db: %s", err)
+		t.Errorf("dropping test db: %s", err)
 	}
 }
 
