@@ -3,8 +3,8 @@ package db_auth
 import (
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/details/login"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 )
@@ -19,9 +19,9 @@ type Auth struct {
 	loginDetsM *login.Model
 }
 
-func New(dsnF model.DSNFormatter, quitCh chan error) (*Auth, error) {
+func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 
-	db, err := model.New(dsnF)
+	db, err := helper.New(dsnF)
 	if err != nil {
 		return nil, err
 	}
@@ -31,17 +31,22 @@ func New(dsnF model.DSNFormatter, quitCh chan error) (*Auth, error) {
 		return nil, err
 	}
 
-	tokenM, err := token.NewModel(db, usrM.PrimaryKeyField(), quitCh)
+	tokenM, err := token.NewModel(db)
 	if err != nil {
 		return nil, err
 	}
 
-	loginM, err := login.NewModel(db, usrM.PrimaryKeyField())
+	err = tokenM.RunGarbageCollector(quitCh)
 	if err != nil {
 		return nil, err
 	}
 
-	err = model.CreateTables(db, usrM, tokenM, loginM)
+	loginM, err := login.NewModel(db)
+	if err != nil {
+		return nil, err
+	}
+
+	err = helper.CreateTables(db, usrM, tokenM, loginM)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +89,7 @@ func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (*user.User, er
 		return nil, err
 	}
 
-	_, err = a.loginDetsM.Insert(*loginDets)
+	_, err = a.loginDetsM.Save(*loginDets)
 	if err != nil {
 		a.tokenM.Delete(token.Token())
 		return nil, err

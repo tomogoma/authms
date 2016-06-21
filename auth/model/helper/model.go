@@ -1,45 +1,24 @@
-package model
+package helper
 
 import (
 	"database/sql"
 	"errors"
 	"fmt"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	_ "github.com/lib/pq"
 )
 
 const (
-	driverName = "postgres"
+	driverName        = "postgres"
+	NoResultsErrorStr = "sql: no rows in result set"
 )
 
+var ErrorNilDB = errors.New("db cannot be nil")
 var ErrorNilDSNFormatter = errors.New("DSNFormatter cannot be nil")
 
-type DSNFormatter interface {
-	FormatDSN() string
-}
-
-type DSN struct {
-	UName    string
-	Password string
-	Host     string
-	DB       string
-}
-
-func (d DSN) FormatDSN() string {
-
-	if d.UName != "" {
-		if d.Password != "" {
-			return fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=verify-full",
-				d.UName, d.Password, d.Host, d.DB,
-			)
-		}
-		return fmt.Sprintf("postgres://%s@%s/%s?sslmode=verify-full",
-			d.UName, d.Host, d.DB,
-		)
-	}
-
-	return fmt.Sprintf("postgres://%s/%s?sslmode=verify-full", d.Host, d.DB)
+type Model interface {
+	TableName() string
+	TableDesc() string
 }
 
 func New(dsnF DSNFormatter) (*sql.DB, error) {
@@ -60,7 +39,7 @@ func New(dsnF DSNFormatter) (*sql.DB, error) {
 	return db, nil
 }
 
-func CreateTables(db *sql.DB, models ...helper.Model) error {
+func CreateTables(db *sql.DB, models ...Model) error {
 
 	modelsM := make(map[string]string)
 	for _, model := range models {
