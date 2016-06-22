@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	_ "github.com/lib/pq"
 )
 
@@ -40,21 +39,10 @@ func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
 	}
 }
 
-func NewUserModel(db *sql.DB, t *testing.T) *user.Model {
-
-	m, err := user.NewModel(db)
-	if err != nil {
-		TearDown(db, t)
-		t.Fatalf("user.NewModel(): %s", err)
-	}
-	SetUp(m, db, t)
-	return m
-}
-
 func TearDown(db *sql.DB, t *testing.T) {
 
 	if db == nil {
-		t.Errorf("Found nil db while tearing down")
+		t.Logf("Found nil db while tearing down")
 		return
 	}
 

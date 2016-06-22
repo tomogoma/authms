@@ -113,7 +113,13 @@ func TestModel_Get_passNotInDB(t *testing.T) {
 func newUserModel(t *testing.T) *user.Model {
 
 	db = testhelper.InstantiateDB(t)
-	return testhelper.NewUserModel(db, t)
+	m, err := user.NewModel(db)
+	if err != nil {
+		testhelper.TearDown(db, t)
+		t.Fatalf("user.NewModel(): %s", err)
+	}
+	testhelper.SetUp(m, db, t)
+	return m
 }
 
 func save(expU User, m *user.Model, t *testing.T) bool {
