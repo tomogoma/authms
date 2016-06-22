@@ -49,7 +49,7 @@ func (m *Model) TableDesc() string {
 	`)
 }
 
-func (m *Model) Save(ld loginDetails) (int, error) {
+func (m *Model) Save(ld LoginDetails) (int, error) {
 
 	qStr := fmt.Sprintf(`
 		INSERT INTO %s (userID, date, forServiceID, ipAddress, referral)
@@ -64,7 +64,7 @@ func (m *Model) Save(ld loginDetails) (int, error) {
 	return detsID, err
 }
 
-func (m *Model) Get(userID, offset, count int) ([]*loginDetails, error) {
+func (m *Model) Get(userID, offset, count int) ([]*LoginDetails, error) {
 
 	qStr := fmt.Sprintf(`
 		SELECT id, userID, date, forServiceID, ipAddress, referral
@@ -79,10 +79,10 @@ func (m *Model) Get(userID, offset, count int) ([]*loginDetails, error) {
 		return nil, err
 	}
 
-	dets := make([]*loginDetails, 0)
+	dets := make([]*LoginDetails, 0)
 	for r.Next() {
 
-		d := &loginDetails{}
+		d := &LoginDetails{}
 		var tmStmp string
 		r.Scan(&d.id, &d.userID, &tmStmp, &d.forService, &d.ipAddress, &d.referral)
 		d.date, err = time.Parse(dateFormat, tmStmp)

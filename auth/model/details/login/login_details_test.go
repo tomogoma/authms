@@ -55,7 +55,7 @@ func initLoginDets() loginDetails {
 	}
 }
 
-func compareLoginDets(act login.LoginDetails, exp loginDetails, t *testing.T) {
+func compareLoginDets(act *login.LoginDetails, exp loginDetails, t *testing.T) {
 
 	if act == nil {
 		t.Errorf("got nil, expected %v", exp)

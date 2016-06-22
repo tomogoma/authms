@@ -30,7 +30,7 @@ func TestModel_Save_n_Get(t *testing.T) {
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	if !save(expUser, m, t) {
+	if i := save(expUser, m, t); i < 1 {
 		return
 	}
 
@@ -47,7 +47,7 @@ func TestModel_Get_hashError(t *testing.T) {
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	if !save(expUser, m, t) {
+	if i := save(expUser, m, t); i < 1 {
 		return
 	}
 
@@ -77,7 +77,7 @@ func TestModel_Get_userNameNotInDB(t *testing.T) {
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	if !save(expUser, m, t) {
+	if i := save(expUser, m, t); i < 1 {
 		return
 	}
 
@@ -96,11 +96,41 @@ func TestModel_Get_passNotInDB(t *testing.T) {
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	if !save(expUser, m, t) {
+	if i := save(expUser, m, t); i < 1 {
 		return
 	}
 
 	usr, err := m.Get(expUser.UserName, "some other password", anotherHashF)
+	if err != nil {
+		t.Fatalf("userModel.Get(): %s", err)
+	}
+
+	if usr != nil {
+		t.Fatalf("Expected nil user but got %v", usr)
+	}
+}
+
+func TestModel_GetByID(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	uid := save(expUser, m, t)
+
+	usr, err := m.GetByID(uid)
+	if err != nil {
+		t.Fatalf("userModel.Get(): %s", err)
+	}
+
+	compareUsersShallow(usr, expUser, t)
+}
+
+func TestModel_GetByID_noResults(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	usr, err := m.GetByID(4567)
 	if err != nil {
 		t.Fatalf("userModel.Get(): %s", err)
 	}
@@ -122,23 +152,23 @@ func newUserModel(t *testing.T) *user.Model {
 	return m
 }
 
-func save(expU User, m *user.Model, t *testing.T) bool {
+func save(expU User, m *user.Model, t *testing.T) int {
 
 	u, err := user.New(expU.explodeParams())
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
-		return false
+		return 0
 	}
 
 	i, err := m.Save(*u)
 	if err != nil {
 		t.Fatalf("userModel.Save(): %s", err)
-		return false
+		return 0
 	}
 
 	if i < 1 {
 		t.Errorf("Expected id > 1 got %d", i)
-		return false
+		return 0
 	}
-	return true
+	return i
 }

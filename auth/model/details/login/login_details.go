@@ -8,16 +8,7 @@ import (
 
 var ErrorBadUserID = errors.New("User ID provided was not good")
 
-type LoginDetails interface {
-	ID() int
-	UserID() int
-	IPAddress() string
-	Date() time.Time
-	ForService() string
-	Referral() string
-}
-
-type loginDetails struct {
+type LoginDetails struct {
 	id         int
 	userID     int
 	ipAddress  string
@@ -26,20 +17,20 @@ type loginDetails struct {
 	referral   string
 }
 
-func (ld *loginDetails) ID() int            { return ld.id }
-func (ld *loginDetails) UserID() int        { return ld.userID }
-func (ld *loginDetails) IPAddress() string  { return ld.ipAddress }
-func (ld *loginDetails) Date() time.Time    { return ld.date }
-func (ld *loginDetails) ForService() string { return ld.forService }
-func (ld *loginDetails) Referral() string   { return ld.referral }
+func (ld *LoginDetails) ID() int            { return ld.id }
+func (ld *LoginDetails) UserID() int        { return ld.userID }
+func (ld *LoginDetails) IPAddress() string  { return ld.ipAddress }
+func (ld *LoginDetails) Date() time.Time    { return ld.date }
+func (ld *LoginDetails) ForService() string { return ld.forService }
+func (ld *LoginDetails) Referral() string   { return ld.referral }
 
-func New(uID int, date time.Time, ip, forSrvc, ref string) (*loginDetails, error) {
+func New(uID int, date time.Time, ip, forSrvc, ref string) (*LoginDetails, error) {
 
 	if uID == 0 {
 		return nil, ErrorBadUserID
 	}
 
-	return &loginDetails{
+	return &LoginDetails{
 		userID:     uID,
 		ipAddress:  ip,
 		date:       date,

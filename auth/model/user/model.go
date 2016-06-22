@@ -57,6 +57,30 @@ func (m Model) Save(u user) (int, error) {
 	return userid, err
 }
 
+func (m Model) GetByID(userID int) (*user, error) {
+
+	qStr := fmt.Sprintf(`
+		SELECT id, userName, password, firstName, middleName, lastName
+		FROM %s
+		WHERE id = $1
+	`, tableName)
+
+	usr := &user{}
+	err := m.db.QueryRow(qStr, userID).Scan(
+		&usr.id, &usr.userName, &usr.password,
+		&usr.firstName, &usr.middleName, &usr.lastName,
+	)
+
+	if err != nil {
+		if err.Error() != helper.NoResultsErrorStr {
+			return nil, err
+		}
+		return nil, nil
+	}
+
+	return usr, err
+}
+
 func (m Model) Get(uName, pass string, hashF HashFunc) (*user, error) {
 
 	qStr := fmt.Sprintf(`

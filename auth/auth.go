@@ -54,19 +54,24 @@ func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 	return &Auth{usrM: usrM, tokenM: tokenM, loginDetsM: loginM}, nil
 }
 
-func (a *Auth) RegisterUser(usr user.User) (int, error) {
+func (a *Auth) RegisterUser(usr user.User, pass string) (int, error) {
 
-	return a.usrM.Save(usr)
+	u, err := user.New(usr.UserName(), usr.FirstName(), usr.MiddleName(), usr.LastName(), pass, user.Hash)
+	if err != nil {
+		return 0, err
+	}
+
+	return a.usrM.Save(*u)
 }
 
-func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (*user.User, error) {
+func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (user.User, error) {
 
-	usr, err := a.usrM.Get(uName, pass)
+	usr, err := a.usrM.Get(uName, pass, user.Hash)
 	if err != nil {
 		return nil, err
 	}
 
-	token, err := token.New(uName, devID, token.ShortExpType)
+	token, err := token.New(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +82,11 @@ func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (*user.User, er
 		return nil, err
 	}
 
-	prevLogins, err := a.loginDetsM.Get(usr.UserName(), 0, numPrevLogins)
+	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins)
 	if err != nil {
 		return nil, err
 	}
-	usr.SetPreviousLogins(prevLogins)
+	usr.SetPreviousLogins(prevLogins...)
 
 	loginDets, err := login.New(usr.ID(), time.Now(), rIP, srvID, ref)
 	if err != nil {
@@ -98,24 +103,24 @@ func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (*user.User, er
 	return usr, nil
 }
 
-func (a *Auth) AuthenticateToken(usrID int, token string) (*user.User, error) {
+func (a *Auth) AuthenticateToken(usrID int, tknStr string) (user.User, error) {
 
-	token, err := a.tokenM.Get(usrID, token)
+	token, err := a.tokenM.Get(usrID, tknStr)
 	if err != nil {
 		return nil, err
 	}
 
-	usr, err := a.usrM.Get(token.UserID())
+	usr, err := a.usrM.GetByID(token.UserID())
 	if err != nil {
 		return nil, err
 	}
 	usr.SetToken(token)
 
-	prevLogins, err := a.loginDetsM.Get(usr.UserName(), 0, numPrevLogins)
+	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins)
 	if err != nil {
 		return nil, err
 	}
-	usr.SetPreviousLogins(prevLogins)
+	usr.SetPreviousLogins(prevLogins...)
 
 	return usr, nil
 }
