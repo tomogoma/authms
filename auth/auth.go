@@ -56,7 +56,8 @@ func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 
 func (a *Auth) RegisterUser(usr user.User, pass string) (int, error) {
 
-	u, err := user.New(usr.UserName(), usr.FirstName(), usr.MiddleName(), usr.LastName(), pass, user.Hash)
+	u, err := user.New(usr.UserName(), usr.FirstName(), usr.MiddleName(),
+		usr.LastName(), pass, user.Hash)
 	if err != nil {
 		return 0, err
 	}
@@ -64,7 +65,7 @@ func (a *Auth) RegisterUser(usr user.User, pass string) (int, error) {
 	return a.usrM.Save(*u)
 }
 
-func (a *Auth) Login(uName, devID, pass, rIP, srvID, ref string) (user.User, error) {
+func (a *Auth) Login(uName, pass, devID, rIP, srvID, ref string) (user.User, error) {
 
 	usr, err := a.usrM.Get(uName, pass, user.Hash)
 	if err != nil {
