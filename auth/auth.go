@@ -1,4 +1,4 @@
-package db_auth
+package auth
 
 import (
 	"time"
@@ -21,7 +21,7 @@ type Auth struct {
 
 func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 
-	db, err := helper.New(dsnF)
+	db, err := helper.SQLDB(dsnF)
 	if err != nil {
 		return nil, err
 	}

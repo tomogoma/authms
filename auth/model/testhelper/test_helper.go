@@ -10,8 +10,7 @@ import (
 )
 
 const (
-	dbname       = "test_authms"
-	dbDriverName = "postgres"
+	DBName = "test_authms"
 )
 
 func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
@@ -20,16 +19,20 @@ func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
 		t.Fatalf("Found nil db while setting up")
 	}
 
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", dbname))
+	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", DBName))
 	if err != nil {
 		TearDown(db, t)
 		t.Fatalf("creating test db: %s", err)
 	}
 
-	_, err = db.Exec(fmt.Sprintf("SET DATABASE = %s", dbname))
+	_, err = db.Exec(fmt.Sprintf("SET DATABASE = %s", DBName))
 	if err != nil {
 		TearDown(db, t)
 		t.Fatalf("selecting test db: %s", err)
+	}
+
+	if m == nil {
+		return
 	}
 
 	_, err = db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", m.TableName(), m.TableDesc()))
@@ -47,7 +50,7 @@ func TearDown(db *sql.DB, t *testing.T) {
 	}
 
 	defer db.Close()
-	_, err := db.Exec(fmt.Sprintf("DROP DATABASE %s", dbname))
+	_, err := db.Exec(fmt.Sprintf("DROP DATABASE %s", DBName))
 	if err != nil {
 		t.Errorf("dropping test db: %s", err)
 	}
@@ -55,16 +58,33 @@ func TearDown(db *sql.DB, t *testing.T) {
 
 func InstantiateDB(t *testing.T) *sql.DB {
 
-	dsn := "postgresql://root@z500:26257?sslcert=%2Fetc%2Fcockroachdb%2Fcerts%2Fnode.cert&sslkey=%2Fetc%2Fcockroachdb%2Fcerts%2Fnode.key&sslmode=verify-full&sslrootcert=%2Fetc%2Fcockroachdb%2Fcerts%2Fca.cert"
-
-	db, err := sql.Open(dbDriverName, dsn)
-	if err != nil {
-		t.Fatalf("sql.Open(): %s", err)
+	dsn := helper.DSN{
+		UName:       "root",
+		Host:        "z500:26257",
+		SslCert:     "/etc/cockroachdb/certs/node.cert",
+		SslKey:      "/etc/cockroachdb/certs/node.key",
+		SslRootCert: "/etc/cockroachdb/certs/ca.cert",
 	}
 
-	if err = db.Ping(); err != nil {
-		t.Fatalf("db.Ping(): %s", err)
+	db, err := helper.SQLDB(dsn)
+	if err != nil {
+		t.Fatalf("helper.SQLDB(): %s", err)
+	}
+
+	if db == nil {
+		t.Fatalf("Expected db but got nil")
 	}
 
 	return db
+
+	//db, err := sql.Open(dbDriverName, DSN.FormatDSN())
+	//if err != nil {
+	//	t.Fatalf("sql.Open(): %s", err)
+	//}
+	//
+	//if err = db.Ping(); err != nil {
+	//	t.Fatalf("db.Ping(): %s", err)
+	//}
+	//
+	//return db
 }

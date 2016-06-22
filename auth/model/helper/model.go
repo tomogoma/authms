@@ -16,12 +16,14 @@ const (
 var ErrorNilDB = errors.New("db cannot be nil")
 var ErrorNilDSNFormatter = errors.New("DSNFormatter cannot be nil")
 
+var DupTblErrPrfx = "Duplicate tables"
+
 type Model interface {
 	TableName() string
 	TableDesc() string
 }
 
-func New(dsnF DSNFormatter) (*sql.DB, error) {
+func SQLDB(dsnF DSNFormatter) (*sql.DB, error) {
 
 	if dsnF == nil {
 		return nil, ErrorNilDSNFormatter
@@ -46,12 +48,12 @@ func CreateTables(db *sql.DB, models ...Model) error {
 
 		tName := model.TableName()
 		if _, ok := modelsM[tName]; ok {
-			return fmt.Errorf("Duplicate tables with name %s", tName)
+			return fmt.Errorf("%s with name %s", DupTblErrPrfx, tName)
 		}
 		modelsM[tName] = model.TableDesc()
 	}
 
-	templateQStr := "CREATE TABLE IF NOT EXIST %s (%s)"
+	templateQStr := "CREATE TABLE IF NOT EXISTS %s (%s)"
 
 	tx, err := db.Begin()
 	if err != nil {
