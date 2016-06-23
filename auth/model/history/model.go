@@ -1,4 +1,4 @@
-package login
+package history
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	tableName  = "details_login"
+	tableName  = "history"
 	dateFormat = time.RFC3339 // "2006-01-02T15:04:05Z07:00"
 )
 
@@ -42,49 +42,75 @@ func (m *Model) TableDesc() string {
 		id		SERIAL		PRIMARY KEY,
 		userID		INT 		NOT NULL,
 		date		TIMESTAMP	NOT NULL,
+		accessMethod	INT		NOT NULL,
+		successful	BOOL		NOT NULL,
 		forServiceID	STRING,
 		ipAddress	STRING,
 		referral	STRING,
-		INDEX userLoginDateIndex (userID, date)
+		INDEX history_UserDateIndex (userID, date)
 	`)
 }
 
-func (m *Model) Save(ld LoginDetails) (int, error) {
+func (m *Model) Save(ld History) (int, error) {
+
+	if err := ld.Validate(); err != nil {
+		return 0, err
+	}
 
 	qStr := fmt.Sprintf(`
-		INSERT INTO %s (userID, date, forServiceID, ipAddress, referral)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO %s (userID, accessMethod, successful, date, forServiceID, ipAddress, referral)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id
 		`, tableName)
 
 	var detsID int
 	date := ld.date.Format(dateFormat)
-	err := m.db.QueryRow(qStr, ld.userID, date,
+	err := m.db.QueryRow(qStr, ld.userID, ld.accessMethod, ld.successful, date,
 		ld.forService, ld.ipAddress, ld.referral).Scan(&detsID)
 	return detsID, err
 }
 
-func (m *Model) Get(userID, offset, count int) ([]*LoginDetails, error) {
+func (m *Model) Get(userID, offset, count int, acMs ...int) ([]*History, error) {
+
+	acMFilter := ""
+
+	for i, acM := range acMs {
+
+		if err := validateAcM(acM); err != nil {
+			return nil, err
+		}
+
+		if i == 0 {
+			acMFilter = fmt.Sprintf("AND (accessMethod = %d", acM)
+			continue
+		}
+
+		acMFilter = fmt.Sprintf("%s OR accessMethod = %d", acMFilter, acM)
+	}
+
+	if acMFilter != "" {
+		acMFilter += ")"
+	}
 
 	qStr := fmt.Sprintf(`
-		SELECT id, userID, date, forServiceID, ipAddress, referral
+		SELECT id, accessMethod, successful, userID, date, forServiceID, ipAddress, referral
 		FROM %s
-		WHERE userID = $1
+		WHERE userID = $1 %s
 		ORDER BY date DESC
 		LIMIT $2 OFFSET $3
-	`, tableName)
+	`, tableName, acMFilter)
 
 	r, err := m.db.Query(qStr, userID, count, offset)
 	if err != nil {
 		return nil, err
 	}
 
-	dets := make([]*LoginDetails, 0)
+	dets := make([]*History, 0)
 	for r.Next() {
 
-		d := &LoginDetails{}
+		d := &History{}
 		var tmStmp string
-		r.Scan(&d.id, &d.userID, &tmStmp, &d.forService, &d.ipAddress, &d.referral)
+		r.Scan(&d.id, &d.accessMethod, &d.successful, &d.userID, &tmStmp, &d.forService, &d.ipAddress, &d.referral)
 		d.date, err = time.Parse(dateFormat, tmStmp)
 		if err != nil {
 			return nil, err

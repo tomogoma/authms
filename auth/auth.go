@@ -3,8 +3,8 @@ package auth
 import (
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/details/login"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 )
@@ -16,7 +16,7 @@ const (
 type Auth struct {
 	usrM       *user.Model
 	tokenM     *token.Model
-	loginDetsM *login.Model
+	loginDetsM *history.Model
 }
 
 func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
@@ -41,7 +41,7 @@ func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 		return nil, err
 	}
 
-	loginM, err := login.NewModel(db)
+	loginM, err := history.NewModel(db)
 	if err != nil {
 		return nil, err
 	}
@@ -83,13 +83,13 @@ func (a *Auth) Login(uName, pass, devID, rIP, srvID, ref string) (user.User, err
 		return nil, err
 	}
 
-	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins)
+	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {
 		return nil, err
 	}
 	usr.SetPreviousLogins(prevLogins...)
 
-	loginDets, err := login.New(usr.ID(), time.Now(), rIP, srvID, ref)
+	loginDets, err := history.New(usr.ID(), history.LoginAccess, true, time.Now(), rIP, srvID, ref)
 	if err != nil {
 		a.tokenM.Delete(token.Token())
 		return nil, err

@@ -12,10 +12,17 @@ func TestNew(t *testing.T) {
 	// 5. Successful token validation
 	// 6. Invalid (unsuccessful) token validation
 
-	//  TODO limit auth attempts when unsuccessful
+	// TODO limit auth attempts when unsuccessful
 	// 1. n login/token attempts from an ip address for a user over duration t
 	// 2. m>n login/token attempts for a user over duration t
 	// 3. p>m login/token attempts from an ip address over duration t
 
+	// TODO enforce api keys
+	// 1 client: 1 key (a client is a microservice or front-end app)
+	// Access auth services only if client/key combo is recogonized
+
 	t.Fatalf("Not yet implemented")
+}
+
+func TestAuth_RegisterUser(t *testing.T) {
 }

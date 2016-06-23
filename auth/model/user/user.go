@@ -3,7 +3,7 @@ package user
 import (
 	"errors"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/details/login"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -18,7 +18,7 @@ type User interface {
 	FirstName() string
 	MiddleName() string
 	LastName() string
-	PreviousLogins() []*login.LoginDetails
+	PreviousLogins() []*history.History
 	Token() token.Token
 }
 
@@ -29,20 +29,20 @@ type user struct {
 	middleName     string
 	lastName       string
 	password       []byte
-	previousLogins []*login.LoginDetails
+	previousLogins []*history.History
 	token          token.Token
 }
 
-func (u *user) ID() int                               { return u.id }
-func (u *user) UserName() string                      { return u.userName }
-func (u *user) FirstName() string                     { return u.firstName }
-func (u *user) MiddleName() string                    { return u.middleName }
-func (u *user) LastName() string                      { return u.lastName }
-func (u *user) PreviousLogins() []*login.LoginDetails { return u.previousLogins }
-func (u *user) Token() token.Token                    { return u.token }
+func (u *user) ID() int                            { return u.id }
+func (u *user) UserName() string                   { return u.userName }
+func (u *user) FirstName() string                  { return u.firstName }
+func (u *user) MiddleName() string                 { return u.middleName }
+func (u *user) LastName() string                   { return u.lastName }
+func (u *user) PreviousLogins() []*history.History { return u.previousLogins }
+func (u *user) Token() token.Token                 { return u.token }
 
-func (u *user) SetPreviousLogins(ls ...*login.LoginDetails) { u.previousLogins = ls }
-func (u *user) SetToken(t token.Token)                      { u.token = t }
+func (u *user) SetPreviousLogins(ls ...*history.History) { u.previousLogins = ls }
+func (u *user) SetToken(t token.Token)                   { u.token = t }
 
 type HashFunc func(pass string) ([]byte, error)
 
