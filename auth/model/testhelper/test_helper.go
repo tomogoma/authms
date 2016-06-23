@@ -13,6 +13,14 @@ const (
 	DBName = "test_authms"
 )
 
+var DSN = helper.DSN{
+	UName:       "root",
+	Host:        "z500:26257",
+	SslCert:     "/etc/cockroachdb/certs/node.cert",
+	SslKey:      "/etc/cockroachdb/certs/node.key",
+	SslRootCert: "/etc/cockroachdb/certs/ca.cert",
+}
+
 func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
 
 	if db == nil {
@@ -21,14 +29,14 @@ func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
 
 	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", DBName))
 	if err != nil {
-		TearDown(db, t)
-		t.Fatalf("creating test db: %s", err)
+		db.Close()
+		t.Fatalf("Error creating test database: %s", err)
 	}
 
 	_, err = db.Exec(fmt.Sprintf("SET DATABASE = %s", DBName))
 	if err != nil {
 		TearDown(db, t)
-		t.Fatalf("selecting test db: %s", err)
+		t.Fatalf("Error setting default db to test database: %s", err)
 	}
 
 	if m == nil {
@@ -58,15 +66,7 @@ func TearDown(db *sql.DB, t *testing.T) {
 
 func InstantiateDB(t *testing.T) *sql.DB {
 
-	dsn := helper.DSN{
-		UName:       "root",
-		Host:        "z500:26257",
-		SslCert:     "/etc/cockroachdb/certs/node.cert",
-		SslKey:      "/etc/cockroachdb/certs/node.key",
-		SslRootCert: "/etc/cockroachdb/certs/ca.cert",
-	}
-
-	db, err := helper.SQLDB(dsn)
+	db, err := helper.SQLDB(DSN)
 	if err != nil {
 		t.Fatalf("helper.SQLDB(): %s", err)
 	}
@@ -76,15 +76,4 @@ func InstantiateDB(t *testing.T) *sql.DB {
 	}
 
 	return db
-
-	//db, err := sql.Open(dbDriverName, DSN.FormatDSN())
-	//if err != nil {
-	//	t.Fatalf("sql.Open(): %s", err)
-	//}
-	//
-	//if err = db.Ping(); err != nil {
-	//	t.Fatalf("db.Ping(): %s", err)
-	//}
-	//
-	//return db
 }
