@@ -14,9 +14,9 @@ const (
 )
 
 type Auth struct {
-	usrM       *user.Model
-	tokenM     *token.Model
-	loginDetsM *history.Model
+	usrM   *user.Model
+	tokenM *token.Model
+	histM  *history.Model
 }
 
 func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
@@ -36,22 +36,22 @@ func New(dsnF helper.DSNFormatter, quitCh chan error) (*Auth, error) {
 		return nil, err
 	}
 
+	histM, err := history.NewModel(db)
+	if err != nil {
+		return nil, err
+	}
+
+	err = helper.CreateTables(db, usrM, tokenM, histM)
+	if err != nil {
+		return nil, err
+	}
+
 	err = tokenM.RunGarbageCollector(quitCh)
 	if err != nil {
 		return nil, err
 	}
 
-	loginM, err := history.NewModel(db)
-	if err != nil {
-		return nil, err
-	}
-
-	err = helper.CreateTables(db, usrM, tokenM, loginM)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Auth{usrM: usrM, tokenM: tokenM, loginDetsM: loginM}, nil
+	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM}, nil
 }
 
 func (a *Auth) RegisterUser(usr user.User, pass string) (int, error) {
@@ -83,7 +83,7 @@ func (a *Auth) Login(uName, pass, devID, rIP, srvID, ref string) (user.User, err
 		return nil, err
 	}
 
-	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
+	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {
 		return nil, err
 	}
@@ -95,7 +95,7 @@ func (a *Auth) Login(uName, pass, devID, rIP, srvID, ref string) (user.User, err
 		return nil, err
 	}
 
-	_, err = a.loginDetsM.Save(*loginDets)
+	_, err = a.histM.Save(*loginDets)
 	if err != nil {
 		a.tokenM.Delete(token.Token())
 		return nil, err
@@ -117,7 +117,7 @@ func (a *Auth) AuthenticateToken(usrID int, tknStr string) (user.User, error) {
 	}
 	usr.SetToken(token)
 
-	prevLogins, err := a.loginDetsM.Get(usr.ID(), 0, numPrevLogins)
+	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins)
 	if err != nil {
 		return nil, err
 	}
