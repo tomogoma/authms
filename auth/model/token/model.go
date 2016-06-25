@@ -18,6 +18,7 @@ var ErrorExpiredToken = errors.New("Token has expired")
 var ErrorNilQuitChanel = errors.New("Quit channel cannot be nil")
 var ErrorBadUserID = errors.New("UserID cannot be empty")
 var ErrorGCRunning = errors.New("Garbage collector is already running")
+var ErrorInvalidToken = errors.New("Token is invalid")
 
 type Model struct {
 	db *sql.DB
@@ -104,30 +105,23 @@ func (m *Model) Save(t token) (int, error) {
 	return tokenID, nil
 }
 
-func (um *Model) Get(usrID int, tknStr string) (*token, error) {
-
-	if usrID < 1 {
-		return nil, ErrorBadUserID
-	}
-
-	if tknStr == "" {
-		return nil, ErrorEmptyToken
-	}
+func (um *Model) Get(usrID int, devID, tknStr string) (*token, error) {
 
 	qStr := fmt.Sprintf(`
 		SELECT id, userID, devID, token, issued, expiry
 		FROM %s
 		WHERE userID = $1
 		AND token = $2
+		AND devID = $3
 	`, tableName)
 
 	tkn := &token{}
-	err := um.db.QueryRow(qStr, usrID, tknStr).Scan(
+	err := um.db.QueryRow(qStr, usrID, tknStr, devID).Scan(
 		&tkn.id, &tkn.userID, &tkn.devID, &tkn.token, &tkn.issued, &tkn.expiry,
 	)
 	if err != nil {
 		if err.Error() == helper.NoResultsErrorStr {
-			return nil, nil
+			return nil, ErrorInvalidToken
 		}
 		return nil, err
 	}

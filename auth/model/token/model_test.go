@@ -50,7 +50,7 @@ func TestModel_Save_n_Get(t *testing.T) {
 		t.Errorf("Expected token id > 1 but got %d", i)
 	}
 
-	act, err := m.Get(tkn.UserID(), tkn.Token())
+	act, err := m.Get(tkn.UserID(), tkn.DevID(), tkn.Token())
 	if err != nil {
 		t.Fatalf("tokenModel.Get(): %s", err)
 	}
@@ -73,9 +73,9 @@ func TestModel_Get_notExist(t *testing.T) {
 		t.Fatalf("tokenModel.Save(): %s", err)
 	}
 
-	act, err := m.Get(578013, "some-nonexist-token")
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %s", err)
+	act, err := m.Get(578013, tkn.DevID(), "some-nonexist-token")
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if act != nil {
@@ -98,9 +98,9 @@ func TestModel_Get_userIDNotExist(t *testing.T) {
 		t.Fatalf("tokenModel.Save(): %s", err)
 	}
 
-	act, err := m.Get(578013, tkn.Token())
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %s", err)
+	act, err := m.Get(578013, tkn.DevID(), tkn.Token())
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if act != nil {
@@ -123,9 +123,9 @@ func TestModel_Get_tokenNotExist(t *testing.T) {
 		t.Fatalf("tokenModel.Save(): %s", err)
 	}
 
-	act, err := m.Get(tkn.UserID(), "some-noexist-token")
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %s", err)
+	act, err := m.Get(tkn.UserID(), tkn.DevID(), "some-noexist-token")
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if act != nil {
@@ -143,9 +143,9 @@ func TestModel_Get_NoResults(t *testing.T) {
 		t.Fatalf("token.New(): %s", err)
 	}
 
-	act, err := m.Get(tkn.UserID(), tkn.Token())
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %s", err)
+	act, err := m.Get(tkn.UserID(), tkn.DevID(), tkn.Token())
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if act != nil {
@@ -163,9 +163,13 @@ func TestModel_Get_emptyUserID(t *testing.T) {
 		t.Fatalf("token.New(): %s", err)
 	}
 
-	_, err = m.Get(0, tkn.Token())
-	if err == nil || err != token.ErrorBadUserID {
-		t.Fatalf("expected error %s but got %v", token.ErrorBadUserID, err)
+	act, err := m.Get(0, tkn.DevID(), tkn.Token())
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
+	}
+
+	if act != nil {
+		t.Fatalf("Expected nil result, got %v", act)
 	}
 }
 
@@ -179,9 +183,13 @@ func TestModel_Get_emptyToken(t *testing.T) {
 		t.Fatalf("token.New(): %s", err)
 	}
 
-	_, err = m.Get(tkn.UserID(), "")
-	if err == nil || err != token.ErrorEmptyToken {
-		t.Fatalf("expected error %s but got %v", token.ErrorEmptyToken, err)
+	act, err := m.Get(tkn.UserID(), tkn.DevID(), "")
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("Expected error %s but got %v", token.ErrorInvalidToken, err)
+	}
+
+	if act != nil {
+		t.Fatalf("Expected nil result, got %v", act)
 	}
 }
 
@@ -215,16 +223,16 @@ func TestModel_Delete(t *testing.T) {
 		t.Fatalf("Expected deleted to be true got %v", dltd)
 	}
 
-	act, err := m.Get(tknToDel.UserID(), tknToDel.Token())
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %s", err)
+	act, err := m.Get(tknToDel.UserID(), tknToDel.DevID(), tknToDel.Token())
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("tokenModel.Get(): Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if act != nil {
 		t.Errorf("Expected token to be deleted but in db as %+v", act)
 	}
 
-	act, err = m.Get(tknToLeave.UserID(), tknToLeave.Token())
+	act, err = m.Get(tknToLeave.UserID(), tknToLeave.DevID(), tknToLeave.Token())
 	if err != nil {
 		t.Fatalf("tokenModel.Get(): %s", err)
 	}
@@ -258,7 +266,7 @@ func TestModel_Delete_notExist(t *testing.T) {
 		t.Errorf("Expected non exist not to be deleted (false) but got %v", dltd)
 	}
 
-	act, err := m.Get(tknToLeave.UserID(), tknToLeave.Token())
+	act, err := m.Get(tknToLeave.UserID(), tknToLeave.DevID(), tknToLeave.Token())
 	if err != nil {
 		t.Fatalf("tokenModel.Get(): %s", err)
 	}
@@ -334,9 +342,9 @@ func TestModel_ValidateExpiry_expired(t *testing.T) {
 		t.Errorf("Expect return invalid token to be nil, got %v", vTkn)
 	}
 
-	dbTkn, err := m.Get(tkn.UserID(), tkn.Token())
-	if err != nil {
-		t.Fatalf("tokenModel.Get(): %S", err)
+	dbTkn, err := m.Get(tkn.UserID(), tkn.DevID(), tkn.Token())
+	if err == nil || err != token.ErrorInvalidToken {
+		t.Fatalf("tokenModel.Get(): Expected error %s but got %v", token.ErrorInvalidToken, err)
 	}
 
 	if dbTkn != nil {
