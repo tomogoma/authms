@@ -34,7 +34,7 @@ func TestModel_Save_n_Get(t *testing.T) {
 		return
 	}
 
-	usr, err := m.Get(expUser.UserName, expUser.Password, expUser.hashF)
+	usr, err := m.Get(expUser.UserName(), expUser.Password, expUser.ValHashFunc)
 	if err != nil {
 		t.Fatalf("userModel.Get(): %s", err)
 	}
@@ -42,7 +42,7 @@ func TestModel_Save_n_Get(t *testing.T) {
 	compareUsersShallow(usr, expUser, t)
 }
 
-func TestModel_Get_hashError(t *testing.T) {
+func TestModel_Get_PassMismatch(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
@@ -51,10 +51,12 @@ func TestModel_Get_hashError(t *testing.T) {
 		return
 	}
 
-	_, err := m.Get(expUser.UserName, expUser.Password, errorHashF)
-	if err == nil || err != errorHashing {
+	u, err := m.Get(expUser.UserName(), expUser.Password, invalidHashF)
+	if err == nil || err != user.ErrorPasswordMismatch {
 		t.Fatalf("expected error %s but got %s", errorHashing, err)
 	}
+
+	compareUsersShallow(u, expUser, t)
 }
 
 func TestModel_Get_noUsers(t *testing.T) {
@@ -62,13 +64,13 @@ func TestModel_Get_noUsers(t *testing.T) {
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	usr, err := m.Get(expUser.UserName, expUser.Password, expUser.hashF)
-	if err != nil {
-		t.Fatalf("userModel.Get(): %s", err)
+	usr, err := m.Get(expUser.UserName(), expUser.Password, expUser.ValHashFunc)
+	if err == nil || err != user.ErrorPasswordMismatch {
+		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
 	}
 
 	if usr != nil {
-		t.Fatalf("Expected nil user but got %v", usr)
+		t.Errorf("Expected nil user but got %v", usr)
 	}
 }
 
@@ -81,17 +83,17 @@ func TestModel_Get_userNameNotInDB(t *testing.T) {
 		return
 	}
 
-	usr, err := m.Get("someUserName", expUser.Password, expUser.hashF)
-	if err != nil {
-		t.Fatalf("userModel.Get(): %s", err)
+	usr, err := m.Get("someUserName", expUser.Password, expUser.ValHashFunc)
+	if err == nil || err != user.ErrorPasswordMismatch {
+		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
 	}
 
 	if usr != nil {
-		t.Fatalf("Expected nil user but got %v", usr)
+		t.Errorf("Expected nil user but got %v", usr)
 	}
 }
 
-func TestModel_Get_passNotInDB(t *testing.T) {
+func TestModel_Get_emptyUserName(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
@@ -100,13 +102,13 @@ func TestModel_Get_passNotInDB(t *testing.T) {
 		return
 	}
 
-	usr, err := m.Get(expUser.UserName, "some other password", anotherHashF)
-	if err != nil {
-		t.Fatalf("userModel.Get(): %s", err)
+	usr, err := m.Get("", expUser.Password, expUser.ValHashFunc)
+	if err == nil || err != user.ErrorPasswordMismatch {
+		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
 	}
 
 	if usr != nil {
-		t.Fatalf("Expected nil user but got %v", usr)
+		t.Errorf("Expected nil user but got %v", usr)
 	}
 }
 
@@ -152,23 +154,23 @@ func newUserModel(t *testing.T) *user.Model {
 	return m
 }
 
-func save(expU User, m *user.Model, t *testing.T) int {
+func save(expU testhelper.User, m *user.Model, t *testing.T) int {
 
-	u, err := user.New(expU.explodeParams())
+	u, err := user.New(expU.ExplodeParams())
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
 		return 0
 	}
 
-	i, err := m.Save(*u)
+	us, err := m.Save(*u)
 	if err != nil {
 		t.Fatalf("userModel.Save(): %s", err)
 		return 0
 	}
 
-	if i < 1 {
-		t.Errorf("Expected id > 1 got %d", i)
+	if us.ID() < 1 {
+		t.Errorf("Expected id > 1 got %d", us.ID())
 		return 0
 	}
-	return i
+	return us.ID()
 }

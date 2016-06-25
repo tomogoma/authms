@@ -45,6 +45,7 @@ func (u *user) SetPreviousLogins(ls ...*history.History) { u.previousLogins = ls
 func (u *user) SetToken(t token.Token)                   { u.token = t }
 
 type HashFunc func(pass string) ([]byte, error)
+type ValidatePassFunc func(pass string, passHB []byte) bool
 
 func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error) {
 
@@ -78,4 +79,11 @@ func Hash(pass string) ([]byte, error) {
 
 	passB := []byte(pass)
 	return bcrypt.GenerateFromPassword(passB, bcrypt.DefaultCost)
+}
+
+func CompareHash(pass string, passHB []byte) bool {
+
+	passB := []byte(pass)
+	err := bcrypt.CompareHashAndPassword(passB, passHB)
+	return err != nil
 }

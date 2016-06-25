@@ -5,6 +5,7 @@ import (
 
 	"errors"
 
+	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,45 +18,28 @@ const (
 	lname = "Doe"
 )
 
-type User struct {
-	UserName string
-	Password string
-
-	FirstName  string
-	MiddleName string
-	LastName   string
-	hashF      user.HashFunc
-}
-
-func (u User) explodeParams() (string, string, string, string, string, user.HashFunc) {
-	return u.UserName, u.FirstName, u.MiddleName, u.LastName, u.Password, u.hashF
-}
-
 var errorHashing = errors.New("some hashing error")
-var expUser = User{
-	UserName:   uname,
-	Password:   pass,
-	FirstName:  fname,
-	MiddleName: mname,
-	LastName:   lname,
-	hashF:      hashF,
-}
-
-func hashF(p string) ([]byte, error) {
-	return []byte{0, 1, 2, 3, 4, 5}, nil
-}
-
-func anotherHashF(p string) ([]byte, error) {
-	return []byte{6, 7, 8, 9, 10}, nil
+var expUser = testhelper.User{
+	UName:       uname,
+	Password:    pass,
+	FName:       fname,
+	MName:       mname,
+	LName:       lname,
+	HashF:       testhelper.HashF,
+	ValHashFunc: testhelper.ValHashFunc,
 }
 
 func errorHashF(p string) ([]byte, error) {
 	return nil, errorHashing
 }
 
+func invalidHashF(p string, h []byte) bool {
+	return false
+}
+
 func TestNew(t *testing.T) {
 
-	act, err := user.New(expUser.explodeParams())
+	act, err := user.New(expUser.ExplodeParams())
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
 	}
@@ -65,7 +49,7 @@ func TestNew(t *testing.T) {
 
 func TestNew_emptyUserName(t *testing.T) {
 
-	_, err := user.New("", fname, mname, lname, pass, hashF)
+	_, err := user.New("", fname, mname, lname, pass, testhelper.HashF)
 	if err == nil || err != user.ErrorEmptyUserName {
 		t.Fatalf("Expected error %s but got %s", user.ErrorEmptyUserName, err)
 	}
@@ -73,7 +57,7 @@ func TestNew_emptyUserName(t *testing.T) {
 
 func TestNew_emptyPassword(t *testing.T) {
 
-	_, err := user.New(uname, fname, mname, lname, "", hashF)
+	_, err := user.New(uname, fname, mname, lname, "", testhelper.HashF)
 	if err == nil || err != user.ErrorEmptyPassword {
 		t.Fatalf("Expected error %s but got %s", user.ErrorEmptyPassword, err)
 	}
@@ -109,18 +93,18 @@ func TestHash(t *testing.T) {
 	}
 }
 
-func compareUsersShallow(act user.User, exp User, t *testing.T) {
+func compareUsersShallow(act user.User, exp testhelper.User, t *testing.T) {
 
-	if act.UserName() != exp.UserName {
-		t.Errorf("Expected UserName %s but got %s", exp.UserName, act.UserName())
+	if act.UserName() != exp.UserName() {
+		t.Errorf("Expected UserName %s but got %s", exp.UserName(), act.UserName())
 	}
-	if act.FirstName() != exp.FirstName {
-		t.Errorf("Expected FirstName %s but got %s", exp.FirstName, act.FirstName())
+	if act.FirstName() != exp.FirstName() {
+		t.Errorf("Expected FirstName %s but got %s", exp.FirstName(), act.FirstName())
 	}
-	if act.MiddleName() != exp.MiddleName {
-		t.Errorf("Expected MiddleName %s but got %s", exp.MiddleName, act.MiddleName())
+	if act.MiddleName() != exp.MiddleName() {
+		t.Errorf("Expected MiddleName %s but got %s", exp.MiddleName(), act.MiddleName())
 	}
-	if act.LastName() != exp.LastName {
-		t.Errorf("Expected LastName %s but got %s", exp.LastName, act.LastName())
+	if act.LastName() != exp.LastName() {
+		t.Errorf("Expected LastName %s but got %s", exp.LastName(), act.LastName())
 	}
 }

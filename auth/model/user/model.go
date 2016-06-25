@@ -4,12 +4,16 @@ import (
 	"database/sql"
 	"fmt"
 
+	"errors"
+
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 )
 
 const (
 	tableName = "users"
 )
+
+var ErrorPasswordMismatch = errors.New("username/password combo mismatch")
 
 type Model struct {
 	db *sql.DB
@@ -43,7 +47,7 @@ func (m Model) TableDesc() string {
 	`
 }
 
-func (m Model) Save(u user) (int, error) {
+func (m Model) Save(u user) (*user, error) {
 
 	qStr := fmt.Sprintf(`
 		INSERT INTO %s (userName, firstName, middleName, lastName, password)
@@ -51,10 +55,9 @@ func (m Model) Save(u user) (int, error) {
 		 RETURNING id
 		`, tableName)
 
-	var userid int
 	err := m.db.QueryRow(qStr, u.userName, u.firstName,
-		u.middleName, u.lastName, u.password).Scan(&userid)
-	return userid, err
+		u.middleName, u.lastName, u.password).Scan(&u.id)
+	return &u, err
 }
 
 func (m Model) GetByID(userID int) (*user, error) {
@@ -81,31 +84,29 @@ func (m Model) GetByID(userID int) (*user, error) {
 	return usr, err
 }
 
-func (m Model) Get(uName, pass string, hashF HashFunc) (*user, error) {
+func (m Model) Get(uName, pass string, hashF ValidatePassFunc) (*user, error) {
 
 	qStr := fmt.Sprintf(`
 		SELECT id, userName, password, firstName, middleName, lastName
 		FROM %s
 		WHERE userName = $1
-		AND password = $2
 	`, tableName)
 
-	passHB, err := hashF(pass)
-	if err != nil {
-		return nil, err
-	}
-
 	usr := &user{}
-	err = m.db.QueryRow(qStr, uName, passHB).Scan(
+	err := m.db.QueryRow(qStr, uName).Scan(
 		&usr.id, &usr.userName, &usr.password,
 		&usr.firstName, &usr.middleName, &usr.lastName,
 	)
+
+	if !hashF(pass, usr.password) {
+		return usr, ErrorPasswordMismatch
+	}
 
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
 			return nil, err
 		}
-		return nil, nil
+		return nil, ErrorPasswordMismatch
 	}
 
 	return usr, err

@@ -6,12 +6,46 @@ import (
 	"testing"
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
+	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	_ "github.com/lib/pq"
 )
 
 const (
 	DBName = "test_authms"
 )
+
+type User struct {
+	UName    string
+	Password string
+
+	FName       string
+	MName       string
+	LName       string
+	HashF       user.HashFunc
+	ValHashFunc user.ValidatePassFunc
+}
+
+func (u *User) ID() int                            { return 1 }
+func (u *User) UserName() string                   { return u.UName }
+func (u *User) FirstName() string                  { return u.FName }
+func (u *User) MiddleName() string                 { return u.MName }
+func (u *User) LastName() string                   { return u.LName }
+func (u *User) PreviousLogins() []*history.History { return make([]*history.History, 0) }
+func (u *User) Token() token.Token                 { t, _ := token.New(1, "test", token.ShortExpType); return t }
+
+func HashF(p string) ([]byte, error) {
+	return []byte{0, 1, 2, 3, 4, 5}, nil
+}
+
+func ValHashFunc(p string, passHB []byte) bool {
+	return true
+}
+
+func (u User) ExplodeParams() (string, string, string, string, string, user.HashFunc) {
+	return u.UName, u.FName, u.MName, u.LName, u.Password, u.HashF
+}
 
 var DSN = helper.DSN{
 	UName:       "root",
