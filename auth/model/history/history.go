@@ -48,6 +48,23 @@ func (h *History) Validate() error {
 	return nil
 }
 
+func DecodeAccessMethod(acM int) string {
+
+	if acM == LoginAccess {
+		return "login"
+	}
+
+	if acM == TokenValidationAccess {
+		return "token validation"
+	}
+
+	if acM == RegistrationAccess {
+		return "registration"
+	}
+
+	return "unknown"
+}
+
 func New(uID, acM int, successful bool, date time.Time, ip, forSrvc, ref string) (*History, error) {
 
 	h := &History{
