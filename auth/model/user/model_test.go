@@ -42,6 +42,25 @@ func TestModel_Save_n_Get(t *testing.T) {
 	compareUsersShallow(usr, expUser, t)
 }
 
+func TestModel_Save_duplicateUser(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	if i := save(expUser, m, t); i < 1 {
+		return
+	}
+
+	usr, err := user.New(expUser.UName, "", "", "", "some-other-pass", expUser.HashF)
+	if err != nil {
+		t.Fatalf("user.New(): %s", err)
+	}
+	_, err = m.Save(*usr)
+	if err == nil || err != user.ErrorUserExists {
+		t.Fatalf("Expected error %s but got %v", user.ErrorUserExists, err)
+	}
+}
+
 func TestModel_Get_PassMismatch(t *testing.T) {
 
 	m := newUserModel(t)

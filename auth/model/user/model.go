@@ -7,6 +7,7 @@ import (
 	"errors"
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
+	"github.com/lib/pq"
 )
 
 const (
@@ -14,6 +15,7 @@ const (
 )
 
 var ErrorPasswordMismatch = errors.New("username/password combo mismatch")
+var ErrorUserExists = errors.New("A user with the provided username already exists")
 
 type Model struct {
 	db *sql.DB
@@ -57,7 +59,14 @@ func (m Model) Save(u user) (*user, error) {
 
 	err := m.db.QueryRow(qStr, u.userName, u.firstName,
 		u.middleName, u.lastName, u.password).Scan(&u.id)
-	return &u, err
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
+			return nil, ErrorUserExists
+		}
+		return nil, err
+	}
+
+	return &u, nil
 }
 
 func (m Model) GetByID(userID int) (*user, error) {
