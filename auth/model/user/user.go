@@ -8,7 +8,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-var ErrorEmptyUserName = errors.New("uName cannot be empty")
+var ErrorEmptyUserName = errors.New("userName cannot be empty")
 var ErrorEmptyPassword = errors.New("password cannot be empty")
 var ErrorNilHashFunc = errors.New("Hash function cannot be nil")
 
