@@ -53,7 +53,7 @@ func main() {
 		BlacklistWindow:    auth.MinBlackListWindow,
 	}
 
-	a, err := auth.New(dsn, hm, aConf, authQuitCh)
+	a, err := auth.New(dsn, hm, aConf, lg, authQuitCh)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return

@@ -1,14 +1,10 @@
 package http
 
 import (
-	"errors"
-
-	"net/http"
-
-	"io/ioutil"
-
 	"encoding/json"
-
+	"errors"
+	"io/ioutil"
+	"net/http"
 	"time"
 
 	"bitbucket.org/tomogoma/auth-ms/auth"
@@ -18,16 +14,19 @@ import (
 )
 
 const (
-	loginPath            = "/login"
 	internalErrorMessage = "whoops! Something wicked happened"
-	regPath              = "/register"
-	tokenPath            = "/token"
+
+	loginPath = "/login"
+	regPath   = "/register"
+	tokenPath = "/token"
 )
 
 type Logger interface {
 	Error(interface{}, ...interface{}) error
 	Warn(interface{}, ...interface{}) error
 	Info(interface{}, ...interface{})
+	Debug(interface{}, ...interface{})
+	Fine(interface{}, ...interface{})
 }
 
 type Request struct {
@@ -127,6 +126,7 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := &User{}
+	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
 		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
@@ -134,8 +134,10 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.lg.Fine("%d - register user...", tID)
 	svdUsr, err := s.auth.RegisterUser(req, req.Pass, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	if err != nil {
+		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
 			s.lg.Error("%d - registration error: %s", tID, err)
 			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
@@ -146,8 +148,10 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.lg.Fine("%d - package registered user result...", tID)
 	respUsr := packageUser(svdUsr)
-	b, err := jsonResponse(w, "user", respUsr, http.StatusOK)
+	s.lg.Fine("%d - write json response...", tID)
+	b, err := jsonResponse(w, "user", respUsr, http.StatusCreated)
 	if err != nil {
 		s.lg.Error("%d - json response error: %s", tID, err)
 		return
@@ -158,12 +162,13 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 
-	tID, dataB, ok := s.readReqBody("register", w, r)
+	tID, dataB, ok := s.readReqBody("login", w, r)
 	if !ok {
 		return
 	}
 
 	req := &User{}
+	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
 		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
@@ -171,8 +176,10 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.lg.Fine("%d - validate login...", tID)
 	authUsr, err := s.auth.Login(req.UName, req.Pass, req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	if err != nil {
+		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
 			s.lg.Error("%d - login error: %s", tID, err)
 			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
@@ -183,7 +190,9 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.lg.Fine("%d - package authenticated user result...", tID)
 	respUsr := packageUser(authUsr)
+	s.lg.Fine("%d - write json response...", tID)
 	b, err := jsonResponse(w, "user", respUsr, http.StatusOK)
 	if err != nil {
 		s.lg.Error("%d - json response error: %s", tID, err)
@@ -201,6 +210,7 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	req := &User{}
+	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
 		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
@@ -212,12 +222,18 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 	token := ""
 	devID := req.DevID
 	if req.Token != nil {
-		userID = req.Token.UserID
-		devID = req.Token.DevID
+		if req.Token.UserID != 0 {
+			userID = req.Token.UserID
+		}
+		if req.Token.DevID != "" {
+			devID = req.Token.DevID
+		}
 		token = req.Token.Token
 	}
+	s.lg.Fine("%d - validate token...", tID)
 	authUsr, err := s.auth.AuthenticateToken(userID, devID, token, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	if err != nil {
+		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
 			s.lg.Error("%d - token authentication error: %s", tID, err)
 			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
@@ -228,7 +244,9 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	s.lg.Fine("%d - package authenticated user result...", tID)
 	respUsr := packageUser(authUsr)
+	s.lg.Fine("%d - write json response...", tID)
 	b, err := jsonResponse(w, "user", respUsr, http.StatusOK)
 	if err != nil {
 		s.lg.Error("%d - json response error: %s", tID, err)
@@ -241,9 +259,10 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 func (s *Server) readReqBody(handlerName string, w http.ResponseWriter, r *http.Request) (int, []byte, bool) {
 
 	tID := <-s.tIDCh
-	s.lg.Info("%d - [%s] %s request", tID, handlerName, r.RemoteAddr)
+	s.lg.Info("%d - [%s] %s request", tID, r.RemoteAddr, handlerName)
 
 	defer r.Body.Close()
+	s.lg.Fine("%d - read request body...", tID)
 	dataB, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		s.lg.Warn("%d - read request body fail: %s", tID, err)
