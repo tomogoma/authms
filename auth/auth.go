@@ -1,11 +1,9 @@
 package auth
 
 import (
-	"time"
-
 	"fmt"
-
 	"strings"
+	"time"
 
 	"bitbucket.org/alkira/contactsms/kazoo/errors"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
@@ -56,7 +54,7 @@ func AuthError(err error) bool {
 	return false
 }
 
-func New(dsnF helper.DSNFormatter, histM HistModel, conf Config, quitCh chan error) (*Auth, error) {
+func New(dsnF helper.DSNFormatter, histM HistModel, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
 
 	if histM == nil {
 		return nil, ErrorNilHistoryModel
@@ -86,7 +84,7 @@ func New(dsnF helper.DSNFormatter, histM HistModel, conf Config, quitCh chan err
 		return nil, err
 	}
 
-	err = tokenM.RunGarbageCollector(quitCh)
+	err = tokenM.RunGarbageCollector(quitCh, lg)
 	if err != nil {
 		return nil, err
 	}

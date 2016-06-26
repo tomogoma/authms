@@ -12,6 +12,7 @@ import (
 	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
+	"github.com/limetext/log4go"
 )
 
 type History struct {
@@ -335,8 +336,9 @@ func newAuth(h *History, t *testing.T) *auth.Auth {
 		BlackListFailCount: 3,
 	}
 
+	lg := log4go.NewDefaultLogger(log4go.FINEST)
 	dsn.DB = testhelper.DBName
-	a, err := auth.New(dsn, h, conf, quitCh)
+	a, err := auth.New(dsn, h, conf, lg, quitCh)
 	if err != nil {
 		t.Fatalf("auth.New(): %s", err)
 	}

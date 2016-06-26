@@ -16,9 +16,14 @@ const (
 var ErrorEmptyToken = errors.New("Token string cannot be empty")
 var ErrorExpiredToken = errors.New("Token has expired")
 var ErrorNilQuitChanel = errors.New("Quit channel cannot be nil")
+var ErrorNilLogger = errors.New("Logger cannot be nil")
 var ErrorBadUserID = errors.New("UserID cannot be empty")
 var ErrorGCRunning = errors.New("Garbage collector is already running")
 var ErrorInvalidToken = errors.New("Token is invalid")
+
+type Logger interface {
+	Info(interface{}, ...interface{})
+}
 
 type Model struct {
 	db *sql.DB
@@ -46,10 +51,14 @@ func NewModel(db *sql.DB) (*Model, error) {
 	return m, nil
 }
 
-func (m *Model) RunGarbageCollector(quitCh chan error) error {
+func (m *Model) RunGarbageCollector(quitCh chan error, lg Logger) error {
 
 	if quitCh == nil {
 		return ErrorNilQuitChanel
+	}
+
+	if lg == nil {
+		return ErrorNilLogger
 	}
 
 	smallest, err := m.GetSmallestExpiry()
@@ -57,7 +66,7 @@ func (m *Model) RunGarbageCollector(quitCh chan error) error {
 		return err
 	}
 
-	go m.garbageCollect(smallest, quitCh)
+	go m.garbageCollect(smallest, lg, quitCh)
 	return nil
 }
 
@@ -212,6 +221,20 @@ func (um *Model) GetSmallestExpiry() (*token, error) {
 	return t, nil
 }
 
+// um.concurrentDelete() deletes a token with token string tknstr and
+// sends to delCh on success or delErrCh on failure
+func (um *Model) concurrentDelete(tknStr string, errCh chan error) {
+
+	if errCh == nil {
+		return
+	}
+
+	_, err := um.Delete(tknStr)
+	if err != nil {
+		errCh <- err
+	}
+}
+
 // garbageCollect deletes all expired tokens.
 // quitCh - sends an error value on quit (nil if no error occurred).
 // garbageCollect is best run in a goroutine as it blocks in a
@@ -219,10 +242,14 @@ func (um *Model) GetSmallestExpiry() (*token, error) {
 // 1. Token with earliest expiry time has just expired (garbage collect it).
 // 2. A token has been inserted (recalculate token with earliest expiry time).
 // 3. A token has been deleted (recalculate token with earliest expiry time).
-func (um *Model) garbageCollect(smallest *token, quitCh chan error) {
+func (um *Model) garbageCollect(smallest *token, log Logger, quitCh chan error) {
 
 	if quitCh == nil {
 		return
+	}
+
+	if log == nil {
+		quitCh <- ErrorNilLogger
 	}
 
 	if um.gcRunning {
@@ -233,37 +260,26 @@ func (um *Model) garbageCollect(smallest *token, quitCh chan error) {
 	um.gcRunning = true
 	defer func() { um.gcRunning = false }()
 
-	nextExp := longDuration
+	nextExp := shortDuration
 	if smallest != nil {
 		nextExp = smallest.expiry.Sub(time.Now())
 	}
 
 	timer := time.NewTimer(nextExp)
+	delErrCh := make(chan error)
 
 loop:
 	for {
+		log.Info("Garbage collector - next expiry in less than %v", nextExp)
 		select {
 
 		case <-timer.C:
-			if smallest == nil {
+			log.Info("Garbage collector - expiry occured")
+			if smallest != nil {
+				nextExp = shortDuration
+				timer = time.NewTimer(nextExp)
+				go um.concurrentDelete(smallest.token, delErrCh)
 				continue loop
-			}
-			// um.Delete() should send to delCh on success which will
-			// trigger calculation of the next smallest
-			_, err := um.Delete(smallest.token)
-			if err != nil {
-				quitCh <- err
-				return
-			}
-
-		case inserted := <-um.insCh:
-			if smallest == nil || smallest.expiry.After(inserted.expiry) {
-				smallest = &inserted
-			}
-
-		case deleted := <-um.delCh:
-			if deleted != smallest.token {
-				continue
 			}
 
 			var err error
@@ -279,6 +295,44 @@ loop:
 			}
 
 			timer = time.NewTimer(nextExp)
+
+		case inserted := <-um.insCh:
+			log.Info("Garbage collector - insertion occurred")
+			if smallest != nil && smallest.expiry.Before(inserted.expiry) {
+				continue loop
+			}
+
+			smallest = &inserted
+			nextExp = smallest.expiry.Sub(time.Now())
+			timer = time.NewTimer(nextExp)
+
+		case deleted := <-um.delCh:
+			log.Info("Garbage collector - deletion occured")
+			if smallest != nil && deleted != smallest.token {
+				continue loop
+			}
+
+			var err error
+			smallest, err = um.GetSmallestExpiry()
+			if err != nil {
+				quitCh <- err
+				return
+			}
+
+			nextExp = shortDuration
+			if smallest != nil {
+				nextExp = smallest.expiry.Sub(time.Now())
+			}
+
+			timer = time.NewTimer(nextExp)
+
+		case delErr := <-delErrCh:
+			log.Info("Garbage collector - deletion error: %v", delErr)
+			if delErr == nil {
+				continue loop
+			}
+			quitCh <- delErr
+			return
 
 		}
 	}

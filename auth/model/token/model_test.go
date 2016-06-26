@@ -12,6 +12,7 @@ import (
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
+	"github.com/limetext/log4go"
 )
 
 var db *sql.DB
@@ -410,10 +411,31 @@ func TestModel_RunGarbageCollector_nilQuitCh(t *testing.T) {
 
 	m := newModel(t)
 	defer testhelper.TearDown(db, t)
+	lg := log4go.NewDefaultLogger(log4go.FINEST)
 
-	err := m.RunGarbageCollector(nil)
+	err := m.RunGarbageCollector(nil, lg)
 	if err == nil || err != token.ErrorNilQuitChanel {
 		t.Fatalf("Expected error %s but got %v", token.ErrorNilQuitChanel, err)
+	}
+
+	timer := time.NewTimer(1 * time.Second)
+	select {
+	case <-timer.C:
+		break
+	case err := <-quitCh:
+		t.Fatalf("Garbage collector quit with error %v", err)
+	}
+}
+
+func TestModel_RunGarbageCollector_nilLogger(t *testing.T) {
+
+	m := newModel(t)
+	defer testhelper.TearDown(db, t)
+
+	quitCh := make(chan error)
+	err := m.RunGarbageCollector(quitCh, nil)
+	if err == nil || err != token.ErrorNilLogger {
+		t.Fatalf("Expected error %s but got %v", token.ErrorNilLogger, err)
 	}
 
 	timer := time.NewTimer(1 * time.Second)
@@ -429,15 +451,16 @@ func TestModel_RunGarbageCollector_singleCollector(t *testing.T) {
 
 	m := newModel(t)
 	defer testhelper.TearDown(db, t)
+	lg := log4go.NewDefaultLogger(log4go.FINEST)
 
 	quitCh1 := make(chan error)
-	err := m.RunGarbageCollector(quitCh1)
+	err := m.RunGarbageCollector(quitCh1, lg)
 	if err != nil {
 		t.Fatalf("tokenModel.RunGarbageCollector(): %s", err)
 	}
 
 	quitCh2 := make(chan error)
-	err = m.RunGarbageCollector(quitCh2)
+	err = m.RunGarbageCollector(quitCh2, lg)
 	if err != nil {
 		t.Fatalf("tokenModel.RunGarbageCollector(): %s", err)
 	}
