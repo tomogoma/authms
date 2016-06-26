@@ -5,6 +5,8 @@ import (
 
 	"fmt"
 
+	"strings"
+
 	"bitbucket.org/alkira/contactsms/kazoo/errors"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
@@ -26,11 +28,32 @@ type HistModel interface {
 	Get(userID, offset, count int, acMs ...int) ([]*history.History, error)
 }
 
+type User interface {
+	UserName() string
+	FirstName() string
+	MiddleName() string
+	LastName() string
+}
+
 type Auth struct {
 	conf   Config
 	usrM   *user.Model
 	tokenM *token.Model
 	histM  HistModel
+}
+
+func AuthError(err error) bool {
+
+	if strings.HasPrefix(err.Error(), user.ErrorPasswordMismatch.Error()) ||
+		strings.HasPrefix(err.Error(), token.ErrorExpiredToken.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorUserExists.Error()) ||
+		strings.HasPrefix(err.Error(), token.ErrorInvalidToken.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorEmptyUserName.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorEmptyPassword.Error()) {
+		return true
+	}
+
+	return false
 }
 
 func New(dsnF helper.DSNFormatter, histM HistModel, conf Config, quitCh chan error) (*Auth, error) {
@@ -71,7 +94,7 @@ func New(dsnF helper.DSNFormatter, histM HistModel, conf Config, quitCh chan err
 	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM}, nil
 }
 
-func (a *Auth) RegisterUser(usr user.User, pass string, rIP, srvID, ref string) (user.User, error) {
+func (a *Auth) RegisterUser(usr User, pass string, rIP, srvID, ref string) (user.User, error) {
 
 	u, err := user.New(usr.UserName(), usr.FirstName(), usr.MiddleName(),
 		usr.LastName(), pass, hashF)
@@ -137,7 +160,7 @@ func (a *Auth) AuthenticateToken(usrID int, devID, tknStr, rIP, srvID, ref strin
 	}
 	usr.SetToken(token)
 
-	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins)
+	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {
 		return nil, err
 	}
