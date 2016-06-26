@@ -149,6 +149,9 @@ func (a *Auth) AuthenticateToken(usrID int, devID, tknStr, rIP, srvID, ref strin
 
 	token, err := a.tokenM.Get(usrID, devID, tknStr)
 	if err != nil {
+		if usrID == 0 {
+			usrID = -1
+		}
 		return nil, a.saveHistory(usrID, rIP, srvID, ref, history.TokenValidationAccess, err)
 	}
 
