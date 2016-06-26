@@ -8,6 +8,7 @@ import (
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
 	"github.com/lib/pq"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -107,15 +108,23 @@ func (m Model) Get(uName, pass string, hashF ValidatePassFunc) (*user, error) {
 		&usr.firstName, &usr.middleName, &usr.lastName,
 	)
 
-	if !hashF(pass, usr.password) {
-		return usr, ErrorPasswordMismatch
-	}
-
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
 			return nil, err
 		}
 		return nil, ErrorPasswordMismatch
+	}
+
+	if len(usr.password) == 0 {
+		plcholder := uuid.NewV4().String()
+		usr.password, err = Hash(plcholder)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if !hashF(pass, usr.password) {
+		return usr, ErrorPasswordMismatch
 	}
 
 	return usr, err

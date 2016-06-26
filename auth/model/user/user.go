@@ -5,7 +5,6 @@ import (
 
 	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
 	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
-	"golang.org/x/crypto/bcrypt"
 )
 
 var ErrorEmptyUserName = errors.New("userName cannot be empty")
@@ -44,9 +43,6 @@ func (u *user) Token() token.Token                 { return u.token }
 func (u *user) SetPreviousLogins(ls ...*history.History) { u.previousLogins = ls }
 func (u *user) SetToken(t token.Token)                   { u.token = t }
 
-type HashFunc func(pass string) ([]byte, error)
-type ValidatePassFunc func(pass string, passHB []byte) bool
-
 func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error) {
 
 	if uName == "" {
@@ -73,17 +69,4 @@ func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error)
 		lastName:   lName,
 		password:   passHB,
 	}, nil
-}
-
-func Hash(pass string) ([]byte, error) {
-
-	passB := []byte(pass)
-	return bcrypt.GenerateFromPassword(passB, bcrypt.DefaultCost)
-}
-
-func CompareHash(pass string, passHB []byte) bool {
-
-	passB := []byte(pass)
-	err := bcrypt.CompareHashAndPassword(passB, passHB)
-	return err != nil
 }
