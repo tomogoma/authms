@@ -3,20 +3,33 @@ package user
 import (
 	"errors"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/token"
 )
 
-var ErrorEmptyUserName = errors.New("userName cannot be empty")
+var ErrorEmptyIdentifier = errors.New("must have at least one login identifier (username|email|appID...)")
 var ErrorEmptyPassword = errors.New("password cannot be empty")
 var ErrorNilHashFunc = errors.New("Hash function cannot be nil")
+
+type Validated interface {
+	Validated() bool
+}
+
+type Valuer interface {
+	Validated
+	Value() string
+}
+
+func valIsFilled(v Valuer) bool {
+	return v != nil && v.Value() != ""
+}
 
 type User interface {
 	ID() int
 	UserName() string
-	FirstName() string
-	MiddleName() string
-	LastName() string
+	Phone() Valuer
+	Email() Valuer
+	App() App
 	PreviousLogins() []*history.History
 	Token() token.Token
 }
@@ -24,29 +37,47 @@ type User interface {
 type user struct {
 	id             int
 	userName       string
-	firstName      string
-	middleName     string
-	lastName       string
+	phone          *value
+	email          *value
+	app            *app
 	password       []byte
 	previousLogins []*history.History
 	token          token.Token
 }
 
-func (u *user) ID() int                            { return u.id }
-func (u *user) UserName() string                   { return u.userName }
-func (u *user) FirstName() string                  { return u.firstName }
-func (u *user) MiddleName() string                 { return u.middleName }
-func (u *user) LastName() string                   { return u.lastName }
-func (u *user) PreviousLogins() []*history.History { return u.previousLogins }
-func (u *user) Token() token.Token                 { return u.token }
+func (u *user) ID() int {
+	return u.id
+}
+func (u *user) UserName() string {
+	return u.userName
+}
+func (u *user) Phone() Valuer {
+	return u.phone
+}
+func (u *user) Email() Valuer {
+	return u.email
+}
+func (u *user) App() App {
+	return u.app
+}
+func (u *user) PreviousLogins() []*history.History {
+	return u.previousLogins
+}
+func (u *user) Token() token.Token {
+	return u.token
+}
 
-func (u *user) SetPreviousLogins(ls ...*history.History) { u.previousLogins = ls }
-func (u *user) SetToken(t token.Token)                   { u.token = t }
+func (u *user) SetPreviousLogins(ls ...*history.History) {
+	u.previousLogins = ls
+}
+func (u *user) SetToken(t token.Token) {
+	u.token = t
+}
 
-func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error) {
+func New(uName, phoneNo, email, pass string, appUserID App, hashF HashFunc) (*user, error) {
 
-	if uName == "" {
-		return nil, ErrorEmptyUserName
+	if uName == "" && phoneNo == "" && email == "" && !appIsFilled(appUserID) {
+		return nil, ErrorEmptyIdentifier
 	}
 
 	if pass == "" {
@@ -62,11 +93,20 @@ func New(uName, fName, mName, lName, pass string, hashF HashFunc) (*user, error)
 		return nil, err
 	}
 
+	var a *app
+	if appIsFilled(appUserID) {
+		a = &app{
+			name:      appUserID.Name(),
+			userID:    appUserID.UserID(),
+			validated: appUserID.Validated(),
+		}
+	}
+
 	return &user{
-		userName:   uName,
-		firstName:  fName,
-		middleName: mName,
-		lastName:   lName,
-		password:   passHB,
+		userName: uName,
+		phone:    &value{value: phoneNo},
+		email:    &value{value: email},
+		app:      a,
+		password: passHB,
 	}, nil
 }

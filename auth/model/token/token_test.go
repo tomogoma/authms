@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
+	"github.com/tomogoma/authms/auth/model/token"
 )
 
 const (
@@ -108,7 +108,7 @@ func compareToken(act token.Token, exp Token, t *testing.T) {
 		t.Errorf("Expected DevID %s but got %s", exp.devID, act.DevID())
 	}
 	if act.Token() == "" {
-		t.Errorf("Expected non-empty Token")
+		t.Error("Expected non-empty Token")
 	}
 	expIssued := time.Now().Add(-1 * time.Minute)
 	if act.Issued().Before(expIssued) {

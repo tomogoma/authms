@@ -6,11 +6,10 @@ import (
 
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/helper"
 )
 
 const (
-	tableName  = "history"
 	dateFormat = time.RFC3339 // "2006-01-02T15:04:05Z07:00"
 )
 
@@ -27,41 +26,17 @@ func NewModel(db *sql.DB) (*Model, error) {
 	return &Model{db: db}, nil
 }
 
-func (m *Model) TableName() string {
-	return tableName
-}
-
-func (m Model) PrimaryKeyField() string {
-	return tableName + ".id"
-}
-
-func (m *Model) TableDesc() string {
-	// TODO enforce fk integrity (userID)
-	// CHECK https://github.com/cockroachdb/cockroach/issues/2132
-	return fmt.Sprintf(`
-		id		SERIAL		PRIMARY KEY,
-		userID		INT 		NOT NULL,
-		date		TIMESTAMP	NOT NULL,
-		accessMethod	INT		NOT NULL,
-		successful	BOOL		NOT NULL,
-		forServiceID	STRING,
-		ipAddress	STRING,
-		referral	STRING,
-		INDEX history_UserDateIndex (userID, date)
-	`)
-}
-
 func (m *Model) Save(ld History) (int, error) {
 
 	if err := ld.Validate(); err != nil {
 		return 0, err
 	}
 
-	qStr := fmt.Sprintf(`
-		INSERT INTO %s (userID, accessMethod, successful, date, forServiceID, ipAddress, referral)
+	qStr := `
+	INSERT INTO history (userID, accessMethod, successful, date, forServiceID, ipAddress, referral)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id
-		`, tableName)
+	`
 
 	var detsID int
 	date := ld.date.Format(dateFormat)
@@ -94,11 +69,11 @@ func (m *Model) Get(userID, offset, count int, acMs ...int) ([]*History, error) 
 
 	qStr := fmt.Sprintf(`
 		SELECT id, accessMethod, successful, userID, date, forServiceID, ipAddress, referral
-		FROM %s
+		FROM history
 		WHERE userID = $1 %s
 		ORDER BY date DESC
 		LIMIT $2 OFFSET $3
-	`, tableName, acMFilter)
+	`, acMFilter)
 
 	r, err := m.db.Query(qStr, userID, count, offset)
 	if err != nil {

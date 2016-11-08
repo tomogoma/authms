@@ -4,10 +4,17 @@ import (
 	"database/sql"
 	"testing"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/testhelper"
+	"github.com/tomogoma/authms/auth/model/user"
 )
+
+type testCase struct {
+	desc    string
+	appName string
+	appUID  string
+	call    func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error)
+}
 
 var db *sql.DB
 
@@ -29,17 +36,21 @@ func TestModel_Save_n_Get(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
-
-	if i := save(expUser, m, t); i < 1 {
+	i := save(expUser, m, t)
+	if i < 1 {
 		return
 	}
 
-	usr, err := m.Get(expUser.UserName(), expUser.Password, expUser.ValHashFunc)
+	usr, err := m.Get(i)
 	if err != nil {
 		t.Fatalf("userModel.Get(): %s", err)
 	}
 
-	compareUsersShallow(usr, expUser, t)
+	if usr == nil {
+		t.Fatal("user was nil")
+	}
+
+	// TODO compare user values
 }
 
 func TestModel_Save_duplicateUser(t *testing.T) {
@@ -51,7 +62,7 @@ func TestModel_Save_duplicateUser(t *testing.T) {
 		return
 	}
 
-	usr, err := user.New(expUser.UName, "", "", "", "some-other-pass", expUser.HashF)
+	usr, err := user.New(expUser.UName, "", "", "some-other-pass", nil, expUser.HashF)
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
 	}
@@ -61,7 +72,7 @@ func TestModel_Save_duplicateUser(t *testing.T) {
 	}
 }
 
-func TestModel_Get_PassMismatch(t *testing.T) {
+func TestModel_GetBy(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
@@ -70,49 +81,36 @@ func TestModel_Get_PassMismatch(t *testing.T) {
 		return
 	}
 
-	u, err := m.Get(expUser.UserName(), expUser.Password, invalidHashF)
-	if err == nil || err != user.ErrorPasswordMismatch {
-		t.Fatalf("expected error %s but got %s", errorHashing, err)
-	}
+	tcs := genericTestCases(m)
 
-	compareUsersShallow(u, expUser, t)
+	for _, tc := range tcs {
+		_, err := tc.call(tc.appName, tc.appUID,
+			expUser.Password, expUser.ValHashFunc)
+		if err != nil {
+			t.Errorf("%s: Expected nil error but got %v",
+				tc.desc, err)
+		}
+	}
 }
 
-func TestModel_Get_noUsers(t *testing.T) {
+func TestModel_GetBy_noUsers(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	usr, err := m.Get(expUser.UserName(), expUser.Password, expUser.ValHashFunc)
-	if err == nil || err != user.ErrorPasswordMismatch {
-		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
-	}
+	tcs := genericTestCases(m)
 
-	if usr != nil {
-		t.Errorf("Expected nil user but got %v", usr)
-	}
-}
-
-func TestModel_Get_userNameNotInDB(t *testing.T) {
-
-	m := newUserModel(t)
-	defer testhelper.TearDown(db, t)
-
-	if i := save(expUser, m, t); i < 1 {
-		return
-	}
-
-	usr, err := m.Get("someUserName", expUser.Password, expUser.ValHashFunc)
-	if err == nil || err != user.ErrorPasswordMismatch {
-		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
-	}
-
-	if usr != nil {
-		t.Errorf("Expected nil user but got %v", usr)
+	for _, tc := range tcs {
+		_, err := tc.call(tc.appName, "some-username",
+			expUser.Password, expUser.ValHashFunc)
+		if err == nil || err != user.ErrorPasswordMismatch {
+			t.Errorf("%s: Expected error %s but got %v",
+				tc.desc, user.ErrorPasswordMismatch, err)
+		}
 	}
 }
 
-func TestModel_Get_emptyUserName(t *testing.T) {
+func TestModel_GetBy_identifierNotInDB(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
@@ -121,55 +119,79 @@ func TestModel_Get_emptyUserName(t *testing.T) {
 		return
 	}
 
-	usr, err := m.Get("", expUser.Password, expUser.ValHashFunc)
-	if err == nil || err != user.ErrorPasswordMismatch {
-		t.Fatalf("Expected error %s but got %v", user.ErrorPasswordMismatch, err)
-	}
+	tcs := genericTestCases(m)
 
-	if usr != nil {
-		t.Errorf("Expected nil user but got %v", usr)
+	for _, tc := range tcs {
+		_, err := tc.call(tc.appName, "some-username",
+			expUser.Password, expUser.ValHashFunc)
+		if err == nil || err != user.ErrorPasswordMismatch {
+			t.Errorf("%s: Expected error %s but got %v",
+				tc.desc, user.ErrorPasswordMismatch, err)
+		}
 	}
 }
 
-func TestModel_GetByID(t *testing.T) {
+func TestModel_GetBy_emptyIdentifier(t *testing.T) {
+
+	m := newUserModel(t)
+	defer testhelper.TearDown(db, t)
+
+	if i := save(expUser, m, t); i < 1 {
+		return
+	}
+
+	tcs := genericTestCases(m)
+
+	for _, tc := range tcs {
+		_, err := tc.call(tc.appName, "",
+			expUser.Password, expUser.ValHashFunc)
+		if err == nil || err != user.ErrorPasswordMismatch {
+			t.Errorf("%s: Expected error %s but got %v",
+				tc.desc, user.ErrorPasswordMismatch, err)
+		}
+	}
+}
+
+func TestModel_Get(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
 	uid := save(expUser, m, t)
 
-	usr, err := m.GetByID(uid)
+	usr, err := m.Get(uid)
 	if err != nil {
 		t.Fatalf("userModel.Get(): %s", err)
 	}
 
-	compareUsersShallow(usr, expUser, t)
+	if usr == nil {
+		t.Fatal("got nil user")
+	}
+
+	if usr.ID() != uid {
+		t.Errorf("Expected id %d got %d", uid, usr.ID())
+	}
 }
 
-func TestModel_GetByID_noResults(t *testing.T) {
+func TestModel_Get_noResults(t *testing.T) {
 
 	m := newUserModel(t)
 	defer testhelper.TearDown(db, t)
 
-	usr, err := m.GetByID(4567)
-	if err != nil {
-		t.Fatalf("userModel.Get(): %s", err)
-	}
-
-	if usr != nil {
-		t.Fatalf("Expected nil user but got %v", usr)
+	_, err := m.Get(4567)
+	if err == nil {
+		t.Fatal("expected an error but got nil")
 	}
 }
 
 func newUserModel(t *testing.T) *user.Model {
 
-	db = testhelper.InstantiateDB(t)
+	db = testhelper.SQLDB(t)
 	m, err := user.NewModel(db)
 	if err != nil {
 		testhelper.TearDown(db, t)
 		t.Fatalf("user.NewModel(): %s", err)
 	}
-	testhelper.SetUp(m, db, t)
 	return m
 }
 
@@ -192,4 +214,38 @@ func save(expU testhelper.User, m *user.Model, t *testing.T) int {
 		return 0
 	}
 	return us.ID()
+}
+
+func genericTestCases(m *user.Model) []testCase {
+	return []testCase{
+		{
+			desc:   "GetByUsername",
+			appUID: expUser.UserName(),
+			call: func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error) {
+				return m.GetByUserName(appUID, pass, hashFunc)
+			},
+		},
+		{
+			desc:   "GetByPhone",
+			appUID: expUser.Phone().Value(),
+			call: func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error) {
+				return m.GetByPhone(appUID, pass, hashFunc)
+			},
+		},
+		{
+			desc:   "GetByEmail",
+			appUID: expUser.Email().Value(),
+			call: func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error) {
+				return m.GetByEmail(appUID, pass, hashFunc)
+			},
+		},
+		{
+			desc:    "GetByAppUserID",
+			appName: expUser.App().Name(),
+			appUID:  expUser.App().UserID(),
+			call: func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error) {
+				return m.GetByAppUserID(app, appUID, pass, hashFunc)
+			},
+		},
+	}
 }

@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	"github.com/gorilla/mux"
+	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/user"
 )
 
 const (
@@ -53,22 +53,70 @@ type History struct {
 	SuccessStatus bool      `json:"successStatus"`
 }
 
+type AppID struct {
+	AppName  string `json:"appName,omitempty"`
+	UsrID    string `json:"userID,omitempty"`
+	Verified bool   `json:"verified,omitempty"`
+}
+
+func (a *AppID) Name() string {
+	if a == nil {
+		return ""
+	}
+	return a.AppName
+}
+
+func (a *AppID) UserID() string {
+	if a == nil {
+		return ""
+	}
+	return a.UsrID
+}
+
+func (a *AppID) Validated() bool {
+	if a == nil {
+		return false
+	}
+	return a.Verified
+}
+
+type Value struct {
+	Val      string `json:"value,omitempty"`
+	Verified bool   `json:"verified,omitempty"`
+}
+
+func (v *Value) Value() string {
+	if v == nil {
+		return ""
+	}
+	return v.Val
+}
+
+func (v *Value) Validated() bool {
+	if v == nil {
+		return false
+	}
+	return v.Verified
+}
+
 type User struct {
 	Request
 	ID         int       `json:"id,omitempty"`
 	UName      string    `json:"userName,omitempty"`
+	PhoneNo    *Value    `json:"phone,omitempty"`
+	Mail       *Value    `json:"email,omitempty"`
+	AppID      *AppID    `json:"appID,omitempty"`
 	Pass       string    `json:"password,omitempty"`
-	FName      string    `json:"firstName,omitempty"`
-	MName      string    `json:"middleName,omitempty"`
-	LName      string    `json:"lastName,omitempty"`
 	Token      *Token    `json:"token,omitempty"`
 	PrevLogins []History `json:"prevLogins,omitempty"`
 }
 
-func (u *User) UserName() string   { return u.UName }
-func (u *User) FirstName() string  { return u.FName }
-func (u *User) MiddleName() string { return u.MName }
-func (u *User) LastName() string   { return u.LName }
+func (u *User) UserName() string     { return u.UName }
+func (u *User) Email() user.Valuer   { return u.Mail }
+func (u *User) EmailAddress() string { return u.Mail.Value() }
+func (u *User) Phone() user.Valuer   { return u.PhoneNo }
+func (u *User) PhoneNumber() string  { return u.PhoneNo.Value() }
+func (u *User) App() user.App        { return u.AppID }
 
 type Server struct {
 	auth   *auth.Auth
@@ -177,7 +225,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.lg.Fine("%d - validate login...", tID)
-	authUsr, err := s.auth.Login(req.UName, req.Pass, req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
+	authUsr, err := s.auth.LoginUserName(req.UName, req.Pass, req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
@@ -186,7 +234,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		s.lg.Warn("%d - login error: %s", tID, err)
-		http.Error(w, "invalid userName/password combo", http.StatusUnauthorized)
+		http.Error(w, "invalid userName/password combo or missing devID", http.StatusUnauthorized)
 		return
 	}
 
@@ -300,12 +348,37 @@ func packageUser(rcv user.User) User {
 		}
 	}
 
+	var email *Value
+	if e := rcv.Email(); e != nil {
+		email = &Value{
+			Val:      e.Value(),
+			Verified: e.Validated(),
+		}
+	}
+
+	var phone *Value
+	if p := rcv.Phone(); p != nil {
+		phone = &Value{
+			Val:      p.Value(),
+			Verified: p.Validated(),
+		}
+	}
+
+	var appID *AppID
+	if app := rcv.App(); app != nil {
+		app = &AppID{
+			AppName:  app.Name(),
+			UsrID:    app.UserID(),
+			Verified: app.Validated(),
+		}
+	}
+
 	return User{
 		ID:         rcv.ID(),
 		UName:      rcv.UserName(),
-		FName:      rcv.FirstName(),
-		MName:      rcv.MiddleName(),
-		LName:      rcv.LastName(),
+		AppID:      appID,
+		Mail:       email,
+		PhoneNo:    phone,
 		PrevLogins: prevLogins,
 		Token:      token,
 	}

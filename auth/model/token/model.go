@@ -6,11 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-)
-
-const (
-	tableName = "tokens"
+	"github.com/tomogoma/authms/auth/model/helper"
 )
 
 var ErrorEmptyToken = errors.New("Token string cannot be empty")
@@ -70,35 +66,13 @@ func (m *Model) RunGarbageCollector(quitCh chan error, lg Logger) error {
 	return nil
 }
 
-func (m *Model) TableName() string {
-	return tableName
-}
-
-func (m *Model) PrimaryKeyField() string {
-	return tableName + ".id"
-}
-
-func (m *Model) TableDesc() string {
-	// TODO enforce fk integrity (userID)
-	// CHECK https://github.com/cockroachdb/cockroach/issues/2132
-	return fmt.Sprintf(`
-		id	SERIAL		PRIMARY KEY,
-		userID	INT		NOT NULL,
-		devID	STRING		NOT NULL,
-		token	STRING		UNIQUE NOT NULL,
-		issued	TIMESTAMP	NOT NULL,
-		expiry	TIMESTAMP	NOT NULL,
-		INDEX userIDIndex (userID)
-	`)
-}
-
 func (m *Model) Save(t token) (int, error) {
 
-	qStr := fmt.Sprintf(`
-		INSERT INTO %s (userID, devID, token, issued, expiry)
+	qStr := `
+	INSERT INTO tokens (userID, devID, token, issued, expiry)
 		VALUES ($1, $2, $3, $4, $5)
 		 RETURNING id
-		`, tableName)
+	`
 
 	var tokenID int
 	err := m.db.QueryRow(qStr, t.userID, t.devID, t.token,
@@ -116,13 +90,13 @@ func (m *Model) Save(t token) (int, error) {
 
 func (um *Model) Get(usrID int, devID, tknStr string) (*token, error) {
 
-	qStr := fmt.Sprintf(`
-		SELECT id, userID, devID, token, issued, expiry
-		FROM %s
+	qStr := `
+	SELECT id, userID, devID, token, issued, expiry
+		FROM tokens
 		WHERE userID = $1
 		AND token = $2
 		AND devID = $3
-	`, tableName)
+	`
 
 	tkn := &token{}
 	err := um.db.QueryRow(qStr, usrID, tknStr, devID).Scan(
@@ -154,10 +128,7 @@ func (um *Model) Delete(tknStr string) (bool, error) {
 		return false, ErrorEmptyToken
 	}
 
-	qStr := fmt.Sprintf(`
-		DELETE FROM %s
-		WHERE token = $1
-	`, tableName)
+	qStr := `DELETE FROM tokens WHERE token = $1`
 
 	r, err := um.db.Exec(qStr, tknStr)
 	if err != nil {
@@ -200,11 +171,11 @@ func (um *Model) ValidateExpiry(tkn Token) (Token, error) {
 
 func (um *Model) GetSmallestExpiry() (*token, error) {
 
-	qStr := fmt.Sprintf(`
-		SELECT id, userID, devID, token, issued, expiry
-		FROM %s
-		WHERE expiry = (SELECT MIN(expiry) FROM %s)
-	`, tableName, tableName)
+	qStr := `
+	SELECT id, userID, devID, token, issued, expiry
+		FROM tokens
+		WHERE expiry = (SELECT MIN(expiry) FROM tokens)
+	`
 
 	t := &token{}
 	err := um.db.QueryRow(qStr).Scan(

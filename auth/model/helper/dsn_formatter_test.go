@@ -5,8 +5,8 @@ import (
 
 	"fmt"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/testhelper"
 )
 
 func TestDSN_FormatDSN(t *testing.T) {
@@ -25,7 +25,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 	}
 
 	cases := []tcase{
-		tcase{
+		{
 			dsn: helper.DSN{
 				UName:       uname,
 				Password:    pass,
@@ -39,7 +39,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s:%s@%s/%s?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
 				uname, pass, host, testhelper.DBName, sslcert, sslkey, sslrootcert),
 		},
-		tcase{
+		{
 			dsn: helper.DSN{
 				Host:        host,
 				DB:          testhelper.DBName,
@@ -51,7 +51,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s/%s?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
 				host, testhelper.DBName, sslcert, sslkey, sslrootcert),
 		},
-		tcase{
+		{
 			dsn: helper.DSN{
 				UName:       uname,
 				Host:        host,
@@ -64,7 +64,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s@%s/%s?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
 				uname, host, testhelper.DBName, sslcert, sslkey, sslrootcert),
 		},
-		tcase{
+		{
 			dsn: helper.DSN{
 				UName:       uname,
 				Password:    pass,
@@ -77,7 +77,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s:%s@127.0.0.1:26257/%s?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
 				uname, pass, testhelper.DBName, sslcert, sslkey, sslrootcert),
 		},
-		tcase{
+		{
 			dsn: helper.DSN{
 				UName:       uname,
 				Password:    pass,
@@ -90,7 +90,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s:%s@%s/?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
 				uname, pass, host, sslcert, sslkey, sslrootcert),
 		},
-		tcase{
+		{
 			dsn: helper.DSN{
 				UName:    uname,
 				Password: pass,
@@ -101,7 +101,7 @@ func TestDSN_FormatDSN(t *testing.T) {
 			exp: fmt.Sprintf("postgres://%s:%s@%s/%s",
 				uname, pass, host, testhelper.DBName),
 		},
-		tcase{
+		{
 			dsn:  helper.DSN{},
 			desc: "no field provided",
 			exp:  "postgres://127.0.0.1:26257/",

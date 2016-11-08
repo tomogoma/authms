@@ -3,8 +3,10 @@ package helper
 import (
 	"database/sql"
 	"errors"
+
 	"fmt"
 
+	"github.com/cockroachdb/cockroach-go/crdb"
 	_ "github.com/lib/pq"
 )
 
@@ -16,59 +18,136 @@ const (
 var ErrorNilDB = errors.New("db cannot be nil")
 var ErrorNilDSNFormatter = errors.New("DSNFormatter cannot be nil")
 
-var DupTblErrPrfx = "Duplicate tables"
-
-type Model interface {
-	TableName() string
-	TableDesc() string
-}
+const (
+	users = `
+CREATE TABLE IF NOT EXISTS users (
+  id         SERIAL PRIMARY KEY NOT NULL,
+  password   BYTES              NOT NULL,
+  createDate TIMESTAMP          NOT NULL,
+  updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP()
+);
+`
+	usernames = `
+CREATE TABLE IF NOT EXISTS userNames (
+  id         SERIAL PRIMARY KEY NOT NULL,
+  userID     INT                NOT NULL REFERENCES users (id),
+  userName   STRING UNIQUE      NOT NULL,
+  createDate TIMESTAMP          NOT NULL,
+  updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  INDEX      userID_indx (userID)
+) INTERLEAVE IN PARENT users (id);
+`
+	emails = `
+CREATE TABLE IF NOT EXISTS emails (
+  id         SERIAL PRIMARY KEY NOT NULL,
+  userID     INT                NOT NULL REFERENCES users (id),
+  email      STRING UNIQUE      NOT NULL,
+  validated  BOOL               NOT NULL DEFAULT FALSE,
+  createDate TIMESTAMP          NOT NULL,
+  updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  INDEX      userID_indx (userID)
+) INTERLEAVE IN PARENT users (id);
+`
+	phones = `
+CREATE TABLE IF NOT EXISTS phones (
+  id         SERIAL PRIMARY KEY NOT NULL,
+  userID     INT                NOT NULL REFERENCES users (id),
+  phone      STRING UNIQUE      NOT NULL,
+  validated  BOOL               NOT NULL DEFAULT FALSE,
+  createDate TIMESTAMP          NOT NULL,
+  updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  INDEX      userID_indx (userID)
+) INTERLEAVE IN PARENT users (id);
+`
+	appUserIDs = `
+CREATE TABLE IF NOT EXISTS appUserIDs (
+  id         SERIAL PRIMARY KEY NOT NULL,
+  userID     INT                NOT NULL REFERENCES users (id),
+  appUserID  STRING             NOT NULL,
+  appName    STRING             NOT NULL,
+  validated  BOOL               NOT NULL DEFAULT FALSE,
+  createDate TIMESTAMP          NOT NULL,
+  updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+  UNIQUE     (appName, appUserID),
+  INDEX      userID_indx (userID)
+) INTERLEAVE IN PARENT users (id);
+`
+	tokens = `
+CREATE TABLE IF NOT EXISTS tokens (
+  id     SERIAL PRIMARY KEY NOT NULL,
+  userID INT                NOT NULL REFERENCES users (id),
+  devID  STRING             NOT NULL,
+  token  STRING UNIQUE      NOT NULL,
+  issued TIMESTAMP          NOT NULL,
+  expiry TIMESTAMP          NOT NULL,
+  INDEX  userID_indx (userID)
+) INTERLEAVE IN PARENT users (id);
+`
+	history = `
+CREATE TABLE IF NOT EXISTS history (
+  id           SERIAL PRIMARY KEY NOT NULL,
+  userID       INT                NOT NULL,
+  date         TIMESTAMP          NOT NULL,
+  accessMethod INT                NOT NULL,
+  successful   BOOL               NOT NULL,
+  forServiceID STRING,
+  ipAddress    STRING,
+  referral     STRING,
+  INDEX        history_UserDate_indx (userID, DATE )
+) INTERLEAVE IN PARENT users (id);
+`
+)
 
 func SQLDB(dsnF DSNFormatter) (*sql.DB, error) {
-
 	if dsnF == nil {
 		return nil, ErrorNilDSNFormatter
 	}
-
 	db, err := sql.Open(driverName, dsnF.FormatDSN())
 	if err != nil {
 		return nil, err
 	}
-
-	if err = db.Ping(); err != nil {
+	err = db.Ping()
+	if closeDBOnError(db, err); err != nil {
 		return nil, err
-	}
 
+	}
+	err = createTables(db, dsnF.DBName())
+	if closeDBOnError(db, err); err != nil {
+		return nil, err
+
+	}
 	return db, nil
 }
 
-func CreateTables(db *sql.DB, models ...Model) error {
-
-	modelsM := make(map[string]string)
-	for _, model := range models {
-
-		tName := model.TableName()
-		if _, ok := modelsM[tName]; ok {
-			return fmt.Errorf("%s with name %s", DupTblErrPrfx, tName)
-		}
-		modelsM[tName] = model.TableDesc()
-	}
-
-	templateQStr := "CREATE TABLE IF NOT EXISTS %s (%s)"
-
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-
-	for _, m := range models {
-
-		qStr := fmt.Sprintf(templateQStr, m.TableName(), m.TableDesc())
-		_, err := tx.Exec(qStr)
+func createTables(db *sql.DB, dbName string) error {
+	return crdb.ExecuteTx(db, func(tx *sql.Tx) error {
+		_, err := tx.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
 		if err != nil {
-			tx.Rollback()
 			return err
 		}
-	}
+		_, err = tx.Exec("SET DATABASE = " + dbName)
+		if err != nil {
+			return err
+		}
+		createStmts := []string{users, usernames, emails, phones, appUserIDs, tokens, history}
+		for _, createTblStmt := range createStmts {
+			_, err = tx.Exec(createTblStmt)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
 
-	return tx.Commit()
+func closeDBOnError(db *sql.DB, err error) error {
+	if err != nil {
+		clErr := db.Close()
+		if clErr != nil {
+			return fmt.Errorf("%s ...and while closing db: %s",
+				err, clErr)
+		}
+		return err
+	}
+	return nil
 }

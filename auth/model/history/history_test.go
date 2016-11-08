@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/history"
 )
 
 const (

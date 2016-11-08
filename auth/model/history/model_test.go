@@ -6,9 +6,9 @@ import (
 
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/testhelper"
 )
 
 var db *sql.DB
@@ -32,7 +32,7 @@ func TestModel_Save_invalidHistory(t *testing.T) {
 	defer testhelper.TearDown(db, t)
 	_, err := m.Save(history.History{})
 	if err == nil {
-		t.Fatalf("Expected an error but got nil")
+		t.Fatal("Expected an error but got nil")
 	}
 }
 
@@ -130,12 +130,11 @@ func TestModel_Get_noResults(t *testing.T) {
 
 func newModel(t *testing.T) *history.Model {
 
-	db = testhelper.InstantiateDB(t)
+	db = testhelper.SQLDB(t)
 	m, err := history.NewModel(db)
 	if err != nil {
 		t.Fatalf("history.NewModel(): %s", err)
 	}
-	testhelper.SetUp(m, db, t)
 
 	return m
 }

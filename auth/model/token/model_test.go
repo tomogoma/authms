@@ -9,10 +9,10 @@ import (
 
 	"strings"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
 	"github.com/limetext/log4go"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/testhelper"
+	"github.com/tomogoma/authms/auth/model/token"
 )
 
 var db *sql.DB
@@ -200,7 +200,9 @@ func TestModel_Delete(t *testing.T) {
 	defer testhelper.TearDown(db, t)
 
 	tknToDel, err := token.New(expToken.explodeParams())
-	tknToLeave, err := token.New(tknToDel.UserID()-1, tknToDel.DevID()+"ab", token.ShortExpType)
+	tknToLeaveUserID := tknToDel.UserID() - 1
+	testhelper.InsertDummyUser(db, tknToLeaveUserID, t)
+	tknToLeave, err := token.New(tknToLeaveUserID, tknToDel.DevID()+"ab", token.ShortExpType)
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
@@ -239,7 +241,7 @@ func TestModel_Delete(t *testing.T) {
 	}
 
 	if act == nil {
-		t.Fatalf("Token not expected to be deleted was deleted", act)
+		t.Fatal("Token not expected to be deleted was deleted", act)
 	}
 }
 
@@ -273,7 +275,7 @@ func TestModel_Delete_notExist(t *testing.T) {
 	}
 
 	if act == nil {
-		t.Fatalf("Token not expected to be deleted was deleted", act)
+		t.Fatal("Token not expected to be deleted was deleted", act)
 	}
 }
 
@@ -358,11 +360,16 @@ func TestModel_GetSmallestExpiry(t *testing.T) {
 	m := newModel(t)
 	defer testhelper.TearDown(db, t)
 
-	med, err := token.New(5, "dev1id", token.MedExpType)
+	medUsrID := 5
+	lrgstUsrID := 6
+	testhelper.InsertDummyUser(db, medUsrID, t)
+	testhelper.InsertDummyUser(db, lrgstUsrID, t)
+
+	med, err := token.New(medUsrID, "dev1id", token.MedExpType)
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
-	lrgst, err := token.New(6, "dev2id", token.LongExpType)
+	lrgst, err := token.New(lrgstUsrID, "dev2id", token.LongExpType)
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
@@ -468,7 +475,7 @@ func TestModel_RunGarbageCollector_singleCollector(t *testing.T) {
 	timer := time.NewTimer(1 * time.Second)
 	select {
 	case <-timer.C:
-		t.Fatalf("Garbage collector took too long to report error")
+		t.Fatal("Garbage collector took too long to report error")
 	case err := <-quitCh1:
 		t.Fatalf("First garbage collector quit with error %v", err)
 	case err := <-quitCh2:
@@ -480,12 +487,12 @@ func TestModel_RunGarbageCollector_singleCollector(t *testing.T) {
 
 func newModel(t *testing.T) *token.Model {
 
-	db = testhelper.InstantiateDB(t)
+	db = testhelper.SQLDB(t)
 	m, err := token.NewModel(db)
 	if err != nil {
 		testhelper.TearDown(db, t)
 		t.Fatalf("token.NewModel(): %s", err)
 	}
-	testhelper.SetUp(m, db, t)
+	testhelper.InsertDummyUser(db, userID, t)
 	return m
 }

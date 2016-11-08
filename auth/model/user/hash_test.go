@@ -3,7 +3,7 @@ package user_test
 import (
 	"testing"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
+	"github.com/tomogoma/authms/auth/model/user"
 )
 
 func TestCompareHash(t *testing.T) {
@@ -16,13 +16,13 @@ func TestCompareHash(t *testing.T) {
 	}
 
 	tcases := []testcase{
-		testcase{
+		{
 			desc:        "Passwords match",
 			pass:        "pass",
 			comparePass: "pass",
 			expEqual:    true,
 		},
-		testcase{
+		{
 			desc:        "Password mismatch",
 			pass:        "pass",
 			comparePass: "passa",

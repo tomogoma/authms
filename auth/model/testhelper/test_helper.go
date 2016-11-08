@@ -5,35 +5,96 @@ import (
 	"fmt"
 	"testing"
 
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	_ "github.com/lib/pq"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/auth/model/user"
 )
 
 const (
 	DBName = "test_authms"
 )
 
-type User struct {
-	UName    string
-	Password string
+type App struct {
+	AppUID     string
+	AppName    string
+	IsVerified bool
+}
 
-	FName       string
-	MName       string
-	LName       string
+func (a *App) UserID() string {
+	return a.AppUID
+}
+
+func (a *App) Name() string {
+	if a == nil {
+		return ""
+	}
+	return a.AppName
+}
+
+func (a *App) Validated() bool {
+	return a.IsVerified
+}
+
+type Value struct {
+	Val        string
+	IsVerified bool
+}
+
+func (v *Value) Value() string {
+	return v.Val
+}
+
+func (v *Value) Validated() bool {
+	return v.IsVerified
+}
+
+type User struct {
+	UName     string
+	EmailAddr *Value
+	PhoneNo   *Value
+	AppDet    *App
+
+	Password    string
 	HashF       user.HashFunc
 	ValHashFunc user.ValidatePassFunc
 }
 
-func (u *User) ID() int                            { return 1 }
-func (u *User) UserName() string                   { return u.UName }
-func (u *User) FirstName() string                  { return u.FName }
-func (u *User) MiddleName() string                 { return u.MName }
-func (u *User) LastName() string                   { return u.LName }
-func (u *User) PreviousLogins() []*history.History { return make([]*history.History, 0) }
-func (u *User) Token() token.Token                 { t, _ := token.New(1, "test", token.ShortExpType); return t }
+func (u *User) ID() int {
+	return 1
+}
+func (u *User) UserName() string {
+	return u.UName
+}
+func (u *User) Email() user.Valuer {
+	return u.EmailAddr
+}
+func (u *User) EmailAddress() string {
+	if u.EmailAddr == nil {
+		return ""
+	}
+	return u.EmailAddr.Val
+}
+func (u *User) Phone() user.Valuer {
+	return u.PhoneNo
+}
+func (u *User) PhoneNumber() string {
+	if u.PhoneNo == nil {
+		return ""
+	}
+	return u.PhoneNo.Val
+}
+func (u *User) App() user.App {
+	return u.AppDet
+}
+func (u *User) PreviousLogins() []*history.History {
+	return make([]*history.History, 0)
+}
+func (u *User) Token() token.Token {
+	t, _ := token.New(1, "test", token.ShortExpType)
+	return t
+}
 
 func HashF(p string) ([]byte, error) {
 	return []byte{0, 1, 2, 3, 4, 5}, nil
@@ -43,71 +104,57 @@ func ValHashFunc(p string, passHB []byte) bool {
 	return true
 }
 
-func (u User) ExplodeParams() (string, string, string, string, string, user.HashFunc) {
-	return u.UName, u.FName, u.MName, u.LName, u.Password, u.HashF
+func (u User) ExplodeParams() (string, string, string, string, user.App, user.HashFunc) {
+	return u.UName, u.PhoneNo.Val, u.EmailAddr.Val, u.Password, u.AppDet, u.HashF
 }
 
 var DSN = helper.DSN{
 	UName:       "root",
-	Host:        "z500:26257",
+	Host:        "localhost:26257",
 	SslCert:     "/etc/cockroachdb/certs/node.cert",
 	SslKey:      "/etc/cockroachdb/certs/node.key",
 	SslRootCert: "/etc/cockroachdb/certs/ca.cert",
-}
-
-func SetUp(m helper.Model, db *sql.DB, t *testing.T) {
-
-	if db == nil {
-		t.Fatalf("Found nil db while setting up")
-	}
-
-	_, err := db.Exec(fmt.Sprintf("CREATE DATABASE IF NOT EXISTS %s", DBName))
-	if err != nil {
-		db.Close()
-		t.Fatalf("Error creating test database: %s", err)
-	}
-
-	_, err = db.Exec(fmt.Sprintf("SET DATABASE = %s", DBName))
-	if err != nil {
-		TearDown(db, t)
-		t.Fatalf("Error setting default db to test database: %s", err)
-	}
-
-	if m == nil {
-		return
-	}
-
-	_, err = db.Exec(fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s (%s)", m.TableName(), m.TableDesc()))
-	if err != nil {
-		TearDown(db, t)
-		t.Fatalf("creating test table: %s", err)
-	}
+	DB:          "test_authms",
 }
 
 func TearDown(db *sql.DB, t *testing.T) {
-
 	if db == nil {
-		t.Logf("Found nil db while tearing down")
+		t.Log("Found nil db while tearing down")
 		return
 	}
-
+	tables := []string{"tokens", "history", "userNames", "emails",
+		"phones", "appUserIDs", "users"}
+	for _, table := range tables {
+		if _, err := db.Exec("DROP TABLE IF EXISTS " + table); err != nil {
+			t.Errorf("dropping table %s: %s", table, err)
+		}
+	}
 	defer db.Close()
-	_, err := db.Exec(fmt.Sprintf("DROP DATABASE %s", DBName))
+	_, err := db.Exec(fmt.Sprintf("DROP DATABASE IF EXISTS %s", DBName))
 	if err != nil {
 		t.Errorf("dropping test db: %s", err)
 	}
 }
 
-func InstantiateDB(t *testing.T) *sql.DB {
-
+func SQLDB(t *testing.T) *sql.DB {
 	db, err := helper.SQLDB(DSN)
 	if err != nil {
 		t.Fatalf("helper.SQLDB(): %s", err)
 	}
-
 	if db == nil {
-		t.Fatalf("Expected db but got nil")
+		t.Fatal("Expected db but got nil")
 	}
-
 	return db
+}
+
+func InsertDummyUser(db *sql.DB, userID int, t *testing.T) {
+	insertQ := `
+	INSERT INTO users (id, password, createDate)
+	 	VALUES ($1, $2, CURRENT_TIMESTAMP())
+	 `
+	_, err := db.Exec(insertQ, userID, []byte("SOME-PASSWORD-HASH"))
+	if err != nil {
+		TearDown(db, t)
+		t.Fatalf("Error setting up dummy user: %s", err)
+	}
 }

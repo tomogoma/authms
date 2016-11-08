@@ -7,12 +7,12 @@ import (
 
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/testhelper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/token"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/user"
 	"github.com/limetext/log4go"
+	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/testhelper"
+	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/auth/model/user"
 )
 
 type History struct {
@@ -84,7 +84,7 @@ func TestAuth_RegisterUser(t *testing.T) {
 	}
 
 	cases := []testcase{
-		testcase{
+		{
 			expErr: nil,
 			desc:   "register successfull",
 			user: &testhelper.User{
@@ -99,8 +99,8 @@ func TestAuth_RegisterUser(t *testing.T) {
 				t:                   t,
 			},
 		},
-		testcase{
-			expErr: user.ErrorEmptyUserName,
+		{
+			expErr: user.ErrorEmptyIdentifier,
 			desc:   "register unsuccessful",
 			user:   &testhelper.User{Password: "pass"},
 			hist: &History{
@@ -118,14 +118,18 @@ func TestAuth_RegisterUser(t *testing.T) {
 			a := newAuth(c.hist, t)
 			defer testhelper.TearDown(db, t)
 
-			_, err := a.RegisterUser(c.user, c.user.Password, "127.0.0.1", "authms", "test")
+			_, err := a.RegisterUser(c.user, c.user.Password,
+				"127.0.0.1", "authms", "test")
 			if err != c.expErr {
-				t.Errorf("Test %s: auth.RegisterUser(): expected error %v got %v", c.desc, c.expErr, err)
+				t.Errorf("Test %s: auth.RegisterUser(): "+
+					"expected error %v got %v",
+					c.desc, c.expErr, err)
 				return
 			}
 
 			if !c.hist.isSaveCalled {
-				t.Errorf("Test %s: save history was never called", c.desc)
+				t.Errorf("Test %s: save history was never"+
+					" called", c.desc)
 				return
 			}
 
@@ -133,9 +137,12 @@ func TestAuth_RegisterUser(t *testing.T) {
 				return
 			}
 
-			_, err = a.Login(c.user.UserName(), c.user.Password, "devid", "127.0.0.1", "tester", "auth")
+			_, err = a.LoginUserName(c.user.UserName(),
+				c.user.Password, "devid", "127.0.0.1",
+				"tester", "auth")
 			if err != nil {
-				t.Errorf("Test %s: auth.Login(): %s", c.desc, err)
+				t.Errorf("Test %s: auth.Login(): %s",
+					c.desc, err)
 			}
 		}()
 	}
@@ -156,7 +163,7 @@ func TestAuth_RegisterUser_limitsFailure(t *testing.T) {
 	//    the past configured max time
 	// 2. check, for each type, if the failed count exceeds the configured max
 	// 3. if it does, return specific error
-	t.Fatalf("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
+	t.Fatal("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
 }
 
 func TestAuth_Login(t *testing.T) {
@@ -174,7 +181,7 @@ func TestAuth_Login(t *testing.T) {
 	}
 
 	cases := []testcase{
-		testcase{
+		{
 			expErr: nil,
 			desc:   "login successfull",
 			user:   regdUsr,
@@ -186,7 +193,7 @@ func TestAuth_Login(t *testing.T) {
 				t:                   t,
 			},
 		},
-		testcase{
+		{
 			expErr: user.ErrorPasswordMismatch,
 			desc:   "login unsuccessful",
 			user:   &testhelper.User{Password: "pass"},
@@ -207,13 +214,15 @@ func TestAuth_Login(t *testing.T) {
 
 			_, err := a.RegisterUser(regdUsr, regdUsr.Password, "127.0.0.1", "authms", "test")
 			if err != nil {
-				t.Fatalf("Test %s: auth.RegisterUser(): %s", err)
+				t.Fatalf("Test %s: auth.RegisterUser(): %s", c.desc, err)
 				return
 			}
 
-			_, err = a.Login(c.user.UName, c.user.Password, "devid", "127.0.0.1", "tester", "auth")
+			_, err = a.LoginUserName(c.user.UName, c.user.Password,
+				"devid", "127.0.0.1", "tester", "auth")
 			if err != c.expErr {
-				t.Errorf("Test %s: auth.Login(): expected error %v but got %v", c.desc, c.expErr, err)
+				t.Errorf("Test %s: auth.Login(): expected error %v but got %v",
+					c.desc, c.expErr, err)
 			}
 
 			if !c.hist.isSaveCalled {
@@ -226,7 +235,7 @@ func TestAuth_Login(t *testing.T) {
 
 func TestAuth_Login2(t *testing.T) {
 	// TODO p>m login/token attempts from an ip address over duration t
-	t.Fatalf("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
+	t.Fatal("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
 }
 
 func TestAuth_AuthenticateToken(t *testing.T) {
@@ -244,7 +253,7 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 	}
 
 	cases := []testcase{
-		testcase{
+		{
 			expErr:  nil,
 			desc:    "token matches",
 			useRegd: true,
@@ -256,7 +265,7 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 				t:                   t,
 			},
 		},
-		testcase{
+		{
 			expErr:  token.ErrorInvalidToken,
 			desc:    "token mismatch",
 			useRegd: false,
@@ -277,10 +286,10 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 
 			_, err := a.RegisterUser(regdUsr, regdUsr.Password, "127.0.0.1", "authms", "test")
 			if err != nil {
-				t.Fatalf("Test %s: auth.RegisterUser(): %s", err)
+				t.Fatalf("Test %s: auth.RegisterUser(): %s", c.desc, err)
 				return
 			}
-			u, err := a.Login(regdUsr.UName, regdUsr.Password, "devid", "127.0.0.1", "tester", "auth")
+			u, err := a.LoginUserName(regdUsr.UName, regdUsr.Password, "devid", "127.0.0.1", "tester", "auth")
 
 			uID := 1
 			if c.useRegd {
@@ -317,34 +326,31 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 
 func TestAuth_AuthenticateToken2(t *testing.T) {
 	// TODO p>m login/token attempts from an ip address over duration t
-	t.Fatalf("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
+	t.Fatal("untested:\nCheck:\n3 failed attempts for a user from an IP in an hour blocked\n6 attempts from a user in an hour blocked")
 }
 
 func TestAPIKeysEnforced(t *testing.T) {
-	t.Fatalf("untested:\nAccess auth services only if client (microservice) / API key combo is recogonized")
+	t.Fatal("untested:\nAccess auth services only if client (microservice) / API key combo is recogonized")
 }
 
 func newAuth(h *History, t *testing.T) *auth.Auth {
 
-	db = testhelper.InstantiateDB(t)
-	testhelper.SetUp(nil, db, t)
+	db = testhelper.SQLDB(t)
 
 	quitCh := make(chan error)
-	dsn := testhelper.DSN
 	conf := auth.Config{
 		BlacklistWindow:    30 * time.Minute,
 		BlackListFailCount: 3,
 	}
 
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	dsn.DB = testhelper.DBName
-	a, err := auth.New(dsn, h, conf, lg, quitCh)
+	a, err := auth.New(db, h, conf, lg, quitCh)
 	if err != nil {
 		t.Fatalf("auth.New(): %s", err)
 	}
 
 	if a == nil {
-		t.Fatalf("auth was nil, expected a value")
+		t.Fatal("auth was nil, expected a value")
 	}
 
 	return a

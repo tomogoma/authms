@@ -5,18 +5,18 @@ import (
 
 	"time"
 
-	"bitbucket.org/tomogoma/auth-ms/auth"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/helper"
-	"bitbucket.org/tomogoma/auth-ms/auth/model/history"
-	"bitbucket.org/tomogoma/auth-ms/server/http"
 	"github.com/limetext/log4go"
+	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/server/http"
 )
 
 type defLogWriter struct {
 	lg log4go.Logger
 }
 
-func (dlw defLogWriter) Write(p []byte) (n int, err error) {
+func (dlw defLogWriter) Write(p []byte) (int, error) {
 	return len(p), dlw.lg.Error("%s", p)
 }
 
@@ -28,7 +28,7 @@ func main() {
 
 	dsn := helper.DSN{
 		UName:       "root",
-		Host:        "z500:26257",
+		Host:        "localhost:26257",
 		DB:          "authms",
 		SslCert:     "/etc/cockroachdb/certs/node.cert",
 		SslKey:      "/etc/cockroachdb/certs/node.key",
@@ -51,9 +51,10 @@ func main() {
 	aConf := auth.Config{
 		BlackListFailCount: auth.MinBlackListFailCount,
 		BlacklistWindow:    auth.MinBlackListWindow,
+		DBName:             dsn.DB,
 	}
 
-	a, err := auth.New(dsn, hm, aConf, lg, authQuitCh)
+	a, err := auth.New(db, hm, aConf, lg, authQuitCh)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return
