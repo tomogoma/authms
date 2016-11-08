@@ -225,7 +225,16 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	s.lg.Fine("%d - validate login...", tID)
-	authUsr, err := s.auth.LoginUserName(req.UName, req.Pass, req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
+	var authUsr user.User
+	if req.UName != "" {
+		s.lg.Fine("%d - use username...", tID)
+		authUsr, err = s.auth.LoginUserName(req.UName, req.Pass,
+			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
+	} else if req.AppID != nil {
+		s.lg.Fine("%d - use appID...", tID)
+		authUsr, err = s.auth.LoginUserAppID(req.AppID, req.Pass,
+			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
+	}
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {

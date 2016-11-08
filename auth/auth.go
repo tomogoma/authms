@@ -140,6 +140,43 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.U
 	return usr, nil
 }
 
+func (a *Auth) LoginUserAppID(app user.App, pass, devID, rIP, srvID, ref string) (user.User, error) {
+
+	usr, err := a.usrM.GetByAppUserID(app.Name(), app.UserID(), pass, valHashF)
+	if err != nil {
+		uid := -1
+		if usr != nil {
+			uid = usr.ID()
+		}
+		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
+	}
+
+	tkn, err := token.New(usr.ID(), devID, token.ShortExpType)
+	if err != nil {
+		return nil, err
+	}
+	usr.SetToken(tkn)
+
+	_, err = a.tokenM.Save(*tkn)
+	if err != nil {
+		return nil, err
+	}
+
+	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
+	if err != nil {
+		return nil, err
+	}
+	usr.SetPreviousLogins(prevLogins...)
+
+	err = a.saveHistory(usr.ID(), rIP, srvID, ref, history.LoginAccess, nil)
+	if err != nil {
+		a.tokenM.Delete(tkn.Token())
+		return nil, err
+	}
+
+	return usr, nil
+}
+
 func (a *Auth) AuthenticateToken(usrID int, devID, tknStr, rIP, srvID, ref string) (user.User, error) {
 
 	tkn, err := a.tokenM.Get(usrID, devID, tknStr)
