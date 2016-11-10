@@ -7,7 +7,6 @@ import (
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/lib/pq"
-	uuid "github.com/satori/go.uuid"
 	"github.com/tomogoma/authms/auth/model/helper"
 )
 
@@ -16,6 +15,7 @@ var ErrorUserExists = errors.New("A user with the provided username already exis
 var ErrorEmailExists = errors.New("A user with the provided email already exists")
 var ErrorAppIDExists = errors.New("A user with the provided app ID for the provided app name already exists")
 var ErrorPhoneExists = errors.New("A user with the provided phone already exists")
+var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
 type Model struct {
 	db *sql.DB
@@ -80,7 +80,7 @@ func (m Model) Save(u user) (*user, error) {
 
 func (m Model) Get(userID int) (*user, error) {
 	userQ := `SELECT id FROM users WHERE id = $1`
-	usr := getUserShell()
+	usr := &user{}
 	err := m.db.QueryRow(userQ, userID).Scan(&usr.id)
 	if err != nil {
 		return nil, err
@@ -89,7 +89,7 @@ func (m Model) Get(userID int) (*user, error) {
 }
 
 func (m Model) GetByUserName(uName, pass string, hashF ValidatePassFunc) (*user, error) {
-	usr := getUserShell()
+	usr := &user{}
 	unameQ := `SELECT userID, userName FROM userNames WHERE userName = $1`
 	err := m.db.QueryRow(unameQ, uName).Scan(&usr.id, &usr.userName)
 	if err != nil {
@@ -105,7 +105,7 @@ func (m Model) GetByUserName(uName, pass string, hashF ValidatePassFunc) (*user,
 }
 
 func (m Model) GetByPhone(phone, pass string, hashF ValidatePassFunc) (*user, error) {
-	usr := getUserShell()
+	usr := &user{phone: &value{}}
 	query := `SELECT userID, phone, validated FROM phones WHERE phone = $1`
 	err := m.db.QueryRow(query, phone).
 		Scan(&usr.id, &usr.phone.value, &usr.phone.validated)
@@ -122,7 +122,7 @@ func (m Model) GetByPhone(phone, pass string, hashF ValidatePassFunc) (*user, er
 }
 
 func (m Model) GetByEmail(email, pass string, hashF ValidatePassFunc) (*user, error) {
-	usr := getUserShell()
+	usr := &user{email: &value{}}
 	query := `SELECT userID, email, validated FROM emails WHERE email = $1`
 	err := m.db.QueryRow(query, email).
 		Scan(&usr.id, &usr.email.value, &usr.email.validated)
@@ -139,7 +139,7 @@ func (m Model) GetByEmail(email, pass string, hashF ValidatePassFunc) (*user, er
 }
 
 func (m Model) GetByAppUserID(appName, appUserID, pass string, hashF ValidatePassFunc) (*user, error) {
-	usr := getUserShell()
+	usr := &user{app: &app{}}
 	query := `SELECT userID, appName, appUserID, validated FROM appUserIDs
 	 		WHERE appName = $1 AND appUserID = $2`
 	err := m.db.QueryRow(query, appName, appUserID).
@@ -164,11 +164,7 @@ func (m Model) validatePassword(id int, password string, hashF ValidatePassFunc)
 		return err
 	}
 	if len(dbPassword) == 0 {
-		plcholder := uuid.NewV4().String()
-		dbPassword, err = Hash(plcholder)
-		if err != nil {
-			return err
-		}
+		return ErrorModelCorruptedOnEmptyPassword
 	}
 	if !hashF(password, dbPassword) {
 		return ErrorPasswordMismatch
@@ -184,12 +180,4 @@ func processError(receivedErr, existsErr error) error {
 		return receivedErr
 	}
 	return nil
-}
-
-func getUserShell() *user {
-	return &user{
-		phone: &value{},
-		email: &value{},
-		app:   &app{},
-	}
 }
