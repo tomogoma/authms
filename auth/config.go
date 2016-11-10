@@ -16,7 +16,6 @@ var ErrorBadMaxFailAttemptsDuration = fmt.Errorf("MaxFailAttempts cannot be less
 type Config struct {
 	BlackListFailCount int
 	BlacklistWindow    time.Duration
-	DBName             string
 }
 
 func (conf Config) Validate() error {

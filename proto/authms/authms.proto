@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+service AuthMS {
+    rpc Register(Request) returns (Response) {}
+    rpc Login(Request) returns (Response) {}
+    rpc ValidateToken(Request) returns (Response) {}
+}
+
+message History {
+    int64 id = 1;
+    int64 userID = 2;
+    string ipAddress = 3;
+    string date = 4;
+    string accessType = 5;
+    bool successStatus = 6;
+}
+
+message AppID {
+    string appName = 1;
+    string appUserID = 2;
+    bool verified = 3;
+}
+
+message Value {
+    string value = 1;
+    bool verified = 2;
+}
+
+message User {
+    int64 id = 1;
+    string token = 2;
+    string password = 3;
+    string username = 4;
+    repeated History loginHistory = 5;
+    Value phone = 6;
+    Value mail = 7;
+    AppID appID = 8;
+}
+
+message Request {
+    string deviceID = 1;
+    string forServiceID = 2;
+    string refererServiceID = 3;
+    User user = 4;
+}
+
+message Response {
+    int32 status = 1;
+    User user = 2;
+    string message = 3;
+}

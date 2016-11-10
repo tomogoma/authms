@@ -13,6 +13,7 @@ import (
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/server/helper"
 )
 
 const (
@@ -138,7 +139,7 @@ func New(auth *auth.Auth, lg Logger, quitCh chan error) (*Server, error) {
 	}
 
 	tIDCh := make(chan int)
-	go transactionSerializer(tIDCh)
+	go helper.TransactionSerializer(tIDCh)
 
 	return &Server{auth: auth, lg: lg, tIDCh: tIDCh, quitCh: quitCh}, nil
 }
@@ -372,13 +373,4 @@ func jsonResponse(w http.ResponseWriter, dataKey string, data interface{}, statu
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	return w.Write(respB)
-}
-
-func transactionSerializer(tIDCh chan int) {
-
-	tID := 0
-	for {
-		tID++
-		tIDCh <- tID
-	}
 }
