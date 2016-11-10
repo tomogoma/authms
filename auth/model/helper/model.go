@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS appUserIDs (
   INDEX      userID_indx (userID)
 ) INTERLEAVE IN PARENT users (id);
 `
+	// TODO enforce that devID, userID [, and appID??] as unique
 	tokens = `
 CREATE TABLE IF NOT EXISTS tokens (
   id     SERIAL PRIMARY KEY NOT NULL,
@@ -83,6 +84,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   INDEX  userID_indx (userID)
 ) INTERLEAVE IN PARENT users (id);
 `
+	// TODO add error column
 	history = `
 CREATE TABLE IF NOT EXISTS history (
   id           SERIAL PRIMARY KEY NOT NULL,
