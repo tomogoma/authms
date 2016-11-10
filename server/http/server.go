@@ -35,15 +35,7 @@ type Request struct {
 	FrSrvcID  string `json:"forServiceID,omitempty"`
 	RefSrvcID string `json:"refererServiceID,omitempty"`
 	DevID     string `json:"devID,omitempty"`
-}
-
-type Token struct {
-	ID     int       `json:"id,omitempty"`
-	UserID int       `json:"userID,omitempty"`
-	DevID  string    `json:"devID,omitempty"`
-	Token  string    `json:"token,omitempty"`
-	Issued time.Time `json:"issueDate,omitempty"`
-	Expiry time.Time `json:"expiryDate,omitempty"`
+	User
 }
 
 type History struct {
@@ -102,7 +94,6 @@ func (v *Value) Validated() bool {
 }
 
 type User struct {
-	Request
 	ID         int       `json:"id,omitempty"`
 	UName      string    `json:"userName,omitempty"`
 	PhoneNo    *Value    `json:"phone,omitempty"`
@@ -175,7 +166,7 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := &User{}
+	req := &Request{}
 	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
@@ -217,7 +208,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := &User{}
+	req := &Request{}
 	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
@@ -268,7 +259,7 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	req := &User{}
+	req := &Request{}
 	s.lg.Fine("%d - unmarshal request...", tID)
 	err := json.Unmarshal(dataB, req)
 	if err != nil {
