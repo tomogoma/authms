@@ -59,6 +59,7 @@ type User struct {
 	Password    string
 	HashF       user.HashFunc
 	ValHashFunc user.ValidatePassFunc
+	TokenGen    *token.Generator
 }
 
 func (u *User) ID() int {
@@ -92,7 +93,7 @@ func (u *User) PreviousLogins() []*history.History {
 	return make([]*history.History, 0)
 }
 func (u *User) Token() token.Token {
-	t, _ := token.New(1, "test", token.ShortExpType)
+	t, _ := u.TokenGen.Generate(1, "test", token.ShortExpType)
 	return t
 }
 

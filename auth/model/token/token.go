@@ -4,8 +4,6 @@ import (
 	"errors"
 
 	"time"
-
-	uuid "github.com/satori/go.uuid"
 )
 
 const (
@@ -49,32 +47,25 @@ func (t *token) Token() string     { return t.token }
 func (t *token) Issued() time.Time { return t.issued }
 func (t *token) Expiry() time.Time { return t.expiry }
 
-func New(usrID int, devID string, expType ExpiryType) (*token, error) {
-
+func New(usrID int, devID, tokenStr string, issued, expiry time.Time) (*token, error) {
 	if usrID < 1 {
 		return nil, ErrorBadUserID
 	}
-
 	if devID == "" {
 		return nil, ErrorEmptyDevID
 	}
-
-	tknStr := uuid.NewV4().String()
-	issued := time.Now()
-	expiry := issued.Add(shortDuration)
-
-	switch expType {
-	case MedExpType:
-		expiry = issued.Add(mediumDuration)
-	case LongExpType:
-		expiry = issued.Add(longDuration)
+	if tokenStr == "" {
+		return nil, ErrorEmptyToken
 	}
-
 	return &token{
 		userID: usrID,
 		devID:  devID,
-		token:  tknStr,
+		token:  tokenStr,
 		issued: issued,
 		expiry: expiry,
 	}, nil
+}
+
+func NewFrom(t Token) (*token, error) {
+	return New(t.UserID(), t.DevID(), t.Token(), t.Issued(), t.Expiry())
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/model/helper"
 	"github.com/tomogoma/authms/auth/model/history"
+	"github.com/tomogoma/authms/auth/model/token"
 	"github.com/tomogoma/authms/server/http"
 )
 
@@ -54,7 +55,12 @@ func main() {
 		DBName:             dsn.DB,
 	}
 
-	a, err := auth.New(db, hm, aConf, lg, authQuitCh)
+	tgConf := token.Config{
+		TokenKeyFile: "ssh-keys/sha256.key",
+	}
+	tg, err := token.NewGenerator(tgConf)
+
+	a, err := auth.New(db, hm, tg, aConf, lg, authQuitCh)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return

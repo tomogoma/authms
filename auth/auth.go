@@ -20,10 +20,16 @@ const (
 var hashF = user.Hash
 var valHashF = user.CompareHash
 var ErrorNilHistoryModel = errors.New("history model was nil")
+var ErrorNilTokenGenerator = errors.New("Token generator was nil")
 
 type HistModel interface {
 	Save(ld history.History) (int, error)
 	Get(userID, offset, count int, acMs ...int) ([]*history.History, error)
+}
+
+type TokenGenerator interface {
+	Generate(usrID int, devID string, expType token.ExpiryType) (token.Token, error)
+	Validate(tokenStr string) (token.Token, error)
 }
 
 type User interface {
@@ -38,6 +44,7 @@ type Auth struct {
 	usrM   *user.Model
 	tokenM *token.Model
 	histM  HistModel
+	tokenG TokenGenerator
 }
 
 func AuthError(err error) bool {
@@ -58,7 +65,7 @@ func AuthError(err error) bool {
 	return false
 }
 
-func New(db *sql.DB, histM HistModel, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
+func New(db *sql.DB, histM HistModel, tg TokenGenerator, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
 
 	if histM == nil {
 		return nil, ErrorNilHistoryModel
@@ -66,6 +73,10 @@ func New(db *sql.DB, histM HistModel, conf Config, lg token.Logger, quitCh chan 
 
 	if err := conf.Validate(); err != nil {
 		return nil, err
+	}
+
+	if tg == nil {
+		return nil, ErrorNilTokenGenerator
 	}
 
 	usrM, err := user.NewModel(db)
@@ -83,14 +94,13 @@ func New(db *sql.DB, histM HistModel, conf Config, lg token.Logger, quitCh chan 
 		return nil, err
 	}
 
-	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM}, nil
+	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM, tokenG: tg}, nil
 }
 
 func (a *Auth) RegisterUser(usr User, pass string, rIP, srvID, ref string) (user.User, error) {
 
 	u, err := user.New(usr.UserName(), usr.PhoneNumber(), usr.EmailAddress(), pass,
 		usr.App(), hashF)
-	fmt.Printf("created user: %+v", err)
 	if err != nil {
 		return nil, a.saveHistory(-1, rIP, srvID, ref, history.RegistrationAccess, err)
 	}
@@ -113,14 +123,17 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.U
 		}
 		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
 	}
-
-	tkn, err := token.New(usr.ID(), devID, token.ShortExpType)
+	tkn, err := a.tokenG.Generate(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
 		return nil, err
 	}
-	usr.SetToken(tkn)
+	usr.Token(tkn.Token())
+	modelTkn, err := token.NewFrom(tkn)
+	if err != nil {
+		return nil, err
+	}
 
-	_, err = a.tokenM.Save(*tkn)
+	_, err = a.tokenM.Save(*modelTkn)
 	if err != nil {
 		return nil, err
 	}
@@ -151,13 +164,17 @@ func (a *Auth) LoginUserAppID(app user.App, pass, devID, rIP, srvID, ref string)
 		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
 	}
 
-	tkn, err := token.New(usr.ID(), devID, token.ShortExpType)
+	tkn, err := a.tokenG.Generate(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
 		return nil, err
 	}
-	usr.SetToken(tkn)
+	usr.Token(tkn.Token())
 
-	_, err = a.tokenM.Save(*tkn)
+	modelTkn, err := token.NewFrom(tkn)
+	if err != nil {
+		return nil, err
+	}
+	_, err = a.tokenM.Save(*modelTkn)
 	if err != nil {
 		return nil, err
 	}
@@ -177,21 +194,29 @@ func (a *Auth) LoginUserAppID(app user.App, pass, devID, rIP, srvID, ref string)
 	return usr, nil
 }
 
-func (a *Auth) AuthenticateToken(usrID int, devID, tknStr, rIP, srvID, ref string) (user.User, error) {
+func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (user.User, error) {
 
-	tkn, err := a.tokenM.Get(usrID, devID, tknStr)
+	claimsTkn, err := a.tokenG.Validate(tknStr)
 	if err != nil {
-		if usrID == 0 {
-			usrID = -1
+		usrID := -1
+		return nil, a.saveHistory(usrID, rIP, srvID, ref, history.TokenValidationAccess, token.ErrorInvalidToken)
+	}
+
+	tkn, err := a.tokenM.Get(claimsTkn.UserID(), claimsTkn.DevID(), tknStr)
+	if err != nil {
+		usrID := -1
+		if tkn != nil && tkn.UserID() != 0 {
+			usrID = tkn.UserID()
 		}
 		return nil, a.saveHistory(usrID, rIP, srvID, ref, history.TokenValidationAccess, err)
 	}
 
+	// TODO remove this
 	usr, err := a.usrM.Get(tkn.UserID())
 	if err != nil {
 		return nil, err
 	}
-	usr.SetToken(tkn)
+	usr.Token(tkn.Token())
 
 	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {

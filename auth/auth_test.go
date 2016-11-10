@@ -69,6 +69,8 @@ var histM = &History{
 	accessSuccessStatus: true,
 }
 
+var tokenGen *token.Generator
+
 func TestNew(t *testing.T) {
 	newAuth(histM, t)
 	defer testhelper.TearDown(db, t)
@@ -90,6 +92,7 @@ func TestAuth_RegisterUser(t *testing.T) {
 			user: &testhelper.User{
 				UName:    "uname",
 				Password: "pass",
+				TokenGen: tokenGen,
 			},
 			hist: &History{
 				desc:                "register successfull",
@@ -102,7 +105,10 @@ func TestAuth_RegisterUser(t *testing.T) {
 		{
 			expErr: user.ErrorEmptyIdentifier,
 			desc:   "register unsuccessful",
-			user:   &testhelper.User{Password: "pass"},
+			user: &testhelper.User{
+				Password: "pass",
+				TokenGen: tokenGen,
+			},
 			hist: &History{
 				desc:                "register unsuccessful",
 				testPoint:           1,
@@ -178,6 +184,7 @@ func TestAuth_Login(t *testing.T) {
 	regdUsr := &testhelper.User{
 		UName:    "uname",
 		Password: "pass",
+		TokenGen: tokenGen,
 	}
 
 	cases := []testcase{
@@ -250,6 +257,7 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 	regdUsr := &testhelper.User{
 		UName:    "uname",
 		Password: "pass",
+		TokenGen: tokenGen,
 	}
 
 	cases := []testcase{
@@ -290,12 +298,19 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 				return
 			}
 			u, err := a.LoginUserName(regdUsr.UName, regdUsr.Password, "devid", "127.0.0.1", "tester", "auth")
-
-			uID := 1
-			if c.useRegd {
-				uID = u.ID()
+			if err != nil {
+				t.Fatalf("Test %s: auth.loginUserName(): %s", c.desc, err)
+				return
 			}
-			usr, err := a.AuthenticateToken(uID, "devid", u.Token().Token(), "127.0.0.1", "tester", "auth")
+			tkStr := u.Token("")
+			if !c.useRegd {
+				tkn, err := tokenGen.Generate(regdUsr.ID(), "devid", token.ShortExpType)
+				if err != nil {
+					t.Errorf("Test %s: unable to generate dummy token: %s", c.desc, err)
+				}
+				tkStr = tkn.Token()
+			}
+			usr, err := a.AuthenticateToken(tkStr, "127.0.0.1", "tester", "auth")
 			if err != c.expErr {
 				t.Errorf("Test %s: auth.AuthenticateToken(): expected error %v but got %v", c.desc, c.expErr, err)
 			}
@@ -313,8 +328,8 @@ func TestAuth_AuthenticateToken(t *testing.T) {
 				return
 			}
 
-			if usr.Token() == nil {
-				t.Errorf("Test %s: expected a token, got nil", c.desc)
+			if usr.Token("") == "" {
+				t.Errorf("Test %s: expected a token, got empty", c.desc)
 			}
 
 			if len(usr.PreviousLogins()) != 1 {
@@ -343,8 +358,16 @@ func newAuth(h *History, t *testing.T) *auth.Auth {
 		BlackListFailCount: 3,
 	}
 
+	var err error
+	tokenGen, err = token.NewGenerator(token.Config{
+		TokenKeyFile: "../ssh-keys/sha256.key",
+	})
+	if err != nil {
+		t.Fatalf("New Token Generator: %s", err)
+	}
+
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := auth.New(db, h, conf, lg, quitCh)
+	a, err := auth.New(db, h, tokenGen, conf, lg, quitCh)
 	if err != nil {
 		t.Fatalf("auth.New(): %s", err)
 	}

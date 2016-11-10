@@ -4,7 +4,6 @@ import (
 	"errors"
 
 	"github.com/tomogoma/authms/auth/model/history"
-	"github.com/tomogoma/authms/auth/model/token"
 )
 
 var ErrorEmptyIdentifier = errors.New("must have at least one login identifier (username|email|appID...)")
@@ -31,7 +30,7 @@ type User interface {
 	Email() Valuer
 	App() App
 	PreviousLogins() []*history.History
-	Token() token.Token
+	Token(string) string
 }
 
 type user struct {
@@ -42,7 +41,7 @@ type user struct {
 	app            *app
 	password       []byte
 	previousLogins []*history.History
-	token          token.Token
+	token          string
 }
 
 func (u *user) ID() int {
@@ -63,15 +62,16 @@ func (u *user) App() App {
 func (u *user) PreviousLogins() []*history.History {
 	return u.previousLogins
 }
-func (u *user) Token() token.Token {
+func (u *user) Token(tkn string) string {
+	if tkn == "" {
+		return u.token
+	}
+	u.token = tkn
 	return u.token
 }
 
 func (u *user) SetPreviousLogins(ls ...*history.History) {
 	u.previousLogins = ls
-}
-func (u *user) SetToken(t token.Token) {
-	u.token = t
 }
 
 func New(uName, phoneNo, email, pass string, appUserID App, hashF HashFunc) (*user, error) {

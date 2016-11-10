@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"time"
 
+	"fmt"
+
 	"github.com/gorilla/mux"
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/model/history"
@@ -107,7 +109,7 @@ type User struct {
 	Mail       *Value    `json:"email,omitempty"`
 	AppID      *AppID    `json:"appID,omitempty"`
 	Pass       string    `json:"password,omitempty"`
-	Token      *Token    `json:"token,omitempty"`
+	Token      string    `json:"token,omitempty"`
 	PrevLogins []History `json:"prevLogins,omitempty"`
 }
 
@@ -274,21 +276,8 @@ func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to unmarshal json request body", http.StatusBadRequest)
 		return
 	}
-
-	userID := req.ID
-	token := ""
-	devID := req.DevID
-	if req.Token != nil {
-		if req.Token.UserID != 0 {
-			userID = req.Token.UserID
-		}
-		if req.Token.DevID != "" {
-			devID = req.Token.DevID
-		}
-		token = req.Token.Token
-	}
 	s.lg.Fine("%d - validate token...", tID)
-	authUsr, err := s.auth.AuthenticateToken(userID, devID, token, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
+	authUsr, err := s.auth.AuthenticateToken(req.Token, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
@@ -343,22 +332,8 @@ func packageUser(rcv user.User) User {
 			SuccessStatus: h.Successful(),
 		}
 	}
-
-	var token *Token
-	rt := rcv.Token()
-	if rt != nil {
-		token = &Token{
-			ID:     rt.ID(),
-			UserID: rt.UserID(),
-			DevID:  rt.DevID(),
-			Token:  rt.Token(),
-			Issued: rt.Issued(),
-			Expiry: rt.Expiry(),
-		}
-	}
-
 	var email *Value
-	if e := rcv.Email(); e != nil {
+	if e := rcv.Email(); e != nil && fmt.Sprintf("%v", e) != "<nil>" {
 		email = &Value{
 			Val:      e.Value(),
 			Verified: e.Validated(),
@@ -366,7 +341,7 @@ func packageUser(rcv user.User) User {
 	}
 
 	var phone *Value
-	if p := rcv.Phone(); p != nil {
+	if p := rcv.Phone(); p != nil && fmt.Sprintf("%v", p) != "<nil>" {
 		phone = &Value{
 			Val:      p.Value(),
 			Verified: p.Validated(),
@@ -374,7 +349,7 @@ func packageUser(rcv user.User) User {
 	}
 
 	var appID *AppID
-	if app := rcv.App(); app != nil {
+	if app := rcv.App(); app != nil && fmt.Sprintf("%v", app) != "<nil>" {
 		app = &AppID{
 			AppName:  app.Name(),
 			UsrID:    app.UserID(),
@@ -385,11 +360,11 @@ func packageUser(rcv user.User) User {
 	return User{
 		ID:         rcv.ID(),
 		UName:      rcv.UserName(),
+		Token:      rcv.Token(""),
 		AppID:      appID,
 		Mail:       email,
 		PhoneNo:    phone,
 		PrevLogins: prevLogins,
-		Token:      token,
 	}
 }
 
