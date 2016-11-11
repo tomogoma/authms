@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"time"
 
@@ -11,12 +12,13 @@ import (
 	"github.com/tomogoma/authms/auth/model/helper"
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/rpc"
 )
 
 const (
-	serviceName    = "AuthMS"
+	serviceName    = "authms"
 	serviceVersion = "0.0.1"
 )
 
@@ -28,26 +30,13 @@ func (dlw defLogWriter) Write(p []byte) (int, error) {
 	return len(p), dlw.lg.Error("%s", p)
 }
 
+var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "location of config file")
+
 func main() {
-	conf := Config{
-		RunType:          runTypeRPC,
-		RegisterInterval: 5 * time.Second,
-		HttpAddress:      ":3345",
-		Database: helper.DSN{
-			UName:       "root",
-			Host:        "localhost:26257",
-			DB:          "authms",
-			SslCert:     "/etc/cockroachdb/certs/node.cert",
-			SslKey:      "/etc/cockroachdb/certs/node.key",
-			SslRootCert: "/etc/cockroachdb/certs/ca.cert",
-		},
-		Authentication: auth.Config{
-			BlackListFailCount: auth.MinBlackListFailCount,
-			BlacklistWindow:    auth.MinBlackListWindow,
-		},
-		Token: token.Config{
-			TokenKeyFile: "ssh-keys/sha256.key",
-		},
+	flag.Parse()
+	conf, err := config.ReadFile(*confFile)
+	if err != nil {
+		log.Fatalf("Error Reading config file: %s", err)
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
 	log.SetOutput(defLogWriter{lg: lg})
@@ -80,11 +69,11 @@ func main() {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
 	}
-	switch conf.RunType {
-	case runTypeRPC:
-		serveRPC(conf, rpcSrv, serverRPCQuitCh)
-	case runTypeHttp:
-		serveHttp(rpcSrv, serverHttpQuitCh)
+	switch conf.Service.RunType {
+	case config.RunTypeRPC:
+		go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
+	case config.RunTypeHttp:
+		go serveHttp(rpcSrv, serverHttpQuitCh)
 	default:
 		lg.Critical("Invalid runt type chosen")
 		return
@@ -99,7 +88,7 @@ func main() {
 	}
 }
 
-func serveRPC(c Config, rpcSrv *rpc.Server, quitCh chan error) {
+func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(serviceName),
 		micro.Version(serviceVersion),
@@ -107,11 +96,9 @@ func serveRPC(c Config, rpcSrv *rpc.Server, quitCh chan error) {
 	)
 	service.Init()
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
-	go func() {
-		if err := service.Run(); err != nil {
-			quitCh <- err
-		}
-	}()
+	if err := service.Run(); err != nil {
+		quitCh <- err
+	}
 }
 
 func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
@@ -127,9 +114,7 @@ func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
 		//server.RegisterInterval(c.RegisterInterval),
 	)
 	server.Handle(server.NewHandler(rpcServ))
-	go func() {
-		if err := server.Run(); err != nil {
-			quitCh <- err
-		}
-	}()
+	if err := server.Run(); err != nil {
+		quitCh <- err
+	}
 }

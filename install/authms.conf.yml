@@ -1,0 +1,16 @@
+service:
+  runtype: http
+  registerinterval: 5s
+database:
+  uname: root
+  password: ""
+  host: localhost:26257
+  db: authms
+  sslcert: /etc/cockroachdb/certs/node.cert
+  sslkey: /etc/cockroachdb/certs/node.key
+  sslrootcert: /etc/cockroachdb/certs/ca.cert
+authentication:
+  blacklistfailcount: 3
+  blacklistwindow: 30m0s
+token:
+  tokenkeyfile: ssh-keys/sha256.key

@@ -21,6 +21,10 @@ func (d DSN) DBName() string {
 	return d.DB
 }
 
+func (d DSN) Validate() error {
+	return nil
+}
+
 //func (d DSN) FormatDSNNoDB() string {
 //
 //	dsnPrefix := "postgres://"
