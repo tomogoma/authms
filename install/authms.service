@@ -1,0 +1,12 @@
+[Unit]
+Description=Authentication Micro-Service
+After=cockroach.service
+Requires=cockroach.service
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=/usr/local/authms/authms -config=/etc/authms/authms.conf.yml
+SyslogIdentifier=AUTH_SERV
+Restart=always
