@@ -10,7 +10,9 @@ UNIT_FILE="/etc/systemd/system/${NAME}.service"
 ./systemd-uninstall.sh || exit 1
 echo "Begin install"
 mkdir -p "${CONF_DIR}" || exit 1
-cp "${NAME}.conf.yml" "${CONF_FILE}" || exit 1
+if [ ! -f "${CONF_FILE}" ]; then
+    cp "${NAME}.conf.yml" "${CONF_FILE}" || exit 1
+fi
 mkdir -p "${INSTALL_DIR}" || exit 1
 cp -f "${BUILD_NAME}" "${INSTALL_DIR}/${NAME}" || exit 1
 cp -f "${NAME}.service" "${UNIT_FILE}" || exit 1
