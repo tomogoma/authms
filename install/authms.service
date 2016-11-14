@@ -7,6 +7,6 @@ Requires=cockroach.service
 WantedBy=multi-user.target
 
 [Service]
-ExecStart=/usr/local/authms/authms -config=/etc/authms/authms.conf.yml
+ExecStart=/usr/local/authms/authms -conf=/etc/authms/authms.conf.yml
 SyslogIdentifier=AUTH_SERV
 Restart=always
