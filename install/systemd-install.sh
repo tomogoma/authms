@@ -17,5 +17,5 @@ mkdir -p "${INSTALL_DIR}" || exit 1
 cp -f "${BUILD_NAME}" "${INSTALL_DIR}/${NAME}" || exit 1
 cp -f "${NAME}.service" "${UNIT_FILE}" || exit 1
 systemctl enable "${NAME}.service"
-echo "Config file is at '${CONF_FILE}"
+echo "Config file is at '${CONF_FILE}'"
 echo "Install complete"
