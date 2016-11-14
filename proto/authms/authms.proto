@@ -45,7 +45,8 @@ message Request {
 }
 
 message Response {
-    int32 status = 1;
-    User user = 2;
-    string message = 3;
+    string id = 1;
+    int32 code = 2;
+    User user = 3;
+    string detail = 4;
 }

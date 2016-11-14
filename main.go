@@ -27,7 +27,8 @@ type defLogWriter struct {
 }
 
 func (dlw defLogWriter) Write(p []byte) (int, error) {
-	return len(p), dlw.lg.Error("%s", p)
+	dlw.lg.Info("%s", p)
+	return len(p), nil
 }
 
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "location of config file")
@@ -64,7 +65,7 @@ func main() {
 	}
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.New(a, lg)
+	rpcSrv, err := rpc.New(serviceName, a, lg)
 	if err != nil {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
@@ -80,11 +81,11 @@ func main() {
 	}
 	select {
 	case err = <-authQuitCh:
-		lg.Critical("auth quit with error: %s", err)
+		lg.Critical("auth quit with error: %v", err)
 	case err = <-serverHttpQuitCh:
-		lg.Critical("http server quit with error: %s", err)
+		lg.Critical("http server quit with error: %v", err)
 	case err = <-serverRPCQuitCh:
-		lg.Critical("rpc server quit with error: %s", err)
+		lg.Critical("rpc server quit with error: %v", err)
 	}
 }
 
@@ -92,9 +93,12 @@ func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(serviceName),
 		micro.Version(serviceVersion),
+		micro.Metadata(map[string]string{
+			"type": "helloworld",
+		}),
 		micro.RegisterInterval(c.RegisterInterval),
 	)
-	service.Init()
+	//service.Init()
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
 	err := service.Run()
 	quitCh <- err
