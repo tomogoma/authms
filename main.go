@@ -96,9 +96,8 @@ func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	)
 	service.Init()
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
-	if err := service.Run(); err != nil {
-		quitCh <- err
-	}
+	err := service.Run()
+	quitCh <- err
 }
 
 func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
@@ -114,7 +113,6 @@ func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
 		//server.RegisterInterval(c.RegisterInterval),
 	)
 	server.Handle(server.NewHandler(rpcServ))
-	if err := server.Run(); err != nil {
-		quitCh <- err
-	}
+	err := server.Run()
+	quitCh <- err
 }
