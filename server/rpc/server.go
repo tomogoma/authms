@@ -2,10 +2,8 @@ package rpc
 
 import (
 	"errors"
-
 	"fmt"
 	"net/http"
-
 	"time"
 
 	"github.com/tomogoma/authms/auth"
@@ -28,43 +26,18 @@ type Logger interface {
 	Fine(interface{}, ...interface{})
 }
 
-//type Request authms.Request
-//type History authms.History
 type AppID authms.AppID
 
-func (a AppID) Name() string { return a.AppName }
-
-func (a AppID) UserID() string { return a.AppUserID }
-
+func (a AppID) Name() string    { return a.AppName }
+func (a AppID) UserID() string  { return a.AppUserID }
 func (a AppID) Validated() bool { return a.Verified }
-
-//
-//type Value authms.Value
-//
-//func (v Value) Value() string {
-//	if v == nil {
-//		return ""
-//	}
-//	return v.Value
-//}
-//
-//func (v *Value) Validated() bool {
-//	if v == nil {
-//		return false
-//	}
-//	return v.Verified
-//}
 
 type User authms.User
 
-func (u User) UserName() string { return u.Username }
-
-//func (u User) Email() user.Valuer   { return u.Mail }
+func (u User) UserName() string     { return u.Username }
 func (u User) EmailAddress() string { return u.Mail.Value }
-
-//func (u User) Phone() user.Valuer   { return u.Phone }
-func (u User) PhoneNumber() string { return u.Phone.Value }
-func (u User) App() user.App       { return AppID(*u.AppID) }
+func (u User) PhoneNumber() string  { return u.Phone.Value }
+func (u User) App() user.App        { return AppID(*u.AppID) }
 
 type Server struct {
 	auth  *auth.Auth
@@ -100,7 +73,8 @@ func (s *Server) Register(c context.Context, req *authms.Request, resp *authms.R
 		resp.Detail = "Missing user Body"
 		return nil
 	}
-	svdUsr, err := s.auth.RegisterUser(User(*req.User), req.User.Password, "", req.ForServiceID, req.RefererServiceID)
+	svdUsr, err := s.auth.RegisterUser(User(*req.User), req.User.Password,
+		"", req.ForServiceID, req.RefererServiceID)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
