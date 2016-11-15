@@ -13,6 +13,7 @@ import (
 	"github.com/tomogoma/authms/auth/model/testhelper"
 	"github.com/tomogoma/authms/auth/model/token"
 	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/password"
 )
 
 type History struct {
@@ -365,9 +366,13 @@ func newAuth(h *History, t *testing.T) *auth.Auth {
 	if err != nil {
 		t.Fatalf("New Token Generator: %s", err)
 	}
+	passGen, err := password.NewGenerator(password.AllChars)
+	if err != nil {
+		t.Fatalf("New Token Generator: %s", err)
+	}
 
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := auth.New(db, h, tokenGen, conf, lg, quitCh)
+	a, err := auth.New(db, h, tokenGen, passGen, conf, lg, quitCh)
 	if err != nil {
 		t.Fatalf("auth.New(): %s", err)
 	}

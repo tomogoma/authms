@@ -7,6 +7,7 @@ import (
 
 	"github.com/tomogoma/authms/auth/model/testhelper"
 	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/password"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -44,21 +45,35 @@ func TestNew(t *testing.T) {
 	compareUsersShallow(act, expUser, t)
 }
 
-func TestNew_noIdentifier(t *testing.T) {
+func passwordGenerator(t *testing.T) *password.Generator {
+	g, err := password.NewGenerator(password.AllChars)
+	if err != nil {
+		t.Fatalf("password.NewGenerator(): %s", err)
+	}
+	return g
+}
 
-	_, err := user.New("", "", "", "", nil, testhelper.HashF)
+func TestNew_noIdentifier(t *testing.T) {
+	_, err := user.New("", "", "", "", nil, passwordGenerator(t), testhelper.HashF)
 	if err == nil || err != user.ErrorEmptyIdentifier {
 		t.Fatalf("Expected error %s but got %s", user.ErrorEmptyIdentifier, err)
 	}
 }
 
 func TestNew_emptyPassword(t *testing.T) {
-
 	_, err := user.New(uname, phone, email, "",
 		&testhelper.App{AppUID: appUserID, AppName: appName},
-		testhelper.HashF)
+		passwordGenerator(t), testhelper.HashF)
 	if err == nil || err != user.ErrorEmptyPassword {
 		t.Fatalf("Expected error %s but got %s", user.ErrorEmptyPassword, err)
+	}
+}
+
+func TestNew_nilGenerator(t *testing.T) {
+	_, err := user.New("", "", "", "", &testhelper.App{AppUID: appUserID, AppName: appName},
+		nil, testhelper.HashF)
+	if err == nil || err != user.ErrorNilPasswordGenerator {
+		t.Fatalf("Expected error %s but got %s", user.ErrorNilPasswordGenerator, err)
 	}
 }
 
@@ -66,7 +81,7 @@ func TestNew_NilHashFunc(t *testing.T) {
 
 	_, err := user.New(uname, phone, email, "some-password",
 		&testhelper.App{AppUID: appUserID, AppName: appName},
-		nil)
+		passwordGenerator(t), nil)
 	if err == nil || err != user.ErrorNilHashFunc {
 		t.Fatalf("Expected error %s but got %s", user.ErrorNilHashFunc, err)
 	}
@@ -76,7 +91,7 @@ func TestNew_HashFuncReportError(t *testing.T) {
 
 	_, err := user.New(uname, phone, email, "some-password",
 		&testhelper.App{AppUID: appUserID, AppName: appName},
-		errorHashF)
+		passwordGenerator(t), errorHashF)
 	if err == nil || err != errorHashing {
 		t.Fatalf("Expected error %s but got %s", errorHashing, err)
 	}

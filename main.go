@@ -12,6 +12,7 @@ import (
 	"github.com/tomogoma/authms/auth/model/helper"
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/rpc"
@@ -57,8 +58,13 @@ func main() {
 		lg.Critical("Error instantiating token generator: %s", err)
 		return
 	}
+	pg, err := password.NewGenerator(password.AllChars)
+	if err != nil {
+		lg.Critical("Error instantiating token generator: %s", err)
+		return
+	}
 	authQuitCh := make(chan error)
-	a, err := auth.New(db, hm, tg, conf.Authentication, lg, authQuitCh)
+	a, err := auth.New(db, hm, tg, pg, conf.Authentication, lg, authQuitCh)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return

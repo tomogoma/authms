@@ -226,7 +226,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	} else if req.AppID != nil {
 		s.lg.Fine("%d - use appID...", tID)
-		authUsr, err = s.auth.LoginUserAppID(req.AppID, req.Pass,
+		authUsr, err = s.auth.LoginOAuth(req.AppID, req.Pass,
 			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
 	}
 	if err != nil {

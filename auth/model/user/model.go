@@ -138,7 +138,7 @@ func (m Model) GetByEmail(email, pass string, hashF ValidatePassFunc) (*user, er
 	return usr, nil
 }
 
-func (m Model) GetByAppUserID(appName, appUserID, pass string, hashF ValidatePassFunc) (*user, error) {
+func (m Model) GetByAppUserID(appName, appUserID string) (*user, error) {
 	usr := &user{app: &app{}}
 	query := `SELECT userID, appName, appUserID, validated FROM appUserIDs
 	 		WHERE appName = $1 AND appUserID = $2`
@@ -149,9 +149,6 @@ func (m Model) GetByAppUserID(appName, appUserID, pass string, hashF ValidatePas
 			return nil, err
 		}
 		return nil, ErrorPasswordMismatch
-	}
-	if err = m.validatePassword(usr.id, pass, hashF); err != nil {
-		return nil, err
 	}
 	return usr, nil
 }

@@ -62,7 +62,7 @@ func TestModel_Save_duplicateUser(t *testing.T) {
 		return
 	}
 
-	usr, err := user.New(expUser.UName, "", "", "some-other-pass", nil, expUser.HashF)
+	usr, err := user.New(expUser.UName, "", "", "some-other-pass", nil, nil, expUser.HashF)
 	if err != nil {
 		t.Fatalf("user.New(): %s", err)
 	}
@@ -101,7 +101,7 @@ func TestModel_GetBy_noUsers(t *testing.T) {
 	tcs := genericTestCases(m)
 
 	for _, tc := range tcs {
-		_, err := tc.call(tc.appName, "some-username",
+		_, err := tc.call(tc.appName, tc.appUID,
 			expUser.Password, expUser.ValHashFunc)
 		if err == nil || err != user.ErrorPasswordMismatch {
 			t.Errorf("%s: Expected error %s but got %v",
@@ -122,7 +122,7 @@ func TestModel_GetBy_identifierNotInDB(t *testing.T) {
 	tcs := genericTestCases(m)
 
 	for _, tc := range tcs {
-		_, err := tc.call(tc.appName, "some-username",
+		_, err := tc.call(tc.appName, "some-identifier",
 			expUser.Password, expUser.ValHashFunc)
 		if err == nil || err != user.ErrorPasswordMismatch {
 			t.Errorf("%s: Expected error %s but got %v",
@@ -244,7 +244,7 @@ func genericTestCases(m *user.Model) []testCase {
 			appName: expUser.App().Name(),
 			appUID:  expUser.App().UserID(),
 			call: func(app, appUID, pass string, hashFunc user.ValidatePassFunc) (user.User, error) {
-				return m.GetByAppUserID(app, appUID, pass, hashFunc)
+				return m.GetByAppUserID(app, appUID)
 			},
 		},
 	}

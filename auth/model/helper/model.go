@@ -29,74 +29,75 @@ CREATE TABLE IF NOT EXISTS users (
 `
 	usernames = `
 CREATE TABLE IF NOT EXISTS userNames (
-  id         SERIAL PRIMARY KEY NOT NULL,
-  userID     INT                NOT NULL REFERENCES users (id),
+  userID     SERIAL             NOT NULL REFERENCES users (id),
+  id         SERIAL		NOT NULL,
   userName   STRING UNIQUE      NOT NULL,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  INDEX      userID_indx (userID)
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id)
+);
 `
 	emails = `
 CREATE TABLE IF NOT EXISTS emails (
-  id         SERIAL PRIMARY KEY NOT NULL,
-  userID     INT                NOT NULL REFERENCES users (id),
+  userID     SERIAL             NOT NULL REFERENCES users (id),
+  id         SERIAL		NOT NULL,
   email      STRING UNIQUE      NOT NULL,
   validated  BOOL               NOT NULL DEFAULT FALSE,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  INDEX      userID_indx (userID)
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id)
+);
 `
 	phones = `
 CREATE TABLE IF NOT EXISTS phones (
-  id         SERIAL PRIMARY KEY NOT NULL,
-  userID     INT                NOT NULL REFERENCES users (id),
+  userID     SERIAL             NOT NULL REFERENCES users (id),
+  id         SERIAL		NOT NULL,
   phone      STRING UNIQUE      NOT NULL,
   validated  BOOL               NOT NULL DEFAULT FALSE,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  INDEX      userID_indx (userID)
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id)
+);
 `
 	appUserIDs = `
 CREATE TABLE IF NOT EXISTS appUserIDs (
-  id         SERIAL PRIMARY KEY NOT NULL,
-  userID     INT                NOT NULL REFERENCES users (id),
+  userID     SERIAL             NOT NULL REFERENCES users (id),
+  id         SERIAL		NOT NULL,
   appUserID  STRING             NOT NULL,
   appName    STRING             NOT NULL,
   validated  BOOL               NOT NULL DEFAULT FALSE,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-  UNIQUE     (appName, appUserID),
-  INDEX      userID_indx (userID)
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id),
+  UNIQUE     (appName, appUserID)
+);
 `
 	// TODO enforce that devID, userID [, and appID??] as unique
 	tokens = `
 CREATE TABLE IF NOT EXISTS tokens (
-  id     SERIAL PRIMARY KEY NOT NULL,
-  userID INT                NOT NULL REFERENCES users (id),
+  userID SERIAL             NOT NULL REFERENCES users (id),
+  id     SERIAL		    NOT NULL,
   devID  STRING             NOT NULL,
   token  STRING UNIQUE      NOT NULL,
   issued TIMESTAMP          NOT NULL,
   expiry TIMESTAMP          NOT NULL,
-  INDEX  userID_indx (userID)
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id)
+);
 `
 	// TODO add error column
 	history = `
 CREATE TABLE IF NOT EXISTS history (
-  id           SERIAL PRIMARY KEY NOT NULL,
-  userID       INT                NOT NULL,
+  userID       SERIAL             NOT NULL REFERENCES users (id),
+  id           SERIAL		  NOT NULL,
   date         TIMESTAMP          NOT NULL,
   accessMethod INT                NOT NULL,
   successful   BOOL               NOT NULL,
   forServiceID STRING,
   ipAddress    STRING,
   referral     STRING,
-  INDEX        history_UserDate_indx (userID, DATE )
-) INTERLEAVE IN PARENT users (id);
+  PRIMARY KEY	(userID, id),
+  INDEX         history_UserDate_indx (userID, DATE )
+);
 `
 )
 

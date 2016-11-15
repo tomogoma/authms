@@ -10,6 +10,7 @@ import (
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/token"
 	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/password"
 )
 
 const (
@@ -105,8 +106,9 @@ func ValHashFunc(p string, passHB []byte) bool {
 	return true
 }
 
-func (u User) ExplodeParams() (string, string, string, string, user.App, user.HashFunc) {
-	return u.UName, u.PhoneNo.Val, u.EmailAddr.Val, u.Password, u.AppDet, u.HashF
+func (u User) ExplodeParams() (string, string, string, string, user.App, *password.Generator, user.HashFunc) {
+	g, _ := password.NewGenerator(password.AllChars)
+	return u.UName, u.PhoneNo.Val, u.EmailAddr.Val, u.Password, u.AppDet, g, u.HashF
 }
 
 var DSN = helper.DSN{

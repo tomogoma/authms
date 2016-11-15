@@ -1,9 +1,12 @@
 syntax = "proto3";
 
 service AuthMS {
-    rpc Register(Request) returns (Response) {}
-    rpc Login(Request) returns (Response) {}
-    rpc ValidateToken(Request) returns (Response) {}
+    rpc Register(User) returns (Response) {}
+    rpc LoginUserName(BasicAuthRequest) returns (Response) {}
+    rpc LoginEmail(BasicAuthRequest) returns (Response) {}
+    rpc LoginPhone(BasicAuthRequest) returns (Response) {}
+    rpc LoginOAuth(OAuthRequest) returns (Response) {}
+    rpc ValidateToken(TokenRequest) returns (Response) {}
 }
 
 message History {
@@ -15,10 +18,10 @@ message History {
     bool successStatus = 6;
 }
 
-message AppID {
+message OAuth {
     string appName = 1;
     string appUserID = 2;
-    bool verified = 3;
+    string appToken = 3;
 }
 
 message Value {
@@ -34,14 +37,31 @@ message User {
     repeated History loginHistory = 5;
     Value phone = 6;
     Value mail = 7;
-    AppID appID = 8;
+    OAuth oAuth = 8;
 }
 
-message Request {
+message BasicAuthRequest {
     string deviceID = 1;
     string forServiceID = 2;
-    string refererServiceID = 3;
-    User user = 4;
+    string basicID = 3;
+    string password = 4;
+    string refererServiceID = 5;
+}
+
+message OAuthRequest {
+    string deviceID = 1;
+    string forServiceID = 2;
+    string appName = 3;
+    string appUserID = 4;
+    string appToken = 5;
+    string refererServiceID = 6;
+}
+
+message TokenRequest {
+    string deviceID = 1;
+    string forServiceID = 2;
+    string token = 3;
+    string refererServiceID = 4;
 }
 
 message Response {

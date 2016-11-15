@@ -26,18 +26,44 @@ type Logger interface {
 	Fine(interface{}, ...interface{})
 }
 
-type AppID authms.AppID
+type OAuthRequest authms.OAuthRequest
 
-func (a AppID) Name() string    { return a.AppName }
-func (a AppID) UserID() string  { return a.AppUserID }
-func (a AppID) Validated() bool { return a.Verified }
+func (a OAuthRequest) Name() string {
+	return a.AppName
+}
+func (a OAuthRequest) UserID() string {
+	return a.AppUserID
+}
+func (a OAuthRequest) Validated() bool {
+	return false
+}
+
+type OAuth authms.OAuth
+
+func (a OAuth) Name() string {
+	return a.AppName
+}
+func (a OAuth) UserID() string {
+	return a.AppUserID
+}
+func (a OAuth) Validated() bool {
+	return false
+}
 
 type User authms.User
 
-func (u User) UserName() string     { return u.Username }
-func (u User) EmailAddress() string { return u.Mail.Value }
-func (u User) PhoneNumber() string  { return u.Phone.Value }
-func (u User) App() user.App        { return AppID(*u.AppID) }
+func (u User) UserName() string {
+	return u.Username
+}
+func (u User) EmailAddress() string {
+	return u.Mail.Value
+}
+func (u User) PhoneNumber() string {
+	return u.Phone.Value
+}
+func (u User) App() user.App {
+	return OAuth(*u.OAuth)
+}
 
 type Server struct {
 	auth  *auth.Auth
@@ -65,16 +91,10 @@ func New(name string, auth *auth.Auth, lg Logger) (*Server, error) {
 	return &Server{name: name, auth: auth, lg: lg, tIDCh: tIDCh}, nil
 }
 
-func (s *Server) Register(c context.Context, req *authms.Request, resp *authms.Response) error {
+func (s *Server) Register(c context.Context, req *authms.User, resp *authms.Response) error {
 	tID := <-s.tIDCh
 	s.lg.Fine("%d - register usera...", tID)
-	if req.User == nil {
-		resp.Code = http.StatusBadRequest
-		resp.Detail = "Missing user Body"
-		return nil
-	}
-	svdUsr, err := s.auth.RegisterUser(User(*req.User), req.User.Password,
-		"", req.ForServiceID, req.RefererServiceID)
+	svdUsr, err := s.auth.RegisterUser(User(*req), req.Password)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
@@ -94,27 +114,31 @@ func (s *Server) Register(c context.Context, req *authms.Request, resp *authms.R
 	return nil
 }
 
-func (s *Server) Login(c context.Context, req *authms.Request, resp *authms.Response) error {
+func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
 	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user...", tID)
-	if req.User == nil {
-		resp.Code = http.StatusBadRequest
-		resp.Detail = "Missing user Body"
-		return nil
-	}
-	var authUsr user.User
-	var err error
-	if req.User.Username != "" {
-		s.lg.Fine("%d - use username...", tID)
-		authUsr, err = s.auth.LoginUserName(req.User.Username,
-			req.User.Password, req.DeviceID, "", req.ForServiceID,
-			req.RefererServiceID)
-	} else if req.User.AppID != nil {
-		s.lg.Fine("%d - use appID...", tID)
-		authUsr, err = s.auth.LoginUserAppID(AppID(*req.User.AppID),
-			req.User.Password, req.DeviceID, "", req.ForServiceID,
-			req.RefererServiceID)
-	}
+	s.lg.Fine("%d - login user by username...", tID)
+	authUsr, err := s.auth.LoginUserName(req.BasicID, req.Password,
+		req.DeviceID, "", req.ForServiceID, req.RefererServiceID)
+	return s.respondOn(authUsr, resp, tID, err)
+}
+
+func (s *Server) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+	return errors.New("Not implemented")
+}
+
+func (s *Server) LoginPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+	return errors.New("Not implemented")
+}
+
+func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - login user by OAuth...", tID)
+	authUsr, err := s.auth.LoginOAuth(OAuthRequest(*req), req.DeviceID, "",
+		req.ForServiceID, req.RefererServiceID)
+	return s.respondOn(authUsr, resp, tID, err)
+}
+
+func (s *Server) respondOn(authUsr user.User, resp *authms.Response, tID int, err error) error {
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
@@ -134,15 +158,10 @@ func (s *Server) Login(c context.Context, req *authms.Request, resp *authms.Resp
 	return nil
 }
 
-func (s *Server) ValidateToken(c context.Context, req *authms.Request, resp *authms.Response) error {
+func (s *Server) ValidateToken(c context.Context, req *authms.TokenRequest, resp *authms.Response) error {
 	tID := <-s.tIDCh
 	s.lg.Fine("%d - validate token...", tID)
-	if req.User == nil {
-		resp.Code = http.StatusBadRequest
-		resp.Detail = "Missing user Body"
-		return nil
-	}
-	authUsr, err := s.auth.AuthenticateToken(req.User.Token, "",
+	authUsr, err := s.auth.AuthenticateToken(req.Token, "",
 		req.ForServiceID, req.RefererServiceID)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)
@@ -197,10 +216,9 @@ func (s *Server) packageResponseUser(status int32, rcv user.User, resp *authms.R
 		}
 	}
 	if app := rcv.App(); app != nil && fmt.Sprintf("%v", app) != "<nil>" {
-		resp.User.AppID = &authms.AppID{
+		resp.User.OAuth = &authms.OAuth{
 			AppName:   app.Name(),
 			AppUserID: app.UserID(),
-			Verified:  app.Validated(),
 		}
 	}
 }

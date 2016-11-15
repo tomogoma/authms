@@ -20,7 +20,8 @@ const (
 var hashF = user.Hash
 var valHashF = user.CompareHash
 var ErrorNilHistoryModel = errors.New("history model was nil")
-var ErrorNilTokenGenerator = errors.New("Token generator was nil")
+var ErrorNilTokenGenerator = errors.New("token generator was nil")
+var ErrorNilPasswordGenerator = errors.New("password generator was nil")
 
 type HistModel interface {
 	Save(ld history.History) (int, error)
@@ -32,6 +33,10 @@ type TokenGenerator interface {
 	Validate(tokenStr string) (token.Token, error)
 }
 
+type PasswordGenerator interface {
+	SecureRandomString(length int) ([]byte, error)
+}
+
 type User interface {
 	UserName() string
 	EmailAddress() string
@@ -40,11 +45,12 @@ type User interface {
 }
 
 type Auth struct {
-	conf   Config
-	usrM   *user.Model
-	tokenM *token.Model
-	histM  HistModel
-	tokenG TokenGenerator
+	conf      Config
+	usrM      *user.Model
+	tokenM    *token.Model
+	histM     HistModel
+	tokenG    TokenGenerator
+	passwordG PasswordGenerator
 }
 
 func AuthError(err error) bool {
@@ -65,25 +71,23 @@ func AuthError(err error) bool {
 	return false
 }
 
-func New(db *sql.DB, histM HistModel, tg TokenGenerator, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
-
+func New(db *sql.DB, histM HistModel, tg TokenGenerator, pg PasswordGenerator, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
 	if histM == nil {
 		return nil, ErrorNilHistoryModel
 	}
-
 	if err := conf.Validate(); err != nil {
 		return nil, err
 	}
-
 	if tg == nil {
 		return nil, ErrorNilTokenGenerator
 	}
-
+	if pg == nil {
+		return nil, ErrorNilPasswordGenerator
+	}
 	usrM, err := user.NewModel(db)
 	if err != nil {
 		return nil, err
 	}
-
 	tokenM, err := token.NewModel(db)
 	if err != nil {
 		return nil, err
@@ -94,15 +98,16 @@ func New(db *sql.DB, histM HistModel, tg TokenGenerator, conf Config, lg token.L
 		return nil, err
 	}
 
-	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM, tokenG: tg}, nil
+	return &Auth{usrM: usrM, tokenM: tokenM,
+		histM: histM, tokenG: tg, passwordG: pg}, nil
 }
 
-func (a *Auth) RegisterUser(usr User, pass string, rIP, srvID, ref string) (user.User, error) {
+func (a *Auth) RegisterUser(usr User, pass string) (user.User, error) {
 
 	u, err := user.New(usr.UserName(), usr.PhoneNumber(), usr.EmailAddress(), pass,
-		usr.App(), hashF)
+		usr.App(), a.passwordG, hashF)
 	if err != nil {
-		return nil, a.saveHistory(-1, rIP, srvID, ref, history.RegistrationAccess, err)
+		return nil, err
 	}
 
 	savedU, err := a.usrM.Save(*u)
@@ -110,7 +115,7 @@ func (a *Auth) RegisterUser(usr User, pass string, rIP, srvID, ref string) (user
 		return nil, err
 	}
 
-	return savedU, a.saveHistory(savedU.ID(), rIP, srvID, ref, history.RegistrationAccess, nil)
+	return savedU, nil
 }
 
 func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.User, error) {
@@ -153,9 +158,10 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.U
 	return usr, nil
 }
 
-func (a *Auth) LoginUserAppID(app user.App, pass, devID, rIP, srvID, ref string) (user.User, error) {
+func (a *Auth) LoginOAuth(app user.App, devID, rIP, srvID, ref string) (user.User, error) {
 
-	usr, err := a.usrM.GetByAppUserID(app.Name(), app.UserID(), pass, valHashF)
+	// TODO verify token from app
+	usr, err := a.usrM.GetByAppUserID(app.Name(), app.UserID())
 	if err != nil {
 		uid := -1
 		if usr != nil {

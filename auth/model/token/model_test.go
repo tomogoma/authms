@@ -202,7 +202,8 @@ func TestModel_Delete(t *testing.T) {
 	tknToDel, err := token.New(expToken.explodeParams())
 	tknToLeaveUserID := tknToDel.UserID() - 1
 	testhelper.InsertDummyUser(db, tknToLeaveUserID, t)
-	tknToLeave, err := token.New(tknToLeaveUserID, tknToDel.DevID()+"ab", token.ShortExpType)
+	tknToLeave, err := token.New(tknToLeaveUserID, tknToDel.DevID(),
+		tknToDel.Token()+"ab", tknToDel.Issued(), tknToDel.Expiry())
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
@@ -365,11 +366,11 @@ func TestModel_GetSmallestExpiry(t *testing.T) {
 	testhelper.InsertDummyUser(db, medUsrID, t)
 	testhelper.InsertDummyUser(db, lrgstUsrID, t)
 
-	med, err := token.New(medUsrID, "dev1id", token.MedExpType)
+	med, err := token.New(medUsrID, "dev1id", "some-token1", time.Now(), time.Now().Add(medExpTime))
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
-	lrgst, err := token.New(lrgstUsrID, "dev2id", token.LongExpType)
+	lrgst, err := token.New(lrgstUsrID, "dev2id", "some-other-token2", time.Now(), time.Now().Add(longExpTime))
 	if err != nil {
 		t.Fatalf("token.New(): %s", err)
 	}
