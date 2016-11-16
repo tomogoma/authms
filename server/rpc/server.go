@@ -37,6 +37,9 @@ func (a OAuthRequest) UserID() string {
 func (a OAuthRequest) Validated() bool {
 	return false
 }
+func (a OAuthRequest) Token() string {
+	return a.AppToken
+}
 
 type OAuth authms.OAuth
 
@@ -48,6 +51,9 @@ func (a OAuth) UserID() string {
 }
 func (a OAuth) Validated() bool {
 	return false
+}
+func (a OAuth) Token() string {
+	return a.AppToken
 }
 
 type User authms.User
@@ -93,7 +99,7 @@ func New(name string, auth *auth.Auth, lg Logger) (*Server, error) {
 
 func (s *Server) Register(c context.Context, req *authms.User, resp *authms.Response) error {
 	tID := <-s.tIDCh
-	s.lg.Fine("%d - register usera...", tID)
+	s.lg.Fine("%d - register user...", tID)
 	svdUsr, err := s.auth.RegisterUser(User(*req), req.Password)
 	if err != nil {
 		s.lg.Fine("%d - check error is authentication or internal...", tID)

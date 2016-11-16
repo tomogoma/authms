@@ -8,6 +8,7 @@ import (
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/model/helper"
 	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/auth/oauth"
 )
 
 const (
@@ -38,6 +39,7 @@ type Config struct {
 	Database       helper.DSN    `json:"database,omitempty"`
 	Authentication auth.Config   `json:"authentication,omitempty"`
 	Token          token.Config  `json:"token,omitempty"`
+	OAuth          oauth.Config  `json:"OAuth,omitempty"`
 }
 
 func (c Config) Validate() error {
@@ -51,6 +53,9 @@ func (c Config) Validate() error {
 		return err
 	}
 	if err := c.Database.Validate(); err != nil {
+		return err
+	}
+	if err := c.OAuth.Validate(); err != nil {
 		return err
 	}
 	return nil

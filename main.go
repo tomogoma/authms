@@ -12,6 +12,7 @@ import (
 	"github.com/tomogoma/authms/auth/model/helper"
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/token"
+	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
@@ -42,7 +43,7 @@ func main() {
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
 	log.SetOutput(defLogWriter{lg: lg})
-	defer time.Sleep(5 * time.Second)
+	defer time.Sleep(500 * time.Millisecond)
 	db, err := helper.SQLDB(conf.Database)
 	if err != nil {
 		lg.Critical("Error connecting to db: %s", err)
@@ -64,7 +65,12 @@ func main() {
 		return
 	}
 	authQuitCh := make(chan error)
-	a, err := auth.New(db, hm, tg, pg, conf.Authentication, lg, authQuitCh)
+	oa, err := oauth.New(conf.OAuth)
+	if err != nil {
+		lg.Critical("Error instantiating OAuth module: %s", err)
+		return
+	}
+	a, err := auth.New(db, hm, tg, pg, conf.Authentication, lg, oa, authQuitCh)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return
@@ -104,19 +110,12 @@ func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 		}),
 		micro.RegisterInterval(c.RegisterInterval),
 	)
-	//service.Init()
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
 	err := service.Run()
 	quitCh <- err
 }
 
 func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
-	//httpSrv, err := http.New(a, lg, quitCh)
-	//if err != nil {
-	//	lg.Critical("Error instantiating http server module: %s", err)
-	//	return
-	//}
-	//go httpSrv.Start(c.HttpAddress)
 	server.Init(
 		server.Name(serviceName),
 		server.Version(serviceVersion),

@@ -11,6 +11,8 @@ import (
 	"github.com/tomogoma/authms/auth/model/history"
 	"github.com/tomogoma/authms/auth/model/token"
 	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/oauth"
+	"github.com/tomogoma/authms/auth/oauth/response"
 )
 
 const (
@@ -22,10 +24,16 @@ var valHashF = user.CompareHash
 var ErrorNilHistoryModel = errors.New("history model was nil")
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
 var ErrorNilPasswordGenerator = errors.New("password generator was nil")
+var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
+var ErrorOAuthTokenNotValid = errors.New("oauth token is invalid")
 
 type HistModel interface {
 	Save(ld history.History) (int, error)
 	Get(userID, offset, count int, acMs ...int) ([]*history.History, error)
+}
+
+type OAuthHandler interface {
+	ValidateToken(appName, token string) (response.OAuth, error)
 }
 
 type TokenGenerator interface {
@@ -45,17 +53,19 @@ type User interface {
 }
 
 type Auth struct {
-	conf      Config
-	usrM      *user.Model
-	tokenM    *token.Model
-	histM     HistModel
-	tokenG    TokenGenerator
-	passwordG PasswordGenerator
+	conf         Config
+	usrM         *user.Model
+	tokenM       *token.Model
+	histM        HistModel
+	tokenG       TokenGenerator
+	passwordG    PasswordGenerator
+	oAuthHandler OAuthHandler
 }
 
 func AuthError(err error) bool {
 
 	if strings.HasPrefix(err.Error(), user.ErrorPasswordMismatch.Error()) ||
+		strings.HasPrefix(err.Error(), ErrorOAuthTokenNotValid.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorExpiredToken.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorInvalidToken.Error()) ||
 		strings.HasPrefix(err.Error(), user.ErrorEmptyIdentifier.Error()) ||
@@ -64,14 +74,16 @@ func AuthError(err error) bool {
 		strings.HasPrefix(err.Error(), user.ErrorUserExists.Error()) ||
 		strings.HasPrefix(err.Error(), user.ErrorEmailExists.Error()) ||
 		strings.HasPrefix(err.Error(), user.ErrorPhoneExists.Error()) ||
-		strings.HasPrefix(err.Error(), user.ErrorAppIDExists.Error()) {
+		strings.HasPrefix(err.Error(), user.ErrorAppIDExists.Error()) ||
+		strings.HasPrefix(err.Error(), oauth.ErrorUnsupportedApp.Error()) {
 		return true
 	}
 
 	return false
 }
 
-func New(db *sql.DB, histM HistModel, tg TokenGenerator, pg PasswordGenerator, conf Config, lg token.Logger, quitCh chan error) (*Auth, error) {
+func New(db *sql.DB, histM HistModel, tg TokenGenerator, pg PasswordGenerator,
+	conf Config, lg token.Logger, oa OAuthHandler, quitCh chan error) (*Auth, error) {
 	if histM == nil {
 		return nil, ErrorNilHistoryModel
 	}
@@ -92,34 +104,36 @@ func New(db *sql.DB, histM HistModel, tg TokenGenerator, pg PasswordGenerator, c
 	if err != nil {
 		return nil, err
 	}
-
+	if oa == nil {
+		return nil, ErrorNilOAuthHandler
+	}
 	err = tokenM.RunGarbageCollector(quitCh, lg)
 	if err != nil {
 		return nil, err
 	}
-
-	return &Auth{usrM: usrM, tokenM: tokenM,
-		histM: histM, tokenG: tg, passwordG: pg}, nil
+	return &Auth{usrM: usrM, tokenM: tokenM, histM: histM, tokenG: tg,
+		passwordG: pg, oAuthHandler: oa}, nil
 }
 
 func (a *Auth) RegisterUser(usr User, pass string) (user.User, error) {
-
+	if usr.App().UserID() != "" {
+		if err := a.validateOAuth(usr.App()); err != nil {
+			return nil, err
+		}
+	}
 	u, err := user.New(usr.UserName(), usr.PhoneNumber(), usr.EmailAddress(), pass,
 		usr.App(), a.passwordG, hashF)
 	if err != nil {
 		return nil, err
 	}
-
 	savedU, err := a.usrM.Save(*u)
 	if err != nil {
 		return nil, err
 	}
-
 	return savedU, nil
 }
 
 func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.User, error) {
-
 	usr, err := a.usrM.GetByUserName(uName, pass, valHashF)
 	if err != nil {
 		uid := -1
@@ -154,13 +168,13 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.U
 		a.tokenM.Delete(tkn.Token())
 		return nil, err
 	}
-
 	return usr, nil
 }
 
 func (a *Auth) LoginOAuth(app user.App, devID, rIP, srvID, ref string) (user.User, error) {
-
-	// TODO verify token from app
+	if err := a.validateOAuth(app); err != nil {
+		return nil, err
+	}
 	usr, err := a.usrM.GetByAppUserID(app.Name(), app.UserID())
 	if err != nil {
 		uid := -1
@@ -169,13 +183,11 @@ func (a *Auth) LoginOAuth(app user.App, devID, rIP, srvID, ref string) (user.Use
 		}
 		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
 	}
-
 	tkn, err := a.tokenG.Generate(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
 		return nil, err
 	}
 	usr.Token(tkn.Token())
-
 	modelTkn, err := token.NewFrom(tkn)
 	if err != nil {
 		return nil, err
@@ -184,19 +196,16 @@ func (a *Auth) LoginOAuth(app user.App, devID, rIP, srvID, ref string) (user.Use
 	if err != nil {
 		return nil, err
 	}
-
 	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {
 		return nil, err
 	}
 	usr.SetPreviousLogins(prevLogins...)
-
 	err = a.saveHistory(usr.ID(), rIP, srvID, ref, history.LoginAccess, nil)
 	if err != nil {
 		a.tokenM.Delete(tkn.Token())
 		return nil, err
 	}
-
 	return usr, nil
 }
 
@@ -236,6 +245,17 @@ func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (user.User, err
 	}
 
 	return usr, nil
+}
+
+func (a *Auth) validateOAuth(app user.App) error {
+	oa, err := a.oAuthHandler.ValidateToken(app.Name(), app.Token())
+	if err != nil {
+		return err
+	}
+	if !oa.IsValid() || oa.UserID() != app.UserID() {
+		return ErrorOAuthTokenNotValid
+	}
+	return nil
 }
 
 func (a *Auth) saveHistory(id int, rIP, srvID, ref string, accType int, err error) error {

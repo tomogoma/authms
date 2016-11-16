@@ -4,6 +4,7 @@ type App interface {
 	Validated
 	UserID() string
 	Name() string
+	Token() string
 }
 
 func appIsFilled(a App) bool {
@@ -28,6 +29,10 @@ func (a *app) Name() string {
 		return ""
 	}
 	return a.name
+}
+
+func (a *app) Token() string {
+	return ""
 }
 
 func (a *app) Validated() bool {
