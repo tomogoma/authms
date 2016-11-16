@@ -1,9 +1,6 @@
 package oauth
 
-import (
-	"errors"
-	"fmt"
-)
+import "errors"
 
 type Config struct {
 	FacebookSecret string `json:"facebookSecret,omitempty"`
@@ -13,7 +10,6 @@ type Config struct {
 var ErrorEmptyFacebookSecret = errors.New("facebook secret was empty")
 
 func (c Config) Validate() error {
-	fmt.Printf("%+v\n", c)
 	if c.FacebookSecret == "" {
 		return ErrorEmptyFacebookSecret
 	}
