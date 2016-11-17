@@ -156,11 +156,10 @@ func (a *Auth) RegisterOAuth(app user.App) (user.User, error) {
 func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.User, error) {
 	usr, err := a.usrM.GetByUserName(uName, pass, valHashF)
 	if err != nil {
-		uid := -1
-		if usr != nil {
-			uid = usr.ID()
+		if usr.ID() < 1 {
+			return nil, err
 		}
-		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
+		return nil, a.saveHistory(usr.ID(), rIP, srvID, ref, history.LoginAccess, err)
 	}
 	tkn, err := a.tokenG.Generate(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
@@ -197,11 +196,10 @@ func (a *Auth) LoginOAuth(app user.App, devID, rIP, srvID, ref string) (user.Use
 	}
 	usr, err := a.usrM.GetByAppUserID(app.Name(), app.UserID())
 	if err != nil {
-		uid := -1
-		if usr != nil {
-			uid = usr.ID()
+		if usr.ID() < 1 {
+			return nil, err
 		}
-		return nil, a.saveHistory(uid, rIP, srvID, ref, history.LoginAccess, err)
+		return nil, a.saveHistory(usr.ID(), rIP, srvID, ref, history.LoginAccess, err)
 	}
 	tkn, err := a.tokenG.Generate(usr.ID(), devID, token.ShortExpType)
 	if err != nil {
@@ -233,29 +231,28 @@ func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (user.User, err
 
 	claimsTkn, err := a.tokenG.Validate(tknStr)
 	if err != nil {
-		usrID := -1
-		return nil, a.saveHistory(usrID, rIP, srvID, ref, history.TokenValidationAccess, token.ErrorInvalidToken)
+		return nil, err
 	}
 
 	tkn, err := a.tokenM.Get(claimsTkn.UserID(), claimsTkn.DevID(), tknStr)
 	if err != nil {
-		usrID := -1
-		if tkn != nil && tkn.UserID() != 0 {
-			usrID = tkn.UserID()
+		if tkn.UserID() < 1 {
+			return nil, err
 		}
-		return nil, a.saveHistory(usrID, rIP, srvID, ref, history.TokenValidationAccess, err)
+		return nil, a.saveHistory(tkn.UserID(), rIP, srvID, ref, history.TokenValidationAccess, err)
 	}
 
-	// TODO remove this
-	usr, err := a.usrM.Get(tkn.UserID())
+	usr, err := user.NewByToken(tkn.UserID(), tkn.Token())
 	if err != nil {
 		return nil, err
 	}
-	usr.Token(tkn.Token())
 
 	prevLogins, err := a.histM.Get(usr.ID(), 0, numPrevLogins, history.LoginAccess)
 	if err != nil {
-		return nil, err
+		if tkn.UserID() < 1 {
+			return nil, err
+		}
+		return nil, a.saveHistory(tkn.UserID(), rIP, srvID, ref, history.TokenValidationAccess, err)
 	}
 	usr.SetPreviousLogins(prevLogins...)
 

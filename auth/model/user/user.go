@@ -8,6 +8,8 @@ import (
 	"github.com/tomogoma/authms/auth/model/history"
 )
 
+var ErrorInvalidID = errors.New("the user ID provided was invalid")
+var ErrorEmptyToken = errors.New("the token provided was empty")
 var ErrorInvalidOAuth = errors.New("the oauth provided was invalid")
 var ErrorEmptyEmail = errors.New("email was empty")
 var ErrorEmptyPhone = errors.New("phone was empty")
@@ -162,6 +164,22 @@ func NewByOAuth(oauth App, gen PasswordGenerator, hashF HashFunc) (*user, error)
 		email:    new(value),
 		app:      a,
 		password: passHB,
+	}, nil
+}
+
+func NewByToken(id int, token string) (*user, error) {
+	if id < 1 {
+		return nil, ErrorInvalidID
+	}
+	if token == "" {
+		return nil, ErrorEmptyToken
+	}
+	return &user{
+		id:    id,
+		phone: new(value),
+		app:   new(app),
+		email: new(value),
+		token: token,
 	}, nil
 }
 

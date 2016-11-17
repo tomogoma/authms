@@ -104,19 +104,19 @@ func (um *Model) Get(usrID int, devID, tknStr string) (*token, error) {
 	)
 	if err != nil {
 		if err.Error() == helper.NoResultsErrorStr {
-			return nil, ErrorInvalidToken
+			return tkn, ErrorInvalidToken
 		}
-		return nil, err
+		return tkn, err
 	}
 
 	tknI, err := um.ValidateExpiry(tkn)
 	if err != nil {
-		return nil, err
+		return tkn, err
 	}
 
 	tkn, ok := tknI.(*token)
 	if !ok {
-		return nil, fmt.Errorf("Error handling token type got %T expected %T", tkn, &token{})
+		return tkn, fmt.Errorf("Error handling token type got %T expected %T", tkn, &token{})
 	}
 
 	return tkn, nil

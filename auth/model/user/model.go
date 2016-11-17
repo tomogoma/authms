@@ -78,28 +78,18 @@ func (m Model) Save(u user) (*user, error) {
 	return &u, nil
 }
 
-func (m Model) Get(userID int) (*user, error) {
-	userQ := `SELECT id FROM users WHERE id = $1`
-	usr := &user{}
-	err := m.db.QueryRow(userQ, userID).Scan(&usr.id)
-	if err != nil {
-		return nil, err
-	}
-	return usr, err
-}
-
 func (m Model) GetByUserName(uName, pass string, hashF ValidatePassFunc) (*user, error) {
 	usr := &user{}
 	unameQ := `SELECT userID, userName FROM userNames WHERE userName = $1`
 	err := m.db.QueryRow(unameQ, uName).Scan(&usr.id, &usr.userName)
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
-			return nil, err
+			return usr, err
 		}
-		return nil, ErrorPasswordMismatch
+		return usr, ErrorPasswordMismatch
 	}
 	if err = m.validatePassword(usr.id, pass, hashF); err != nil {
-		return nil, err
+		return usr, err
 	}
 	return usr, nil
 }
@@ -111,12 +101,12 @@ func (m Model) GetByPhone(phone, pass string, hashF ValidatePassFunc) (*user, er
 		Scan(&usr.id, &usr.phone.value, &usr.phone.validated)
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
-			return nil, err
+			return usr, err
 		}
-		return nil, ErrorPasswordMismatch
+		return usr, ErrorPasswordMismatch
 	}
 	if err = m.validatePassword(usr.id, pass, hashF); err != nil {
-		return nil, err
+		return usr, err
 	}
 	return usr, nil
 }
@@ -128,12 +118,12 @@ func (m Model) GetByEmail(email, pass string, hashF ValidatePassFunc) (*user, er
 		Scan(&usr.id, &usr.email.value, &usr.email.validated)
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
-			return nil, err
+			return usr, err
 		}
-		return nil, ErrorPasswordMismatch
+		return usr, ErrorPasswordMismatch
 	}
 	if err = m.validatePassword(usr.id, pass, hashF); err != nil {
-		return nil, err
+		return usr, err
 	}
 	return usr, nil
 }
@@ -146,9 +136,9 @@ func (m Model) GetByAppUserID(appName, appUserID string) (*user, error) {
 		Scan(&usr.id, &usr.app.name, &usr.app.userID, &usr.app.validated)
 	if err != nil {
 		if err.Error() != helper.NoResultsErrorStr {
-			return nil, err
+			return usr, err
 		}
-		return nil, ErrorPasswordMismatch
+		return usr, ErrorPasswordMismatch
 	}
 	return usr, nil
 }
