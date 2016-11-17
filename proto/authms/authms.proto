@@ -1,7 +1,10 @@
 syntax = "proto3";
 
 service AuthMS {
-    rpc Register(User) returns (Response) {}
+    rpc RegisterUserName(BasicAuthRequest) returns (Response) {}
+    rpc RegisterEmail(BasicAuthRequest) returns (Response) {}
+    rpc RegisterPhone(BasicAuthRequest) returns (Response) {}
+    rpc RegisterOAuth(OAuthRequest) returns (Response) {}
     rpc LoginUserName(BasicAuthRequest) returns (Response) {}
     rpc LoginEmail(BasicAuthRequest) returns (Response) {}
     rpc LoginPhone(BasicAuthRequest) returns (Response) {}

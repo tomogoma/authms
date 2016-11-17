@@ -97,27 +97,32 @@ func New(name string, auth *auth.Auth, lg Logger) (*Server, error) {
 	return &Server{name: name, auth: auth, lg: lg, tIDCh: tIDCh}, nil
 }
 
-func (s *Server) Register(c context.Context, req *authms.User, resp *authms.Response) error {
+func (s *Server) RegisterOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
 	tID := <-s.tIDCh
-	s.lg.Fine("%d - register user...", tID)
-	svdUsr, err := s.auth.RegisterUser(User(*req), req.Password)
-	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - registration error: %s", tID, err)
-			resp.Code = http.StatusInternalServerError
-			resp.Detail = internalErrorMessage
-			return nil
-		}
-		s.lg.Warn("%d - registration error: %s", tID, err)
-		resp.Detail = err.Error()
-		resp.Code = http.StatusUnauthorized
-		return nil
-	}
-	s.lg.Fine("%d - package registered user result...", tID)
-	s.packageResponseUser(http.StatusCreated, svdUsr, resp)
-	s.lg.Info("%d - Registration complete", tID)
-	return nil
+	s.lg.Fine("%d - register user by oauth id...", tID)
+	svdUsr, err := s.auth.RegisterOAuth(OAuthRequest((*req)))
+	return s.respondOn(svdUsr, resp, http.StatusCreated, tID, err)
+}
+
+func (s *Server) RegisterUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - register user by username...", tID)
+	svdUsr, err := s.auth.RegisterUserName(req.BasicID, req.Password)
+	return s.respondOn(svdUsr, resp, http.StatusCreated, tID, err)
+}
+
+func (s *Server) RegisterEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - register user by email...", tID)
+	svdUsr, err := s.auth.RegisterEmail(req.BasicID, req.Password)
+	return s.respondOn(svdUsr, resp, http.StatusCreated, tID, err)
+}
+
+func (s *Server) RegisterPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - register user by phone...", tID)
+	svdUsr, err := s.auth.RegisterPhone(req.BasicID, req.Password)
+	return s.respondOn(svdUsr, resp, http.StatusCreated, tID, err)
 }
 
 func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
@@ -125,7 +130,7 @@ func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, 
 	s.lg.Fine("%d - login user by username...", tID)
 	authUsr, err := s.auth.LoginUserName(req.BasicID, req.Password,
 		req.DeviceID, "", req.ForServiceID, req.RefererServiceID)
-	return s.respondOn(authUsr, resp, tID, err)
+	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
 func (s *Server) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
@@ -141,27 +146,7 @@ func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *a
 	s.lg.Fine("%d - login user by OAuth...", tID)
 	authUsr, err := s.auth.LoginOAuth(OAuthRequest(*req), req.DeviceID, "",
 		req.ForServiceID, req.RefererServiceID)
-	return s.respondOn(authUsr, resp, tID, err)
-}
-
-func (s *Server) respondOn(authUsr user.User, resp *authms.Response, tID int, err error) error {
-	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - login error: %s", tID, err)
-			resp.Detail = internalErrorMessage
-			resp.Code = http.StatusInternalServerError
-			return nil
-		}
-		s.lg.Warn("%d - login error: %s", tID, err)
-		resp.Detail = "invalid userName/password combo or missing devID"
-		resp.Code = http.StatusUnauthorized
-		return nil
-	}
-	s.lg.Fine("%d - package authenticated user result...", tID)
-	s.packageResponseUser(http.StatusOK, authUsr, resp)
-	s.lg.Info("%d - login complete", tID)
-	return nil
+	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
 func (s *Server) ValidateToken(c context.Context, req *authms.TokenRequest, resp *authms.Response) error {
@@ -169,22 +154,26 @@ func (s *Server) ValidateToken(c context.Context, req *authms.TokenRequest, resp
 	s.lg.Fine("%d - validate token...", tID)
 	authUsr, err := s.auth.AuthenticateToken(req.Token, "",
 		req.ForServiceID, req.RefererServiceID)
+	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
+}
+
+func (s *Server) respondOn(authUsr user.User, resp *authms.Response, code int32, tID int, err error) error {
 	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
 		if !auth.AuthError(err) {
-			s.lg.Error("%d - token authentication error: %s", tID, err)
+			s.lg.Error("%d - internal auth error: %s", tID, err)
 			resp.Detail = internalErrorMessage
 			resp.Code = http.StatusInternalServerError
 			return nil
 		}
-		s.lg.Warn("%d - token authentication error: %s", tID, err)
+		s.lg.Debug("%d - auth error: %s", tID, err)
+		// FIXME the error message may have TMI, sanitize
 		resp.Detail = err.Error()
 		resp.Code = http.StatusUnauthorized
 		return nil
 	}
-	s.lg.Fine("%d - package authenticated user result...", tID)
-	s.packageResponseUser(http.StatusOK, authUsr, resp)
-	s.lg.Info("%d - token validation complete", tID)
+	s.lg.Fine("%d - package auth result...", tID)
+	s.packageResponseUser(code, authUsr, resp)
+	s.lg.Info("%d - auth complete", tID)
 	return nil
 }
 

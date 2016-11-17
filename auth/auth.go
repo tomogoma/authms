@@ -68,7 +68,10 @@ func AuthError(err error) bool {
 		strings.HasPrefix(err.Error(), ErrorOAuthTokenNotValid.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorExpiredToken.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorInvalidToken.Error()) ||
-		strings.HasPrefix(err.Error(), user.ErrorEmptyIdentifier.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorEmptyUserName.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorEmptyPhone.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorEmptyEmail.Error()) ||
+		strings.HasPrefix(err.Error(), user.ErrorInvalidOAuth.Error()) ||
 		strings.HasPrefix(err.Error(), user.ErrorEmptyPassword.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorEmptyDevID.Error()) ||
 		strings.HasPrefix(err.Error(), user.ErrorUserExists.Error()) ||
@@ -115,22 +118,39 @@ func New(db *sql.DB, histM HistModel, tg TokenGenerator, pg PasswordGenerator,
 		passwordG: pg, oAuthHandler: oa}, nil
 }
 
-func (a *Auth) RegisterUser(usr User, pass string) (user.User, error) {
-	if usr.App().UserID() != "" {
-		if err := a.validateOAuth(usr.App()); err != nil {
-			return nil, err
-		}
-	}
-	u, err := user.New(usr.UserName(), usr.PhoneNumber(), usr.EmailAddress(), pass,
-		usr.App(), a.passwordG, hashF)
+func (a *Auth) RegisterUserName(userName, pass string) (user.User, error) {
+	u, err := user.NewByUserName(userName, pass, hashF)
 	if err != nil {
 		return nil, err
 	}
-	savedU, err := a.usrM.Save(*u)
+	return a.usrM.Save(*u)
+}
+
+func (a *Auth) RegisterEmail(email string, pass string) (user.User, error) {
+	u, err := user.NewByEmail(email, pass, hashF)
 	if err != nil {
 		return nil, err
 	}
-	return savedU, nil
+	return a.usrM.Save(*u)
+}
+
+func (a *Auth) RegisterPhone(phone string, pass string) (user.User, error) {
+	u, err := user.NewByPhone(phone, pass, hashF)
+	if err != nil {
+		return nil, err
+	}
+	return a.usrM.Save(*u)
+}
+
+func (a *Auth) RegisterOAuth(app user.App) (user.User, error) {
+	if err := a.validateOAuth(app); err != nil {
+		return nil, err
+	}
+	u, err := user.NewByOAuth(app, a.passwordG, hashF)
+	if err != nil {
+		return nil, err
+	}
+	return a.usrM.Save(*u)
 }
 
 func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (user.User, error) {
