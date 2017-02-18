@@ -26,7 +26,7 @@ type Config struct {
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/conf.file.yml")
 var conf = &Config{}
 var hasher = hash.Hasher{}
-var tg *password.Generator
+var tg *token.Generator
 
 func init() {
 	flag.Parse()
@@ -52,37 +52,198 @@ func TestModel_Save(t *testing.T) {
 	if err := m.Save(usr); err != nil {
 		t.Fatalf("model.Save(): %s", err)
 	}
-	db := getDB(t)
-	query := `
-	SELECT users.id, userNames.userName, phones.phone, phones.validated,
-		  emails.email, emails.validated, appUserIDs.appName,
-		  appUserIDs.appUserID
-		FROM users
-		LEFT JOIN userNames ON users.id=userNames.userID
-		LEFT JOIN phones ON users.id=phones.userID
-		LEFT JOIN emails ON users.id=emails.userID
-		LEFT JOIN appUserIDs ON users.id=appUserIDs.userID
-		WHERE users.id=$1`
-	dbUsr := &authms.User{
-		Email: &authms.Value{},
-		Phone: &authms.Value{},
-		OAuth: &authms.OAuth{},
-	}
-	var dbUserName, dbPhone, dbEmail sql.NullString
-	var dbPhoneValidated, dbEmailValidated sql.NullBool
-	err := db.QueryRow(query, usr.ID).Scan(&dbUsr.ID,
-		&dbUserName, &dbPhone, &dbPhoneValidated, &dbEmail,
-		&dbEmailValidated, &dbUsr.OAuth.AppName,
-		&dbUsr.OAuth.AppUserID)
-	dbUsr.UserName = dbUserName.String
-	dbUsr.Phone.Value = dbPhone.String
-	dbUsr.Phone.Verified = dbPhoneValidated.Bool
-	dbUsr.Email.Value = dbEmail.String
-	dbUsr.Email.Verified = dbEmailValidated.Bool
-	if err != nil {
-		t.Fatalf("Error checking db contents for validation: %s", err)
-	}
+	dbUsr := fetchUser(usr.ID, t)
 	assertUsersEqual(dbUsr, usr, t)
+}
+
+type UpdateTestCase struct {
+	Desc string
+	User *authms.User
+}
+
+func TestModel_UpdateAppUserID(t *testing.T) {
+	bareBoneUser := &authms.User{
+		UserName: "test-username",
+		Password: "test-password",
+	}
+	cmpltUsr := completeUser()
+	appName := cmpltUsr.OAuth.AppName
+	appToken := cmpltUsr.OAuth.AppToken
+	tcs := []UpdateTestCase{
+		{Desc: "Is to update", User: cmpltUsr},
+		{Desc: "Is to insert", User: bareBoneUser},
+	}
+	for _, tc := range tcs {
+		func() {
+			expUsr := tc.User
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			insertUser(tc.User, t)
+			if expUsr.OAuth == nil {
+				expUsr.OAuth = &authms.OAuth{
+					AppName: appName,
+					AppToken: appToken,
+				}
+			}
+			expUsr.OAuth.AppUserID = "test-user-id-updated"
+			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
+			if err != nil {
+				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
+				return
+			}
+			err = m.UpdateAppUserID(tkn.Token(), expUsr.OAuth)
+			if err != nil {
+				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				return
+			}
+			dbUsr := fetchUser(expUsr.ID, t)
+			assertUsersEqual(dbUsr, expUsr, t)
+		}()
+	}
+}
+
+func TestModel_UpdatePhone(t *testing.T) {
+	bareBoneUser := &authms.User{
+		UserName: "test-username",
+		Password: "test-password",
+	}
+	cmpltUsr := completeUser()
+	tcs := []UpdateTestCase{
+		{Desc: "Is to update", User: cmpltUsr},
+		{Desc: "Is to insert", User: bareBoneUser},
+	}
+	for _, tc := range tcs {
+		func() {
+			expUsr := tc.User
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			insertUser(tc.User, t)
+			if expUsr.Phone == nil {
+				expUsr.Phone = &authms.Value{}
+			}
+			expUsr.Phone.Value = "+254098765432"
+			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
+			if err != nil {
+				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
+				return
+			}
+			err = m.UpdatePhone(tkn.Token(), expUsr.Phone.Value)
+			if err != nil {
+				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				return
+			}
+			dbUsr := fetchUser(expUsr.ID, t)
+			assertUsersEqual(dbUsr, expUsr, t)
+		}()
+	}
+}
+
+func TestModel_UpdateEmail(t *testing.T) {
+	bareBoneUser := &authms.User{
+		UserName: "test-username",
+		Password: "test-password",
+	}
+	cmpltUsr := completeUser()
+	tcs := []UpdateTestCase{
+		{Desc: "Is to update", User: cmpltUsr},
+		{Desc: "Is to insert", User: bareBoneUser},
+	}
+	for _, tc := range tcs {
+		func() {
+			expUsr := tc.User
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			insertUser(tc.User, t)
+			if expUsr.Email == nil {
+				expUsr.Email = &authms.Value{}
+			}
+			expUsr.Email.Value = "test.update@email.com"
+			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
+			if err != nil {
+				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
+				return
+			}
+			err = m.UpdateEmail(tkn.Token(), expUsr.Email.Value)
+			if err != nil {
+				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				return
+			}
+			dbUsr := fetchUser(expUsr.ID, t)
+			assertUsersEqual(dbUsr, expUsr, t)
+		}()
+	}
+}
+
+func TestModel_UpdateUserName(t *testing.T) {
+	bareBoneUser := &authms.User{
+		Phone: &authms.Value{Value: "+254012345678"},
+		Password: "test-password",
+	}
+	cmpltUsr := completeUser()
+	tcs := []UpdateTestCase{
+		{Desc: "Is to update", User: cmpltUsr},
+		{Desc: "Is to insert", User: bareBoneUser},
+	}
+	for _, tc := range tcs {
+		func() {
+			expUsr := tc.User
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			insertUser(tc.User, t)
+			expUsr.UserName = "test-updated-username"
+			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
+			if err != nil {
+				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
+				return
+			}
+			err = m.UpdateUserName(tkn.Token(), expUsr.UserName)
+			if err != nil {
+				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				return
+			}
+			dbUsr := fetchUser(expUsr.ID, t)
+			assertUsersEqual(dbUsr, expUsr, t)
+		}()
+	}
+}
+
+func TestModel_UpdatePassword(t *testing.T) {
+	t.Fatal("Not yet tested :(")
+	//bareBoneUser := &authms.User{
+	//	Phone: &authms.Value{Value: "+254012345678"},
+	//	Password: "test-password",
+	//}
+	//cmpltUsr := completeUser()
+	//tcs := []UpdateTestCase{
+	//	{Desc: "Is to update", User: cmpltUsr},
+	//	{Desc: "Is to insert", User: bareBoneUser},
+	//}
+	//for _, tc := range tcs {
+	//	func() {
+	//		expUsr := tc.User
+	//		setUp(t)
+	//		defer tearDown(t)
+	//		m := newModel(t)
+	//		insertUser(tc.User, t)
+	//		expUsr.UserName = "test-updated-username"
+	//		tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
+	//		if err != nil {
+	//			t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
+	//			return
+	//		}
+	//		err = m.UpdateUserName(tkn.Token(), expUsr.UserName)
+	//		if err != nil {
+	//			t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+	//			return
+	//		}
+	//		dbUsr := fetchUser(expUsr.ID, t)
+	//		assertUsersEqual(dbUsr, expUsr, t)
+	//	}()
+	//}
 }
 
 func TestModel_GetByAppUserID(t *testing.T) {
@@ -158,6 +319,41 @@ func completeUser() (*authms.User) {
 	}
 }
 
+func fetchUser(userID int64, t *testing.T) *authms.User {
+	db := getDB(t)
+	query := `
+	SELECT users.id, userNames.userName, phones.phone, phones.validated,
+		  emails.email, emails.validated, appUserIDs.appName,
+		  appUserIDs.appUserID
+		FROM users
+		LEFT JOIN userNames ON users.id=userNames.userID
+		LEFT JOIN phones ON users.id=phones.userID
+		LEFT JOIN emails ON users.id=emails.userID
+		LEFT JOIN appUserIDs ON users.id=appUserIDs.userID
+		WHERE users.id=$1`
+	dbUsr := &authms.User{
+		Email: &authms.Value{},
+		Phone: &authms.Value{},
+		OAuth: &authms.OAuth{},
+	}
+	var dbUserName, dbPhone, dbEmail, dbAppName, dbAppUsrID sql.NullString
+	var dbPhoneValidated, dbEmailValidated sql.NullBool
+	err := db.QueryRow(query, userID).Scan(&dbUsr.ID, &dbUserName, &dbPhone,
+		&dbPhoneValidated, &dbEmail, &dbEmailValidated, &dbAppName,
+		&dbAppUsrID)
+	dbUsr.UserName = dbUserName.String
+	dbUsr.Phone.Value = dbPhone.String
+	dbUsr.Phone.Verified = dbPhoneValidated.Bool
+	dbUsr.Email.Value = dbEmail.String
+	dbUsr.Email.Verified = dbEmailValidated.Bool
+	dbUsr.OAuth.AppName = dbAppName.String
+	dbUsr.OAuth.AppUserID = dbAppUsrID.String
+	if err != nil {
+		t.Fatalf("Error checking db contents for validation: %s", err)
+	}
+	return dbUsr
+}
+
 func insertUser(u *authms.User, t *testing.T) {
 	db := getDB(t)
 	query := `INSERT INTO users (password, createDate)
@@ -175,36 +371,44 @@ func insertUser(u *authms.User, t *testing.T) {
 		Scan(&u.ID); err != nil {
 		t.Fatalf("Error setting up (insert user): %s", err)
 	}
-	query = `
-	INSERT INTO emails (userID, email, validated, createDate)
-	 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
+	if u.Email != nil {
+		query = `
+		INSERT INTO emails (userID, email, validated, createDate)
+		 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
 		 `
-	if _, err := db.Exec(query, u.ID, u.Email.Value,
-		u.Email.Verified); err != nil {
-		t.Fatalf("Error seting up (inserting email): %s", err)
+		if _, err := db.Exec(query, u.ID, u.Email.Value,
+			u.Email.Verified); err != nil {
+			t.Fatalf("Error seting up (inserting email): %s", err)
+		}
 	}
-	query = `
-	INSERT INTO userNames (userID, userName, createDate)
-	 VALUES ($1, $2, CURRENT_TIMESTAMP());
+	if u.UserName != "" {
+		query = `
+		INSERT INTO userNames (userID, userName, createDate)
+		 VALUES ($1, $2, CURRENT_TIMESTAMP());
 		 `
-	if _, err := db.Exec(query, u.ID, u.UserName); err != nil {
-		t.Fatalf("Error seting up (inserting username): %s", err)
+		if _, err := db.Exec(query, u.ID, u.UserName); err != nil {
+			t.Fatalf("Error seting up (inserting username): %s", err)
+		}
 	}
-	query = `
-	INSERT INTO phones (userID, phone, validated, createDate)
-	 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
+	if u.Phone != nil {
+		query = `
+		INSERT INTO phones (userID, phone, validated, createDate)
+		 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
 		 `
-	if _, err := db.Exec(query, u.ID, u.Phone.Value,
-		u.Phone.Verified); err != nil {
-		t.Fatalf("Error seting up (inserting phone) %s", err)
+		if _, err := db.Exec(query, u.ID, u.Phone.Value,
+			u.Phone.Verified); err != nil {
+			t.Fatalf("Error seting up (inserting phone) %s", err)
+		}
 	}
-	query = `
-	INSERT INTO appUserIDs (userID, appUserID, appName, createDate)
-	 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
+	if u.OAuth != nil {
+		query = `
+		INSERT INTO appUserIDs (userID, appUserID, appName, createDate)
+		 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
 		 `
-	if _, err := db.Exec(query, u.ID, u.OAuth.AppUserID,
-		u.OAuth.AppName); err != nil {
-		t.Fatalf("Error seting up (inserting appUserID): %s", err)
+		if _, err := db.Exec(query, u.ID, u.OAuth.AppUserID,
+			u.OAuth.AppName); err != nil {
+			t.Fatalf("Error seting up (inserting appUserID): %s", err)
+		}
 	}
 }
 
@@ -245,7 +449,7 @@ func newModel(t *testing.T) (*user.Model) {
 	if err != nil {
 		t.Fatalf("password.NewGenerator(): %s", err)
 	}
-	tg, err := token.NewGenerator(conf.Token)
+	tg, err = token.NewGenerator(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %s", err)
 	}

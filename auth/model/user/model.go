@@ -192,8 +192,8 @@ func (m Model) UpdateUserName(tkn, newUserName string) error {
 	}
 	q = `UPDATE userNames
 		 	SET userName=$1, updateDate=CURRENT_TIMESTAMP()
-		 	WHERE userID=$3`
-	rslt, err := m.db.Exec(q, newUserName, false, t.UserID())
+		 	WHERE userID=$2`
+	rslt, err := m.db.Exec(q, newUserName, t.UserID())
 	return checkRowsAffected(rslt, err, 1)
 }
 
@@ -218,7 +218,7 @@ func (m Model) UpdateAppUserID(tkn string, new *authms.OAuth) error {
 	}
 	q = `UPDATE appUserIDs
 		 	SET appUserID=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
-		 	WHERE userID=$3 AND appName=$2`
+		 	WHERE userID=$3 AND appName=$4`
 	rslt, err := m.db.Exec(q, new.AppUserID, false, t.UserID(), new.AppName)
 	return checkRowsAffected(rslt, err, 1)
 }
@@ -275,19 +275,27 @@ func (m Model) UpdatePhone(tkn, newPhone string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m Model) UpdatePassword(tkn, newPassword string) error {
-	t, err := m.token.Validate(tkn)
+func (m Model) UpdatePassword(userID int64, oldPass, newPassword string) error {
+	q := `SELECT password FROM users WHERE id=$1`
+	var currPass []byte
+	err := m.db.QueryRow(q, userID).Scan(&currPass)
 	if err != nil {
+		if err != sql.ErrNoRows {
+			return ErrorPasswordMismatch
+		}
 		return err
+	}
+	if ! m.hasher.CompareHash(newPassword, currPass) {
+		return ErrorPasswordMismatch
 	}
 	passHB, err := m.hasher.Hash(newPassword)
 	if err != nil {
 		return err
 	}
-	q := `UPDATE users
+	q = `UPDATE users
 			SET password=$1, updateDate=CURRENT_TIMESTAMP()
 	 		WHERE id=$2`
-	rslt, err := m.db.Exec(q, passHB, t.UserID())
+	rslt, err := m.db.Exec(q, passHB, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
