@@ -361,7 +361,7 @@ func newAuth(h *History, t *testing.T) *auth.Auth {
 
 	var err error
 	tokenGen, err = token.NewGenerator(token.Config{
-		TokenKeyFile: "../ssh-keys/sha256.key",
+		TknKeyFile: "../ssh-keys/sha256.key",
 	})
 	if err != nil {
 		t.Fatalf("New Token Generator: %s", err)

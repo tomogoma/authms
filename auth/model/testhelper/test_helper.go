@@ -7,10 +7,6 @@ import (
 
 	_ "github.com/lib/pq"
 	"github.com/tomogoma/authms/auth/model/helper"
-	"github.com/tomogoma/authms/auth/model/history"
-	"github.com/tomogoma/authms/auth/model/token"
-	"github.com/tomogoma/authms/auth/model/user"
-	"github.com/tomogoma/authms/auth/password"
 )
 
 const (
@@ -20,6 +16,7 @@ const (
 type App struct {
 	AppUID     string
 	AppName    string
+	AppToken   string
 	IsVerified bool
 }
 
@@ -38,6 +35,10 @@ func (a *App) Validated() bool {
 	return a.IsVerified
 }
 
+func (a *App) Token() string {
+	return a.AppToken
+}
+
 type Value struct {
 	Val        string
 	IsVerified bool
@@ -51,64 +52,12 @@ func (v *Value) Validated() bool {
 	return v.IsVerified
 }
 
-type User struct {
-	UName     string
-	EmailAddr *Value
-	PhoneNo   *Value
-	AppDet    *App
-
-	Password    string
-	HashF       user.HashFunc
-	ValHashFunc user.ValidatePassFunc
-	TokenGen    *token.Generator
-}
-
-func (u *User) ID() int {
-	return 1
-}
-func (u *User) UserName() string {
-	return u.UName
-}
-func (u *User) Email() user.Valuer {
-	return u.EmailAddr
-}
-func (u *User) EmailAddress() string {
-	if u.EmailAddr == nil {
-		return ""
-	}
-	return u.EmailAddr.Val
-}
-func (u *User) Phone() user.Valuer {
-	return u.PhoneNo
-}
-func (u *User) PhoneNumber() string {
-	if u.PhoneNo == nil {
-		return ""
-	}
-	return u.PhoneNo.Val
-}
-func (u *User) App() user.App {
-	return u.AppDet
-}
-func (u *User) PreviousLogins() []*history.History {
-	return make([]*history.History, 0)
-}
-func (u *User) Token() token.Token {
-	t, _ := u.TokenGen.Generate(1, "test", token.ShortExpType)
-	return t
-}
-
 func HashF(p string) ([]byte, error) {
 	return []byte{0, 1, 2, 3, 4, 5}, nil
 }
 
 func ValHashFunc(p string, passHB []byte) bool {
 	return true
-}
-
-func (u User) ExplodeParams() (string, string, string, string, user.App, *password.Generator, user.HashFunc) {
-	g, _ := password.NewGenerator(password.AllChars)
-	return u.UName, u.PhoneNo.Val, u.EmailAddr.Val, u.Password, u.AppDet, g, u.HashF
 }
 
 var DSN = helper.DSN{

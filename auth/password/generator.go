@@ -16,7 +16,8 @@ const (
 	AllChars          = AlphaNumericChars + SpecialChars
 )
 
-var ErrorBadCharSet = errors.New("availableCharBytes length must be greater than 0 and less than or equal to 256")
+var ErrorBadCharSet = errors.New("availableCharBytes length must be greater" +
+	" than 0 and less than or equal to 256")
 
 type Generator struct {
 	letterBytes         string

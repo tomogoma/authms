@@ -13,7 +13,7 @@ authentication:
   blacklistfailcount: 3
   blacklistwindow: 30m0s
 token:
-  tokenkeyfile: ssh-keys/sha256.key
+  tokenkeyfile: /etc/authms/ssh-keys/sha256.key
 oauth:
   facebooksecret:
   facebookid:

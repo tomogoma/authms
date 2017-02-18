@@ -23,7 +23,7 @@ var ErrorSigningMethodTampered = errors.New("Signing method is tampered with")
 var ErrorEmptyKeyFile = errors.New("Key file was empty")
 
 func NewGenerator(c Config) (*Generator, error) {
-	prk, err := ioutil.ReadFile(c.TokenKeyFile)
+	prk, err := ioutil.ReadFile(c.TknKeyFile)
 	if err != nil {
 		return nil, fmt.Errorf("error getting key from '%s': %s",
 			c.TokenKeyFile, err)

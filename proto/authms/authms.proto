@@ -33,13 +33,13 @@ message Value {
 }
 
 message User {
-    int64 id = 1;
+    int64 ID = 1;
     string token = 2;
     string password = 3;
-    string username = 4;
+    string userName = 4;
     repeated History loginHistory = 5;
     Value phone = 6;
-    Value mail = 7;
+    Value email = 7;
     OAuth oAuth = 8;
 }
 
