@@ -13,7 +13,7 @@ import (
 	"github.com/tomogoma/authms/auth/oauth/facebook"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
-	"time"
+	"runtime"
 )
 
 type TokenConfigMock struct {
@@ -104,16 +104,35 @@ func TestAuth_Register(t *testing.T) {
 		DevID     string
 	}
 	cases := []RegisterTestCase{
-		{Desc: "Valid args", User: &authms.User{ID: 123}, OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{}, ExpErr: false, DevID: "test-dev"},
-		{Desc: "Nil user", User: nil, OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{}, ExpErr: true, DevID: "test-dev"},
-		{Desc: "OAuth user",
-			User: &authms.User{ID: 123,
-				OAuth:&authms.OAuth{AppUserID: "test-oauth-app-uid"}},
-			OAHandler: &OAuthHandlerMock{ExpValTknClld: true,
-				ExpValid:true, AppUserID: "test-oauth-app-uid"},
-			DBHelper: &DBHelperMock{}, ExpErr: false, DevID: "test-dev"},
+		{
+			Desc: "Valid args",
+			User: &authms.User{ID: 123},
+			OAHandler: &OAuthHandlerMock{},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: "test-dev",
+		},
+		{
+			Desc: "Nil user",
+			User: nil, OAHandler: &OAuthHandlerMock{},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: "test-dev"},
+		{
+			Desc: "OAuth user",
+			User: &authms.User{
+				ID: 123,
+				OAuth:&authms.OAuth{AppUserID: "test-oauth-app-uid"},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpValTknClld: true,
+				ExpValid:true,
+				AppUserID: "test-oauth-app-uid",
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: "test-dev",
+		},
 		{Desc: "Missing DevID", User: &authms.User{}, OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{}, ExpErr: true},
 	}
@@ -122,7 +141,7 @@ func TestAuth_Register(t *testing.T) {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler)
 			err := a.Register(c.User, c.DevID, "")
-			time.Sleep(500 * time.Millisecond)
+			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
 				t.Errorf("%s - validate oath token not called", c.Desc)
 			}
@@ -170,7 +189,7 @@ func TestAuth_LoginOAuth(t *testing.T) {
 		func() {
 			a := newAuth(t, c.DBHelper, c.OAHandler)
 			usr, err := a.LoginOAuth(c.OAuth, c.DevID, "")
-			time.Sleep(500 * time.Millisecond)
+			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
 				t.Errorf("%s - validate oath token not called", c.Desc)
 			}
@@ -215,7 +234,7 @@ func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock) *auth.Auth {
 }
 
 func setUp(t *testing.T) {
-	if err := config.ReadConfig(*confFile, conf); err != nil {
+	if err := config.ReadYamlConfig(*confFile, conf); err != nil {
 		t.Fatal(err)
 	}
 }

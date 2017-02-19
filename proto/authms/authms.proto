@@ -1,13 +1,7 @@
 syntax = "proto3";
 
 service AuthMS {
-    rpc RegisterUserName (BasicAuthRequest) returns (Response) {
-    }
-    rpc RegisterEmail (BasicAuthRequest) returns (Response) {
-    }
-    rpc RegisterPhone (BasicAuthRequest) returns (Response) {
-    }
-    rpc RegisterOAuth (OAuthRequest) returns (Response) {
+    rpc Register (RegisterRequest) returns (Response) {
     }
     rpc LoginUserName (BasicAuthRequest) returns (Response) {
     }
@@ -16,8 +10,6 @@ service AuthMS {
     rpc LoginPhone (BasicAuthRequest) returns (Response) {
     }
     rpc LoginOAuth (OAuthRequest) returns (Response) {
-    }
-    rpc ValidateToken (TokenRequest) returns (Response) {
     }
 }
 
@@ -55,26 +47,18 @@ message User {
 
 message BasicAuthRequest {
     string deviceID = 1;
-    string forServiceID = 2;
-    string basicID = 3;
-    string password = 4;
-    string refererServiceID = 5;
+    string basicID = 2;
+    string password = 3;
+}
+
+message RegisterRequest {
+    string deviceID = 1;
+    User user = 2;
 }
 
 message OAuthRequest {
     string deviceID = 1;
-    string forServiceID = 2;
-    string appName = 3;
-    string appUserID = 4;
-    string appToken = 5;
-    string refererServiceID = 6;
-}
-
-message TokenRequest {
-    string deviceID = 1;
-    string forServiceID = 2;
-    string token = 3;
-    string refererServiceID = 4;
+    OAuth OAuth = 2;
 }
 
 message Response {

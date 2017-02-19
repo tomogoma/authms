@@ -1,6 +1,6 @@
-service:
-  runtype: rpc
-  registerinterval: 5s
+serviceConfig:
+  runType: rpc
+  registerInterval: 5s
 database:
   userName: root
   password: ""
@@ -13,7 +13,7 @@ authentication:
   blacklistfailcount: 3
   blacklistwindow: 30m0s
 token:
-  tokenkeyfile: /etc/authms/ssh-keys/sha256.key
-oauth:
-  facebooksecret:
-  facebookid:
+  tokenKeyFile: /etc/authms/ssh-keys/sha256.key
+OAuth:
+  facebookSecretFileLoc: /etc/authms/keys/facebooksecret.key
+  facebookID:

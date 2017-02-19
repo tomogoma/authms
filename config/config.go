@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/dbhelper/helper"
 	"github.com/tomogoma/authms/auth/oauth"
+	"github.com/tomogoma/go-commons/database/cockroach"
+	"github.com/tomogoma/go-commons/auth/token"
 )
 
 const (
@@ -19,8 +20,8 @@ var ErrorInvalidRunType = fmt.Errorf("Invalid runtype; expected one of %s, %s", 
 var ErrorInvalidRegInterval = errors.New("Register interval was invalid cannot be < 1ms")
 
 type ServiceConfig struct {
-	RunType          string        `json:"runType,omitempty"`
-	RegisterInterval time.Duration `json:"registerInterval,omitempty"`
+	RunType          string        `json:"runType,omitempty" yaml:"runType"`
+	RegisterInterval time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
 }
 
 func (sc ServiceConfig) Validate() error {
@@ -34,19 +35,19 @@ func (sc ServiceConfig) Validate() error {
 }
 
 type Config struct {
-	Service        ServiceConfig `json:"serviceConfig,omitempty"`
-	Database       helper.DSN    `json:"database,omitempty"`
-	Authentication auth.Config   `json:"authentication,omitempty"`
-	Token          Token  `json:"token,omitempty"`
-	OAuth          oauth.Config  `json:"OAuth,omitempty"`
+	Service        ServiceConfig `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
+	Authentication auth.Config   `json:"authentication,omitempty" yaml:"authentication"`
+	Token          token.DefaultConfig  `json:"token,omitempty" yaml:"token"`
+	OAuth          oauth.Config  `json:"OAuth,omitempty" yaml:"OAuth"`
 }
 
 func (c Config) Validate() error {
 	if err := c.Service.Validate(); err != nil {
 		return err
 	}
-	if err := c.Token.Validate(); err != nil {
-		return err
+	if c.Token.TokenKeyFile() == "" {
+		return errors.New("Token key file not provided")
 	}
 	if err := c.Authentication.Validate(); err != nil {
 		return err

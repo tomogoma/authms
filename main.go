@@ -3,24 +3,23 @@ package main
 import (
 	"flag"
 	"log"
-	"time"
-
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-micro/server"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/dbhelper/helper"
-	"github.com/tomogoma/authms/auth/dbhelper/history"
-	"github.com/tomogoma/authms/auth/dbhelper/token"
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/rpc"
+	"runtime"
+	"github.com/tomogoma/go-commons/auth/token"
+	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/auth/hash"
 )
 
 const (
-	serviceName    = "authms"
+	serviceName = "authms"
 	serviceVersion = "0.0.1"
 )
 
@@ -43,17 +42,7 @@ func main() {
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
 	log.SetOutput(defLogWriter{lg: lg})
-	defer time.Sleep(500 * time.Millisecond)
-	db, err := helper.SQLDB(conf.Database)
-	if err != nil {
-		lg.Critical("Error connecting to db: %s", err)
-		return
-	}
-	hm, err := history.NewModel(db)
-	if err != nil {
-		lg.Critical("Error instantiating history model: %s", err)
-		return
-	}
+	defer runtime.Gosched()
 	tg, err := token.NewGenerator(conf.Token)
 	if err != nil {
 		lg.Critical("Error instantiating token generator: %s", err)
@@ -70,7 +59,8 @@ func main() {
 		lg.Critical("Error instantiating OAuth module: %s", err)
 		return
 	}
-	a, err := auth.New(db, hm, tg, pg, conf.Authentication, lg, oa, authQuitCh)
+	db, err := dbhelper.New(conf.Database, pg, hash.Hasher{})
+	a, err := auth.New(tg, lg, db, oa)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return
@@ -105,9 +95,6 @@ func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(serviceName),
 		micro.Version(serviceVersion),
-		micro.Metadata(map[string]string{
-			"type": "helloworld",
-		}),
 		micro.RegisterInterval(c.RegisterInterval),
 	)
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)

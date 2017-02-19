@@ -18,7 +18,6 @@ type DBHelper struct {
 
 var ErrorNilHashFunc = errors.New("HashFunc cannot be nil")
 var ErrorNilPasswordGenerator = errors.New("password generator was nil")
-var ErrorNilTokenValidator = errors.New("token validator was nil")
 
 func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper, error) {
 	if h == nil {
@@ -32,7 +31,7 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper
 		return nil, errors.Newf("error connecting to db: %s", err)
 	}
 	if err := cockroach.InstantiateDB(db, dsnF.DBName(), users, usernames,
-		emails, phones, appUserIDs, history); err != nil {
+		emails, phones, appUserIDs, history, tokens); err != nil {
 		return nil, errors.Newf("error instantiating db: %s", err)
 	}
 	iCh := make(chan *token.Token)

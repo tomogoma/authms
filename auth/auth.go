@@ -34,7 +34,7 @@ type DBHelper interface {
 	GetByUserName(uname, pass string) (*authms.User, error)
 	GetByAppUserID(appName, appUserID string) (*authms.User, error)
 	SaveToken(*token.Token) error
-	GetHistory(userID int64, offset, count int, accessType string) ([]*authms.History, error)
+	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	SaveHistory(*authms.History) error
 }
 
