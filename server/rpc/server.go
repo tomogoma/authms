@@ -77,10 +77,18 @@ func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *a
 	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
-func (s *Server) UpdatePhone(c context.Context, req *authms.RegisterRequest, resp *authms.Response) error {
-	tID := <- s.tIDCh
+func (s *Server) UpdatePhone(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
 	s.lg.Fine("%d - update phone...", tID)
+	err := s.auth.UpdatePhone(req.User, req.Token, req.DeviceID, "")
+	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
+}
 
+func (s *Server) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - update OAuth...", tID)
+	err := s.auth.UpdateOAuth(req.User, req.Token, req.DeviceID, "")
+	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
 }
 
 func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int32, tID int, err error) error {

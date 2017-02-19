@@ -9,9 +9,11 @@ service AuthMS {
     }
     rpc LoginPhone (BasicAuthRequest) returns (Response) {
     }
-    rpc UpdatePhone (RegisterRequest) returns (Response) {
-    }
     rpc LoginOAuth (OAuthRequest) returns (Response) {
+    }
+    rpc UpdatePhone (UpdateRequest) returns (Response) {
+    }
+    rpc UpdateOauth (UpdateRequest) returns (Response) {
     }
 }
 
@@ -57,6 +59,12 @@ message BasicAuthRequest {
 message RegisterRequest {
     string deviceID = 1;
     User user = 2;
+}
+
+message UpdateRequest {
+    string token = 1;
+    string deviceID = 2;
+    User user = 3;
 }
 
 message OAuthRequest {
