@@ -18,6 +18,7 @@ type OAuthHandler interface {
 type TokenGenerator interface {
 	Generate(usrID int, devID string, expType token.ExpiryType) (*token.Token, error)
 	Validate(tokenStr string) (*token.Token, error)
+	ValidateUser(tokenStr string, userID int) (*token.Token, error)
 }
 
 type PasswordGenerator interface {
@@ -36,6 +37,7 @@ type DBHelper interface {
 	SaveToken(*token.Token) error
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	SaveHistory(*authms.History) error
+	UpdatePhone(userID int64, newPhone string) error
 }
 
 type Auth struct {
@@ -100,7 +102,42 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if err := a.validateOAuth(user.OAuth); err != nil {
 		return err
 	}
+	if user.OAuth != nil {
+		user.OAuth.Verified = false
+	}
+	if user.Phone != nil {
+		user.Phone.Verified = false
+	}
+	if user.Email != nil {
+		user.Email.Verified = false
+	}
 	err := a.dbHelper.SaveUser(user)
+	if err != nil {
+		return err
+	}
+	go a.saveHistory(user, devID, dbhelper.AccessRegistration, rIP, nil)
+	return nil
+}
+
+func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
+	if user == nil {
+		return errors.NewClient("user was empty")
+	}
+	_, err := a.tokenG.ValidateUser(token, int(user.ID))
+	defer func() {
+		go a.saveHistory(user, devID, dbhelper.AccessUpdate, rIP, err)
+	}()
+	if err != nil {
+		return err
+	}
+	if user.Phone == nil {
+		return errors.NewClient("phone was empty")
+	}
+	if devID == "" {
+		return errors.NewClient("device ID was empty")
+	}
+	user.Phone.Verified = false
+	err = a.dbHelper.UpdatePhone(user.ID, user.Phone.Value)
 	if err != nil {
 		return err
 	}

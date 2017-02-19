@@ -77,6 +77,12 @@ func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *a
 	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
+func (s *Server) UpdatePhone(c context.Context, req *authms.RegisterRequest, resp *authms.Response) error {
+	tID := <- s.tIDCh
+	s.lg.Fine("%d - update phone...", tID)
+
+}
+
 func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int32, tID int, err error) error {
 	if err != nil {
 		if !auth.AuthError(err) {

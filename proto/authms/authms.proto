@@ -9,6 +9,8 @@ service AuthMS {
     }
     rpc LoginPhone (BasicAuthRequest) returns (Response) {
     }
+    rpc UpdatePhone (RegisterRequest) returns (Response) {
+    }
     rpc LoginOAuth (OAuthRequest) returns (Response) {
     }
 }
@@ -27,6 +29,7 @@ message OAuth {
     string appName = 1;
     string appUserID = 2;
     string appToken = 3;
+    bool verified = 4;
 }
 
 message Value {

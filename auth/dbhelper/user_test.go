@@ -22,6 +22,7 @@ func TestModel_SaveUser(t *testing.T) {
 			AppName: "test-app",
 			AppUserID: "test-user-id",
 			AppToken: "test-app.test-user-id.test-token",
+			Verified: true,
 		},
 	}
 	if err := m.SaveUser(usr); err != nil {
@@ -54,6 +55,7 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 				expUsr.OAuth = &authms.OAuth{
 					AppName: appName,
 					AppToken: appToken,
+					Verified: true,
 				}
 			}
 			expUsr.OAuth.AppUserID = "test-user-id-updated"
@@ -89,9 +91,10 @@ func TestModel_UpdatePhone(t *testing.T) {
 				expUsr.Phone = &authms.Value{}
 			}
 			expUsr.Phone.Value = "+254098765432"
-			err := m.UpdatePhone(tc.User.ID, expUsr.Phone.Value)
+			expUsr.Phone.Verified = true
+			err := m.UpdatePhone(tc.User.ID, expUsr.Phone)
 			if err != nil {
-				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				t.Errorf("%s - model.UpdatePhone(): %s", tc.Desc, err)
 				return
 			}
 			dbUsr := fetchUser(expUsr.ID, t)
@@ -121,9 +124,10 @@ func TestModel_UpdateEmail(t *testing.T) {
 				expUsr.Email = &authms.Value{}
 			}
 			expUsr.Email.Value = "test.update@email.com"
-			err := m.UpdatePhone(tc.User.ID, expUsr.Email.Value)
+			expUsr.Email.Verified = true
+			err := m.UpdateEmail(tc.User.ID, expUsr.Email)
 			if err != nil {
-				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				t.Errorf("%s - model.UpdateEmail(): %s", tc.Desc, err)
 				return
 			}
 			dbUsr := fetchUser(expUsr.ID, t)
@@ -150,9 +154,9 @@ func TestModel_UpdateUserName(t *testing.T) {
 			m := newModel(t)
 			insertUser(tc.User, t)
 			expUsr.UserName = "test-updated-username"
-			err := m.UpdatePhone(tc.User.ID, expUsr.UserName)
+			err := m.UpdateUserName(tc.User.ID, expUsr.UserName)
 			if err != nil {
-				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
+				t.Errorf("%s - model.UpdateUserName(): %s", tc.Desc, err)
 				return
 			}
 			dbUsr := fetchUser(expUsr.ID, t)
@@ -263,7 +267,7 @@ func completeUser() (*authms.User) {
 		UserName: "test-username",
 		Email: &authms.Value{
 			Value: "test@email.com",
-			Verified: true,
+			Verified: false,
 		},
 		Phone: &authms.Value{
 			Value: "+254712345678",
@@ -273,6 +277,7 @@ func completeUser() (*authms.User) {
 			AppName: "test-app",
 			AppUserID: "test-user-id",
 			AppToken: "test-app.test-user-id.test-token",
+			Verified: false,
 		},
 		Password: "test-password",
 	}
@@ -283,7 +288,7 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 	query := `
 	SELECT users.id, userNames.userName, phones.phone, phones.validated,
 		  emails.email, emails.validated, appUserIDs.appName,
-		  appUserIDs.appUserID
+		  appUserIDs.appUserID, appUserIDs.validated
 		FROM users
 		LEFT JOIN userNames ON users.id=userNames.userID
 		LEFT JOIN phones ON users.id=phones.userID
@@ -296,10 +301,10 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 		OAuth: &authms.OAuth{},
 	}
 	var dbUserName, dbPhone, dbEmail, dbAppName, dbAppUsrID sql.NullString
-	var dbPhoneValidated, dbEmailValidated sql.NullBool
+	var dbPhoneValidated, dbEmailValidated, dbAppValidated sql.NullBool
 	err := db.QueryRow(query, userID).Scan(&dbUsr.ID, &dbUserName, &dbPhone,
 		&dbPhoneValidated, &dbEmail, &dbEmailValidated, &dbAppName,
-		&dbAppUsrID)
+		&dbAppUsrID, &dbAppValidated)
 	dbUsr.UserName = dbUserName.String
 	dbUsr.Phone.Value = dbPhone.String
 	dbUsr.Phone.Verified = dbPhoneValidated.Bool
@@ -307,6 +312,7 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 	dbUsr.Email.Verified = dbEmailValidated.Bool
 	dbUsr.OAuth.AppName = dbAppName.String
 	dbUsr.OAuth.AppUserID = dbAppUsrID.String
+	dbUsr.OAuth.Verified = dbAppValidated.Bool
 	if err != nil {
 		t.Fatalf("Error checking db contents for validation: %s", err)
 	}
@@ -380,20 +386,18 @@ func assertUsersEqual(act *authms.User, exp *authms.User, t *testing.T) {
 			t.Errorf("Expected nil but got %+v\n", act)
 		}
 		return
-	} else {
-		if act == nil {
-			t.Errorf("Expected a value %+v but got nil\n", exp)
-		}
+	} else if act == nil {
+		t.Errorf("Expected a value %+v but got nil\n", exp)
 		return
 	}
-	if !reflect.DeepEqual(act.OAuth, exp.OAuth) {
-		t.Errorf("Expected oauth %+v but got %+v", act.OAuth, exp.OAuth)
+	if !oAuthEqual(act.OAuth, exp.OAuth) {
+		t.Errorf("Expected oauth %+v but got %+v", exp.OAuth, act.OAuth)
 	}
-	if !reflect.DeepEqual(act.Phone, exp.Phone) {
-		t.Errorf("Expected phone %+v but got %+v", act.Phone, exp.Phone)
+	if !valuesEqual(act.Phone, exp.Phone) {
+		t.Errorf("Expected phone %+v but got %+v", exp.Phone, act.Phone)
 	}
-	if !reflect.DeepEqual(act.Email, exp.Email) {
-		t.Errorf("Expected email %+v but got %+v", act.Email, exp.Email)
+	if !valuesEqual(act.Email, exp.Email) {
+		t.Errorf("Expected email %+v but got %+v", exp.Email, act.Email)
 	}
 	if act.ID != exp.ID {
 		t.Errorf("Expected id %d but got %d", exp.ID, act.ID)
@@ -401,4 +405,24 @@ func assertUsersEqual(act *authms.User, exp *authms.User, t *testing.T) {
 	if act.UserName != exp.UserName {
 		t.Errorf("Expected UserName %d but got %d", exp.UserName, act.UserName)
 	}
+}
+
+func valuesEqual(act, exp *authms.Value) bool {
+	if exp == nil {
+		return act == nil || !dbhelper.HasValue(exp)
+	} else if act == nil {
+		return false
+	}
+	return act.Value == exp.Value && act.Verified == exp.Verified
+}
+
+func oAuthEqual(act, exp *authms.OAuth) bool {
+	if exp == nil {
+		return act == nil ||
+			(act.AppName == "" && act.AppUserID == "" && act.Verified == false)
+	} else if act == nil {
+		return false
+	}
+	return act.AppName == exp.AppName && act.AppUserID == exp.AppUserID &&
+		act.Verified == exp.Verified
 }

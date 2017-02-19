@@ -17,11 +17,11 @@ import (
 )
 
 type TokenConfigMock struct {
-	TknKeyFile string `yaml:"tokenkeyfile"`
+	TknKyFile string `yaml:"tokenKeyFile,omitempty"`
 }
 
 func (c TokenConfigMock) TokenKeyFile() string {
-	return c.TknKeyFile
+	return c.TknKyFile
 }
 
 type ConfigMock struct {
@@ -55,9 +55,19 @@ type DBHelperMock struct {
 	SaveHistoryCalled bool
 	GetUserCalled     bool
 	SaveTokenCalled   bool
+	T                 *testing.T
 }
 
-func (d *DBHelperMock) SaveUser(*authms.User) error {
+func (d *DBHelperMock) SaveUser(u *authms.User) error {
+	if u.OAuth != nil && u.OAuth.Verified == true {
+		d.T.Error("expected OAuth verified=false but got true")
+	}
+	if u.Phone != nil && u.Phone.Verified == true {
+		d.T.Error("expected Phone verified=false but got true")
+	}
+	if u.Email != nil && u.Email.Verified == true {
+		d.T.Error("expected Email verified=false but got true")
+	}
 	d.SaveUserCalled = true
 	return d.ExpErr
 }
@@ -73,11 +83,15 @@ func (d *DBHelperMock) SaveToken(*token.Token) error {
 	d.SaveTokenCalled = true
 	return d.ExpErr
 }
-func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType string) ([]*authms.History, error) {
+func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error) {
 	return d.ExpHist, d.ExpErr
 }
 func (d *DBHelperMock) SaveHistory(*authms.History) error {
 	d.SaveHistoryCalled = true
+	return d.ExpErr
+}
+
+func (d *DBHelperMock) UpdatePhone(userID int64, newPhone string) error {
 	return d.ExpErr
 }
 
@@ -109,6 +123,19 @@ func TestAuth_Register(t *testing.T) {
 			User: &authms.User{ID: 123},
 			OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: "test-dev",
+		},
+		{
+			Desc: "Valid args, verified=true",
+			User: &authms.User{
+				ID: 123,
+				OAuth: &authms.OAuth{AppUserID: "1", Verified:true},
+				Phone: &authms.Value{Verified:true},
+				Email: &authms.Value{Verified:true},
+			},
+			OAHandler: &OAuthHandlerMock{AppUserID:"1", ExpValid:true},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: "test-dev",
 		},

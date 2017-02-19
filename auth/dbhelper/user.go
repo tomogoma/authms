@@ -52,9 +52,9 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 			return err
 		}
 		if HasValue(u.Email) {
-			emailqStr := `INSERT INTO emails (userID, email, createDate)
-		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
-			_, err = tx.Exec(emailqStr, u.ID, u.Email.Value)
+			emailqStr := `INSERT INTO emails (userID, email, validated, createDate)
+		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
+			_, err = tx.Exec(emailqStr, u.ID, u.Email.Value, u.Email.Verified)
 			if err != nil {
 				return err
 			}
@@ -68,17 +68,17 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 			}
 		}
 		if HasValue(u.Phone) {
-			phoneqStr := `INSERT INTO phones (userID, phone, createDate)
-		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
-			_, err = tx.Exec(phoneqStr, u.ID, u.Phone.Value)
+			phoneqStr := `INSERT INTO phones (userID, phone, validated, createDate)
+		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
+			_, err = tx.Exec(phoneqStr, u.ID, u.Phone.Value, u.Phone.Verified)
 			if err != nil {
 				return err
 			}
 		}
 		if u.OAuth != nil {
-			extqStr := `INSERT INTO appUserIDs (userID, appUserID, appName, createDate)
-	 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
-			_, err = tx.Exec(extqStr, u.ID, u.OAuth.AppUserID, u.OAuth.AppName)
+			extqStr := `INSERT INTO appUserIDs (userID, appUserID, appName, validated, createDate)
+	 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP())`
+			_, err = tx.Exec(extqStr, u.ID, u.OAuth.AppUserID, u.OAuth.AppName, u.OAuth.Verified)
 			if err != nil {
 				return err
 			}
@@ -152,20 +152,20 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
 	if (count == 0) {
-		q = `INSERT INTO appUserIDs (userID, appUserID, appName, createDate)
-	 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, new.AppUserID, new.AppName)
+		q = `INSERT INTO appUserIDs (userID, appUserID, appName, validated, createDate)
+	 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP())`
+		rslt, err := m.db.Exec(q, userID, new.AppUserID, new.AppName, new.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE appUserIDs
 		 	SET appUserID=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3 AND appName=$4`
-	rslt, err := m.db.Exec(q, new.AppUserID, false, userID, new.AppName)
+	rslt, err := m.db.Exec(q, new.AppUserID, new.Verified, userID, new.AppName)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdateEmail(userID int64, newEmail string) error {
-	if newEmail == "" {
+func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
+	if !HasValue(newEmail) {
 		return errors.NewClient("the email provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM emails WHERE userID=$1`
@@ -174,20 +174,20 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail string) error {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
 	if (count == 0) {
-		q = `INSERT INTO emails (userID, email, createDate)
-		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, newEmail)
+		q = `INSERT INTO emails (userID, email, validated, createDate)
+		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
+		rslt, err := m.db.Exec(q, userID, newEmail.Value, newEmail.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE emails
 		 	SET email=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3`
-	rslt, err := m.db.Exec(q, newEmail, false, userID)
+	rslt, err := m.db.Exec(q, newEmail.Value, newEmail.Verified, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdatePhone(userID int64, newPhone string) error {
-	if newPhone == "" {
+func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
+	if !HasValue(newPhone) {
 		return errors.NewClient("the phone provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM phones WHERE userID=$1`
@@ -196,15 +196,15 @@ func (m *DBHelper) UpdatePhone(userID int64, newPhone string) error {
 		return fmt.Errorf("error checking if user has phone: %s", err)
 	}
 	if (count == 0) {
-		q = `INSERT INTO phones (userID, phone, createDate)
-		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, newPhone)
+		q = `INSERT INTO phones (userID, phone, validated, createDate)
+		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
+		rslt, err := m.db.Exec(q, userID, newPhone.Value, newPhone.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE phones
 		 	SET phone=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3`
-	rslt, err := m.db.Exec(q, newPhone, false, userID)
+	rslt, err := m.db.Exec(q, newPhone.Value, newPhone.Verified, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
