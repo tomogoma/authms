@@ -11,7 +11,6 @@ type DBHelper struct {
 	db          *sql.DB
 	hasher      Hasher
 	gen         PasswordGenerator
-	token       TokenValidator
 	tokenSaveCh chan *token.Token
 	tokenDelCh  chan string
 	gcRunning   bool
@@ -21,15 +20,12 @@ var ErrorNilHashFunc = errors.New("HashFunc cannot be nil")
 var ErrorNilPasswordGenerator = errors.New("password generator was nil")
 var ErrorNilTokenValidator = errors.New("token validator was nil")
 
-func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher, tv TokenValidator) (*DBHelper, error) {
+func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper, error) {
 	if h == nil {
 		return nil, ErrorNilHashFunc
 	}
 	if pg == nil {
 		return nil, ErrorNilPasswordGenerator
-	}
-	if tv == nil {
-		return nil, ErrorNilTokenValidator
 	}
 	db, err := cockroach.DBConn(dsnF)
 	if err != nil {
@@ -41,7 +37,7 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher, tv TokenVa
 	}
 	iCh := make(chan *token.Token)
 	dCh := make(chan string)
-	return &DBHelper{db: db, gen: pg, hasher: h, token: tv, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
+	return &DBHelper{db: db, gen: pg, hasher: h, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {

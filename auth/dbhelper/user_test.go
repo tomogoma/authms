@@ -5,7 +5,6 @@ import (
 	"reflect"
 	"database/sql"
 	"testing"
-	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/authms/auth/dbhelper"
 )
 
@@ -58,12 +57,7 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 				}
 			}
 			expUsr.OAuth.AppUserID = "test-user-id-updated"
-			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
-			if err != nil {
-				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
-				return
-			}
-			err = m.UpdateAppUserID(tkn.Token(), expUsr.OAuth)
+			err := m.UpdateAppUserID(tc.User.ID, expUsr.OAuth)
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return
@@ -95,12 +89,7 @@ func TestModel_UpdatePhone(t *testing.T) {
 				expUsr.Phone = &authms.Value{}
 			}
 			expUsr.Phone.Value = "+254098765432"
-			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
-			if err != nil {
-				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
-				return
-			}
-			err = m.UpdatePhone(tkn.Token(), expUsr.Phone.Value)
+			err := m.UpdatePhone(tc.User.ID, expUsr.Phone.Value)
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return
@@ -132,12 +121,7 @@ func TestModel_UpdateEmail(t *testing.T) {
 				expUsr.Email = &authms.Value{}
 			}
 			expUsr.Email.Value = "test.update@email.com"
-			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
-			if err != nil {
-				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
-				return
-			}
-			err = m.UpdateEmail(tkn.Token(), expUsr.Email.Value)
+			err := m.UpdatePhone(tc.User.ID, expUsr.Email.Value)
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return
@@ -166,12 +150,7 @@ func TestModel_UpdateUserName(t *testing.T) {
 			m := newModel(t)
 			insertUser(tc.User, t)
 			expUsr.UserName = "test-updated-username"
-			tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
-			if err != nil {
-				t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
-				return
-			}
-			err = m.UpdateUserName(tkn.Token(), expUsr.UserName)
+			err := m.UpdatePhone(tc.User.ID, expUsr.UserName)
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return

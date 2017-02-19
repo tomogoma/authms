@@ -8,7 +8,6 @@ import (
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"database/sql"
-	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/go-commons/config"
 )
 
@@ -28,7 +27,6 @@ type Config struct {
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/conf.file.yml")
 var conf = &Config{}
 var hasher = hash.Hasher{}
-var tg *token.Generator
 
 func init() {
 	flag.Parse()
@@ -45,11 +43,7 @@ func newModel(t *testing.T) (*dbhelper.DBHelper) {
 	if err != nil {
 		t.Fatalf("password.NewGenerator(): %s", err)
 	}
-	tg, err = token.NewGenerator(conf.Token)
-	if err != nil {
-		t.Fatalf("token.NewGenerator(): %s", err)
-	}
-	m, err := dbhelper.New(conf.Database, pg, hasher, tg)
+	m, err := dbhelper.New(conf.Database, pg, hasher)
 	if err != nil {
 		t.Fatalf("user.NewModel(): %s", err)
 	}
@@ -65,7 +59,7 @@ func getDB(t *testing.T) *sql.DB {
 }
 
 func setUp(t *testing.T) {
-	if err := config.ReadConfig(*confFile, conf); err != nil {
+	if err := config.ReadYamlConfig(*confFile, conf); err != nil {
 		t.Fatal(err)
 	}
 	conf.Database.DB = conf.Database.DB + "_test"
