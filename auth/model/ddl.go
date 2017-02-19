@@ -1,4 +1,4 @@
-package user
+package model
 
 const (
 	users = `
@@ -73,11 +73,10 @@ CREATE TABLE IF NOT EXISTS history (
   userID       SERIAL             NOT NULL REFERENCES users (id),
   id           SERIAL		  NOT NULL,
   date         TIMESTAMP          NOT NULL,
-  accessMethod INT                NOT NULL,
+  accessMethod STRING             NOT NULL,
   successful   BOOL               NOT NULL,
-  forServiceID STRING,
   ipAddress    STRING,
-  referral     STRING,
+  devID        STRING,
   PRIMARY KEY	(userID, id),
   INDEX         history_UserDate_indx (userID, DATE )
 );

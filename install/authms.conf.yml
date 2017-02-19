@@ -2,13 +2,13 @@ service:
   runtype: rpc
   registerinterval: 5s
 database:
-  uname: root
+  userName: root
   password: ""
   host: localhost:26257
-  db: authms
-  sslcert: /etc/cockroachdb/certs/node.cert
-  sslkey: /etc/cockroachdb/certs/node.key
-  sslrootcert: /etc/cockroachdb/certs/ca.cert
+  dbName: authms
+  sslCert: /etc/cockroachdb/certs/node.cert
+  sslKey: /etc/cockroachdb/certs/node.key
+  sslRootCert: /etc/cockroachdb/certs/ca.cert
 authentication:
   blacklistfailcount: 3
   blacklistwindow: 30m0s

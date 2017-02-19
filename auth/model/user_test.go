@@ -1,44 +1,20 @@
-package user_test
+package model_test
 
 import (
-	"testing"
-	"github.com/tomogoma/authms/auth/model/user"
-	"io/ioutil"
-	"flag"
-	"gopkg.in/yaml.v2"
-	"github.com/tomogoma/authms/auth/password"
-	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/go-commons/errors"
-	"github.com/tomogoma/authms/auth/model/helper"
-	token_config "github.com/tomogoma/authms/auth/model/token"
-	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/authms/proto/authms"
-	"database/sql"
 	"reflect"
+	"database/sql"
+	"testing"
 	"github.com/tomogoma/go-commons/auth/token"
+	"github.com/tomogoma/authms/auth/model"
 )
 
-type Config struct {
-	Database helper.DSN    `json:"database,omitempty"`
-	Token    token_config.Config  `json:"token,omitempty"`
+type UpdateTestCase struct {
+	Desc string
+	User *authms.User
 }
 
-var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/conf.file.yml")
-var conf = &Config{}
-var hasher = hash.Hasher{}
-var tg *token.Generator
-
-func init() {
-	flag.Parse()
-}
-
-func TestNewModel(t *testing.T) {
-	setUp(t)
-	defer tearDown(t)
-	newModel(t)
-}
-
-func TestModel_Save(t *testing.T) {
+func TestModel_SaveUser(t *testing.T) {
 	setUp(t)
 	defer tearDown(t)
 	m := newModel(t)
@@ -49,16 +25,11 @@ func TestModel_Save(t *testing.T) {
 			AppToken: "test-app.test-user-id.test-token",
 		},
 	}
-	if err := m.Save(usr); err != nil {
+	if err := m.SaveUser(usr); err != nil {
 		t.Fatalf("model.Save(): %s", err)
 	}
 	dbUsr := fetchUser(usr.ID, t)
 	assertUsersEqual(dbUsr, usr, t)
-}
-
-type UpdateTestCase struct {
-	Desc string
-	User *authms.User
 }
 
 func TestModel_UpdateAppUserID(t *testing.T) {
@@ -222,7 +193,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 		{Desc: "Correct old password", OldPass: expUsr.Password,
 			expErr: nil},
 		{Desc: "Incorrect old password", OldPass: "some-invalid",
-			expErr: user.ErrorPasswordMismatch},
+			expErr: model.ErrorPasswordMismatch},
 	}
 	newPass := "test-updated-password"
 	for _, tc := range tcs {
@@ -451,56 +422,4 @@ func assertUsersEqual(act *authms.User, exp *authms.User, t *testing.T) {
 	if act.UserName != exp.UserName {
 		t.Errorf("Expected UserName %d but got %d", exp.UserName, act.UserName)
 	}
-}
-
-func newModel(t *testing.T) (*user.Model) {
-	pg, err := password.NewGenerator(password.AllChars)
-	if err != nil {
-		t.Fatalf("password.NewGenerator(): %s", err)
-	}
-	tg, err = token.NewGenerator(conf.Token)
-	if err != nil {
-		t.Fatalf("token.NewGenerator(): %s", err)
-	}
-	m, err := user.NewModel(conf.Database, pg, hasher, tg)
-	if err != nil {
-		t.Fatalf("user.NewModel(): %s", err)
-	}
-	return m
-}
-
-func getDB(t *testing.T) *sql.DB {
-	db, err := cockroach.DBConn(conf.Database)
-	if err != nil {
-		t.Fatalf("unable to tear down: cockroach.DBConn(): %s", err)
-	}
-	return db
-}
-
-func setUp(t *testing.T) {
-	if err := readConfig(*confFile, conf); err != nil {
-		t.Fatal(err)
-	}
-	conf.Database.DB = conf.Database.DB + "_test"
-}
-
-func tearDown(t *testing.T) {
-	db := getDB(t)
-	_, err := db.Exec("DROP DATABASE IF EXISTS " + conf.Database.DBName())
-	if err != nil {
-		t.Fatalf("unable to tear down db: %s", err)
-	}
-}
-
-func readConfig(confFile string, conf interface{}) error {
-	configB, err := ioutil.ReadFile(confFile)
-	if err != nil {
-		return errors.Newf("unable to read conf file at '%s': %s",
-			confFile, err)
-	}
-	if err := yaml.Unmarshal(configB, conf); err != nil {
-		return errors.Newf("unable to unmarshal conf file values for" +
-			" file at '%s': %s", confFile, err)
-	}
-	return nil
 }
