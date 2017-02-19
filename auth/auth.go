@@ -37,7 +37,8 @@ type DBHelper interface {
 	SaveToken(*token.Token) error
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	SaveHistory(*authms.History) error
-	UpdatePhone(userID int64, newPhone string) error
+	UpdatePhone(userID int64, newPhone *authms.Value) error
+	UpdateAppUserID(userID int64, new *authms.OAuth) error
 }
 
 type Auth struct {
@@ -130,19 +131,50 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	if err != nil {
 		return err
 	}
-	if user.Phone == nil {
-		return errors.NewClient("phone was empty")
+	if !dbhelper.HasValue(user.Phone) {
+		return errors.NewClient("phone was invalid")
 	}
 	if devID == "" {
 		return errors.NewClient("device ID was empty")
 	}
 	user.Phone.Verified = false
-	err = a.dbHelper.UpdatePhone(user.ID, user.Phone.Value)
+	err = a.dbHelper.UpdatePhone(user.ID, user.Phone)
 	if err != nil {
 		return err
 	}
-	go a.saveHistory(user, devID, dbhelper.AccessRegistration, rIP, nil)
 	return nil
+}
+
+func (a *Auth) UpdateOAuth(user *authms.User, token, devID, rIP string) error {
+	if user == nil {
+		return errors.NewClient("user was empty")
+	}
+	_, err := a.tokenG.ValidateUser(token, int(user.ID))
+	defer func() {
+		go a.saveHistory(user, devID, dbhelper.AccessUpdate, rIP, err)
+	}()
+	if err != nil {
+		return err
+	}
+	if user.OAuth == nil {
+		return errors.NewClient("OAuth was not provided")
+	}
+	if err := a.validateOAuth(user.OAuth); err != nil {
+		return err
+	}
+	if devID == "" {
+		return errors.NewClient("device ID was empty")
+	}
+	user.OAuth.Verified = false
+	err = a.dbHelper.UpdateAppUserID(user.ID, user.OAuth)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (a *Auth) UpdatePassword(userID int64, oldPass, newPass, devID, rIP string) error {
+	return errors.New("not yet implemented")
 }
 
 func (a *Auth) LoginUserName(uName, pass, devID, rIP string) (*authms.User, error) {

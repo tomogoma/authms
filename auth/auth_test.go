@@ -48,14 +48,17 @@ func (oa *OAuthHandlerMock) ValidateToken(appName, token string) (response.OAuth
 }
 
 type DBHelperMock struct {
-	ExpErr            error
-	ExpUser           *authms.User
-	ExpHist           []*authms.History
-	SaveUserCalled    bool
-	SaveHistoryCalled bool
-	GetUserCalled     bool
-	SaveTokenCalled   bool
-	T                 *testing.T
+	ExpErr                error
+	ExpUser               *authms.User
+	ExpHist               []*authms.History
+	SaveUserCalled        bool
+	SaveHistoryCalled     bool
+	GetUserCalled         bool
+	SaveTokenCalled       bool
+	UpdatePhoneCalled     bool
+	UpdatePassCalled      bool
+	UpdateAppUserIDCalled bool
+	T                     *testing.T
 }
 
 func (d *DBHelperMock) SaveUser(u *authms.User) error {
@@ -91,11 +94,39 @@ func (d *DBHelperMock) SaveHistory(*authms.History) error {
 	return d.ExpErr
 }
 
-func (d *DBHelperMock) UpdatePhone(userID int64, newPhone string) error {
+func (d *DBHelperMock) UpdatePhone(userID int64, newPhone *authms.Value) error {
+	d.UpdatePhoneCalled = true
+	if newPhone.Verified == true {
+		d.T.Error("expected Phone verified=false but got true")
+	}
 	return d.ExpErr
 }
 
+func (d *DBHelperMock) UpdatePassword(userID int64, oldPass, newPassword string) error {
+	d.UpdatePassCalled = true
+	return d.ExpErr
+}
+
+func (d *DBHelperMock)UpdateAppUserID(userID int64, new *authms.OAuth) error {
+	d.UpdateAppUserIDCalled = true
+	if new.Verified == true {
+		d.T.Error("expected OAuth verified=false but got true")
+	}
+	return d.ExpErr
+}
+
+type RegisterTestCase struct {
+	Desc      string
+	User      *authms.User
+	OAHandler *OAuthHandlerMock
+	DBHelper  *DBHelperMock
+	ExpErr    bool
+	DevID     string
+	Token     *token.Token
+}
+
 var conf = &ConfigMock{}
+var tokenGen *token.Generator
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml",
 	"/path/to/config/file.conf.yml")
 
@@ -109,14 +140,6 @@ func TestNew(t *testing.T) {
 }
 
 func TestAuth_Register(t *testing.T) {
-	type RegisterTestCase struct {
-		Desc      string
-		User      *authms.User
-		OAHandler *OAuthHandlerMock
-		DBHelper  *DBHelperMock
-		ExpErr    bool
-		DevID     string
-	}
 	cases := []RegisterTestCase{
 		{
 			Desc: "Valid args",
@@ -192,6 +215,346 @@ func TestAuth_Register(t *testing.T) {
 	}
 }
 
+func TestAuth_UpdatePhone(t *testing.T) {
+	usrID := int64(123)
+	devID := "test-dev"
+	tkn, err := tokenGen.Generate(int(usrID), devID, token.ShortExpType)
+	if err != nil {
+		t.Fatalf("Error setting up: token.Generate(): %v", err)
+	}
+	cases := []RegisterTestCase{
+		{
+			Desc: "Valid phone",
+			User: &authms.User{
+				ID: usrID,
+				Phone: &authms.Value{Value:"+254123456789"},
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Valid phone and verified=true (exp verified=false sent to dbhelper)",
+			User: &authms.User{
+				ID: usrID,
+				Phone: &authms.Value{
+					Value:"+254123456789",
+					Verified:true},
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Invalid phone",
+			User: &authms.User{
+				ID: usrID,
+				Phone: &authms.Value{},
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "nil phone",
+			User: &authms.User{
+				ID: usrID,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "nil user",
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "no userID",
+			User: &authms.User{
+				Phone: &authms.Value{Value:"+254123456789"},
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Invalid token",
+			User: &authms.User{
+				ID: usrID + 5,
+				Phone: &authms.Value{Value:"+254123456789"},
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+	}
+	for _, c := range cases {
+		func() {
+			setUp(t)
+			a := newAuth(t, c.DBHelper, c.OAHandler)
+			err := a.UpdatePhone(c.User, c.Token.Token(), c.DevID, "")
+			runtime.Gosched()
+			if c.ExpErr {
+				if err == nil {
+					t.Errorf("%s - Expected an error but" +
+						" got nil", c.Desc)
+				}
+				return
+			} else if err != nil {
+				t.Errorf("%s: auth.UpdatePhone(): %v", c.Desc, err)
+				return
+			}
+			if !c.DBHelper.UpdatePhoneCalled {
+				t.Errorf("%s - save user not called", c.Desc)
+			}
+			if !c.DBHelper.SaveHistoryCalled {
+				t.Errorf("%s - Save history not called", c.Desc)
+			}
+		}()
+	}
+}
+
+func TestAuth_UpdateOAuth(t *testing.T) {
+	usrID := int64(123)
+	devID := "test-dev"
+	tkn, err := tokenGen.Generate(int(usrID), devID, token.ShortExpType)
+	if err != nil {
+		t.Fatalf("Error setting up: token.Generate(): %v", err)
+	}
+	appUsrID := "test-app-userID"
+	cases := []RegisterTestCase{
+		{
+			Desc: "Valid OAuth",
+			User: &authms.User{
+				ID: usrID,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+				ExpValTknClld: true,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "missing app user ID",
+			User: &authms.User{
+				ID: usrID,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+				ExpValTknClld: true,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Missing user ID",
+			User: &authms.User{
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Nil OAuth",
+			User: &authms.User{
+				ID: usrID,
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Valid OAuth and verified=true (exp dbhelper to be passed to false)",
+			User: &authms.User{
+				ID: usrID,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+					Verified: true,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+				ExpValTknClld: true,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Invalid token",
+			User: &authms.User{
+				ID: usrID + 5,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "OAuth report error",
+			User: &authms.User{
+				ID: usrID,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: errors.New(""),
+				ExpValid: true,
+				AppUserID: appUsrID,
+				ExpValTknClld: true,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: devID,
+			Token: tkn,
+		},
+		{
+			Desc: "Missing device ID",
+			User: &authms.User{
+				ID: usrID,
+				OAuth: &authms.OAuth{
+					AppName: "test-app",
+					AppUserID: appUsrID,
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpErr: nil,
+				ExpValid: true,
+				AppUserID: appUsrID,
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: true,
+			DevID: "",
+			Token: tkn,
+		},
+	}
+	for _, c := range cases {
+		func() {
+			setUp(t)
+			a := newAuth(t, c.DBHelper, c.OAHandler)
+			err := a.UpdateOAuth(c.User, c.Token.Token(), c.DevID, "")
+			runtime.Gosched()
+			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
+				t.Errorf("%s - validate token was not called", c.Desc)
+			}
+			if c.ExpErr {
+				if err == nil {
+					t.Errorf("%s - Expected an error but" +
+						" got nil", c.Desc)
+				}
+				return
+			} else if err != nil {
+				t.Errorf("%s: auth.UpdatePhone(): %v", c.Desc, err)
+				return
+			}
+			if !c.DBHelper.UpdateAppUserIDCalled {
+				t.Errorf("%s - update userID not called", c.Desc)
+			}
+			if !c.DBHelper.SaveHistoryCalled {
+				t.Errorf("%s - Save history not called", c.Desc)
+			}
+		}()
+	}
+}
+
+func TestAuth_UpdatePassword(t *testing.T) {
+	usrID := int64(123)
+	devID := "test-dev"
+	cases := []RegisterTestCase{
+		{
+			Desc: "Valid password",
+			User: &authms.User{
+				ID: usrID,
+				Password: "some-new-password",
+			},
+			DBHelper: &DBHelperMock{},
+			ExpErr: false,
+			DevID: devID,
+		},
+	}
+	for _, c := range cases {
+		func() {
+			setUp(t)
+			a := newAuth(t, c.DBHelper, c.OAHandler)
+			err := a.UpdatePassword(c.User.ID, "some-old-pass",
+				c.User.Password, c.DevID, "")
+			runtime.Gosched()
+			if c.ExpErr {
+				if err == nil {
+					t.Errorf("%s - Expected an error but" +
+						" got nil", c.Desc)
+				}
+				return
+			} else if err != nil {
+				t.Errorf("%s: auth.UpdatePhone(): %v", c.Desc, err)
+				return
+			}
+			if !c.DBHelper.UpdatePassCalled {
+				t.Errorf("%s - update password was not called", c.Desc)
+			}
+			if !c.DBHelper.SaveHistoryCalled {
+				t.Errorf("%s - Save history not called", c.Desc)
+			}
+		}()
+	}
+}
+
 func TestAuth_LoginOAuth(t *testing.T) {
 	type LoginOAuthTestCase struct {
 		ExpErr    bool
@@ -248,12 +611,13 @@ func TestAuth_LoginOAuth(t *testing.T) {
 }
 
 func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock) *auth.Auth {
-	tg, err := token.NewGenerator(conf.Token)
+	var err error
+	tokenGen, err = token.NewGenerator(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := auth.New(tg, lg, db, oa)
+	a, err := auth.New(tokenGen, lg, db, oa)
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}
