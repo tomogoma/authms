@@ -10,6 +10,7 @@ import (
 	"database/sql"
 	"github.com/lib/pq"
 	"github.com/tomogoma/go-commons/auth/token"
+	"log"
 )
 
 type PasswordGenerator interface {
@@ -123,37 +124,19 @@ func (m Model) Save(u *authms.User) error {
 func (m Model) GetByUserName(uName, pass string) (*authms.User, error) {
 	where := "usernames.userName = $1"
 	usr, err := m.get(where, uName)
-	if err != nil {
-		return usr, err
-	}
-	if err = m.validatePassword(usr.ID, pass); err != nil {
-		return usr, err
-	}
-	return usr, nil
+	return m.validateFetchedUser(usr, err, pass)
 }
 
 func (m Model) GetByPhone(phone, pass string) (*authms.User, error) {
 	where := `phones.phone = $1`
 	usr, err := m.get(where, phone)
-	if err != nil {
-		return usr, err
-	}
-	if err = m.validatePassword(usr.ID, pass); err != nil {
-		return usr, err
-	}
-	return usr, nil
+	return m.validateFetchedUser(usr, err, pass)
 }
 
 func (m Model) GetByEmail(email, pass string) (*authms.User, error) {
 	where := `emails.email = $1`
 	usr, err := m.get(where, email)
-	if err != nil {
-		return usr, err
-	}
-	if err = m.validatePassword(usr.ID, pass); err != nil {
-		return usr, err
-	}
-	return usr, err
+	return m.validateFetchedUser(usr, err, pass)
 }
 
 func (m Model) GetByAppUserID(appName, appUserID, appToken string) (*authms.User, error) {
@@ -277,15 +260,16 @@ func (m Model) UpdatePhone(tkn, newPhone string) error {
 
 func (m Model) UpdatePassword(userID int64, oldPass, newPassword string) error {
 	q := `SELECT password FROM users WHERE id=$1`
-	var currPass []byte
-	err := m.db.QueryRow(q, userID).Scan(&currPass)
+	var actPassHB []byte
+	err := m.db.QueryRow(q, userID).Scan(&actPassHB)
 	if err != nil {
 		if err != sql.ErrNoRows {
+			log.Println("not found")
 			return ErrorPasswordMismatch
 		}
 		return err
 	}
-	if ! m.hasher.CompareHash(newPassword, currPass) {
+	if ! m.hasher.CompareHash(oldPass, actPassHB) {
 		return ErrorPasswordMismatch
 	}
 	passHB, err := m.hasher.Hash(newPassword)
@@ -299,19 +283,15 @@ func (m Model) UpdatePassword(userID int64, oldPass, newPassword string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
-	if err != nil {
-		return err
+func (m Model) validateFetchedUser(usr *authms.User, getErr error, pass string) (
+*authms.User, error) {
+	if getErr != nil {
+		return usr, getErr
 	}
-	c, err := rslt.RowsAffected()
-	if err != nil {
-		return err
+	if getErr = m.validatePassword(usr.ID, pass); getErr != nil {
+		return usr, getErr
 	}
-	if c != expAffected {
-		return errors.Newf("expected %d affected rows but got %d",
-			expAffected, c)
-	}
-	return nil
+	return usr, nil
 }
 
 func (m Model) get(where string, whereArgs... interface{}) (*authms.User, error) {
@@ -394,6 +374,21 @@ func (m *Model) getPasswordHash(u *authms.User) ([]byte, error) {
 		passStr = string(passB)
 	}
 	return m.hasher.Hash(passStr)
+}
+
+func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
+	if err != nil {
+		return err
+	}
+	c, err := rslt.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if c != expAffected {
+		return errors.Newf("expected %d affected rows but got %d",
+			expAffected, c)
+	}
+	return nil
 }
 
 func extractDuplicateError(err error) error {

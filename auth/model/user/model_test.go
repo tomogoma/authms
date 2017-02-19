@@ -212,38 +212,47 @@ func TestModel_UpdateUserName(t *testing.T) {
 }
 
 func TestModel_UpdatePassword(t *testing.T) {
-	t.Fatal("Not yet tested :(")
-	//bareBoneUser := &authms.User{
-	//	Phone: &authms.Value{Value: "+254012345678"},
-	//	Password: "test-password",
-	//}
-	//cmpltUsr := completeUser()
-	//tcs := []UpdateTestCase{
-	//	{Desc: "Is to update", User: cmpltUsr},
-	//	{Desc: "Is to insert", User: bareBoneUser},
-	//}
-	//for _, tc := range tcs {
-	//	func() {
-	//		expUsr := tc.User
-	//		setUp(t)
-	//		defer tearDown(t)
-	//		m := newModel(t)
-	//		insertUser(tc.User, t)
-	//		expUsr.UserName = "test-updated-username"
-	//		tkn, err := tg.Generate(int(expUsr.ID), "test-dev", token.MedExpType)
-	//		if err != nil {
-	//			t.Errorf("%s - token.Generate(): %s", tc.Desc, err)
-	//			return
-	//		}
-	//		err = m.UpdateUserName(tkn.Token(), expUsr.UserName)
-	//		if err != nil {
-	//			t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
-	//			return
-	//		}
-	//		dbUsr := fetchUser(expUsr.ID, t)
-	//		assertUsersEqual(dbUsr, expUsr, t)
-	//	}()
-	//}
+	type PasswordTestCase struct {
+		Desc    string
+		OldPass string
+		expErr  error
+	}
+	expUsr := completeUser()
+	tcs := []PasswordTestCase{
+		{Desc: "Correct old password", OldPass: expUsr.Password,
+			expErr: nil},
+		{Desc: "Incorrect old password", OldPass: "some-invalid",
+			expErr: user.ErrorPasswordMismatch},
+	}
+	newPass := "test-updated-password"
+	for _, tc := range tcs {
+		func() {
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			insertUser(expUsr, t)
+			err := m.UpdatePassword(expUsr.ID, tc.OldPass, newPass)
+			if err != tc.expErr {
+				t.Errorf("%s - model.UpdatePassword() expected" +
+					" error %v but got %v", tc.Desc, tc.expErr, err)
+				return
+			}
+			if tc.expErr != nil {
+				return
+			}
+			db := getDB(t)
+			q := `SELECT password FROM users WHERE id=$1`
+			var updatedPassHB []byte
+			if err = db.QueryRow(q, expUsr.ID).Scan(&updatedPassHB); err != nil {
+				t.Fatalf("%s - error retrieving password for" +
+					" validation: %v", tc.Desc, err)
+			}
+			if !hasher.CompareHash(newPass, updatedPassHB) {
+				t.Error("New password in db did not match " +
+					"new password provided")
+			}
+		}()
+	}
 }
 
 func TestModel_GetByAppUserID(t *testing.T) {
