@@ -1,4 +1,4 @@
-package model
+package dbhelper
 
 import (
 	"fmt"
@@ -16,7 +16,7 @@ const (
 
 var accessTypes = []string{AccessLogin, AccessRegistration, AccessUpdate, AccessPassChange}
 
-func (m *Model) SaveHistory(h *authms.History) error {
+func (m *DBHelper) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (m *Model) SaveHistory(h *authms.History) error {
 		h.DevID, h.IpAddress).Scan(&h.ID)
 }
 
-func (m *Model) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
+func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
 	acMFilter := ""
 	for i, acM := range acMs {
 		if err := in(acM, accessTypes); err != nil {

@@ -9,10 +9,10 @@ import (
 
 	"github.com/limetext/log4go"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/model/history"
-	"github.com/tomogoma/authms/auth/model/testhelper"
-	"github.com/tomogoma/authms/auth/model/token"
-	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/dbhelper/history"
+	"github.com/tomogoma/authms/auth/dbhelper/testhelper"
+	"github.com/tomogoma/authms/auth/dbhelper/token"
+	"github.com/tomogoma/authms/auth/dbhelper/user"
 	"github.com/tomogoma/authms/auth/password"
 )
 

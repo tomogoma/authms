@@ -1,8 +1,8 @@
-package model_test
+package dbhelper_test
 
 import (
 	"testing"
-	"github.com/tomogoma/authms/auth/model"
+	"github.com/tomogoma/authms/auth/dbhelper"
 	"io/ioutil"
 	"flag"
 	"gopkg.in/yaml.v2"
@@ -42,7 +42,7 @@ func TestNewModel(t *testing.T) {
 	newModel(t)
 }
 
-func newModel(t *testing.T) (*model.Model) {
+func newModel(t *testing.T) (*dbhelper.DBHelper) {
 	pg, err := password.NewGenerator(password.AllChars)
 	if err != nil {
 		t.Fatalf("password.NewGenerator(): %s", err)
@@ -51,7 +51,7 @@ func newModel(t *testing.T) (*model.Model) {
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %s", err)
 	}
-	m, err := model.New(conf.Database, pg, hasher, tg)
+	m, err := dbhelper.New(conf.Database, pg, hasher, tg)
 	if err != nil {
 		t.Fatalf("user.NewModel(): %s", err)
 	}

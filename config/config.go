@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/model/helper"
+	"github.com/tomogoma/authms/auth/dbhelper/helper"
 	"github.com/tomogoma/authms/auth/oauth"
 )
 

@@ -1,4 +1,4 @@
-package model
+package dbhelper
 
 import (
 	"github.com/cockroachdb/cockroach-go/crdb"
@@ -36,7 +36,7 @@ var ErrorEmptyUserName = errors.New("username was empty")
 var ErrorEmptyPassword = errors.New("password cannot be empty")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
-func (m *Model) SaveUser(u *authms.User) error {
+func (m *DBHelper) SaveUser(u *authms.User) error {
 	if err := validateUser(u); err != nil {
 		return err
 	}
@@ -88,25 +88,25 @@ func (m *Model) SaveUser(u *authms.User) error {
 	return extractDuplicateError(err)
 }
 
-func (m *Model) GetByUserName(uName, pass string) (*authms.User, error) {
+func (m *DBHelper) GetByUserName(uName, pass string) (*authms.User, error) {
 	where := "usernames.userName = $1"
 	usr, err := m.get(where, uName)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Model) GetByPhone(phone, pass string) (*authms.User, error) {
+func (m *DBHelper) GetByPhone(phone, pass string) (*authms.User, error) {
 	where := `phones.phone = $1`
 	usr, err := m.get(where, phone)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Model) GetByEmail(email, pass string) (*authms.User, error) {
+func (m *DBHelper) GetByEmail(email, pass string) (*authms.User, error) {
 	where := `emails.email = $1`
 	usr, err := m.get(where, email)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Model) GetByAppUserID(appName, appUserID, appToken string) (*authms.User, error) {
+func (m *DBHelper) GetByAppUserID(appName, appUserID, appToken string) (*authms.User, error) {
 	usr := &authms.User{}
 	query := `SELECT userID FROM appUserIDs WHERE appName = $1 AND appUserID = $2`
 	err := m.db.QueryRow(query, appName, appUserID).Scan(&usr.ID)
@@ -120,7 +120,7 @@ func (m *Model) GetByAppUserID(appName, appUserID, appToken string) (*authms.Use
 	return m.get(where, usr.ID)
 }
 
-func (m *Model) UpdateUserName(tkn, newUserName string) error {
+func (m *DBHelper) UpdateUserName(tkn, newUserName string) error {
 	t, err := m.token.Validate(tkn)
 	if err != nil {
 		return err
@@ -146,7 +146,7 @@ func (m *Model) UpdateUserName(tkn, newUserName string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Model) UpdateAppUserID(tkn string, new *authms.OAuth) error {
+func (m *DBHelper) UpdateAppUserID(tkn string, new *authms.OAuth) error {
 	t, err := m.token.Validate(tkn)
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (m *Model) UpdateAppUserID(tkn string, new *authms.OAuth) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Model) UpdateEmail(tkn, newEmail string) error {
+func (m *DBHelper) UpdateEmail(tkn, newEmail string) error {
 	t, err := m.token.Validate(tkn)
 	if err != nil {
 		return err
@@ -198,7 +198,7 @@ func (m *Model) UpdateEmail(tkn, newEmail string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Model) UpdatePhone(tkn, newPhone string) error {
+func (m *DBHelper) UpdatePhone(tkn, newPhone string) error {
 	t, err := m.token.Validate(tkn)
 	if err != nil {
 		return err
@@ -224,7 +224,7 @@ func (m *Model) UpdatePhone(tkn, newPhone string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Model) UpdatePassword(userID int64, oldPass, newPassword string) error {
+func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) error {
 	q := `SELECT password FROM users WHERE id=$1`
 	var actPassHB []byte
 	err := m.db.QueryRow(q, userID).Scan(&actPassHB)
@@ -249,7 +249,7 @@ func (m *Model) UpdatePassword(userID int64, oldPass, newPassword string) error 
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Model) validateFetchedUser(usr *authms.User, getErr error, pass string) (
+func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass string) (
 *authms.User, error) {
 	if getErr != nil {
 		return usr, getErr
@@ -260,7 +260,7 @@ func (m *Model) validateFetchedUser(usr *authms.User, getErr error, pass string)
 	return usr, nil
 }
 
-func (m *Model) get(where string, whereArgs... interface{}) (*authms.User, error) {
+func (m *DBHelper) get(where string, whereArgs... interface{}) (*authms.User, error) {
 	usr := &authms.User{
 		Email: &authms.Value{},
 		Phone: &authms.Value{},
@@ -314,7 +314,7 @@ func (m *Model) get(where string, whereArgs... interface{}) (*authms.User, error
 	return usr, nil
 }
 
-func (m *Model) validatePassword(id int64, password string) error {
+func (m *DBHelper) validatePassword(id int64, password string) error {
 	userQ := `SELECT password FROM users WHERE id = $1`
 	var dbPassword []byte
 	err := m.db.QueryRow(userQ, id).Scan(&dbPassword)
@@ -330,7 +330,7 @@ func (m *Model) validatePassword(id int64, password string) error {
 	return err
 }
 
-func (m *Model) getPasswordHash(u *authms.User) ([]byte, error) {
+func (m *DBHelper) getPasswordHash(u *authms.User) ([]byte, error) {
 	passStr := u.Password
 	if passStr == "" && !havePasswordComboAuth(u) {
 		passB, err := m.gen.SecureRandomString(36)

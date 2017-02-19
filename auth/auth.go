@@ -8,12 +8,12 @@ import (
 	"database/sql"
 	"errors"
 
-	"github.com/tomogoma/authms/auth/model/history"
-	"github.com/tomogoma/authms/auth/model/token"
-	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/dbhelper/history"
+	"github.com/tomogoma/authms/auth/dbhelper/token"
+	"github.com/tomogoma/authms/auth/dbhelper/user"
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/oauth/response"
-	"github.com/tomogoma/authms/auth/model"
+	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/auth/hash"
 )
@@ -49,7 +49,7 @@ type PasswordGenerator interface {
 
 type Auth struct {
 	conf         Config
-	usrM         *model.Model
+	usrM         *dbhelper.DBHelper
 	tokenM       *token.Model
 	histM        HistModel
 	tokenG       TokenGenerator
@@ -59,20 +59,20 @@ type Auth struct {
 
 func AuthError(err error) bool {
 
-	if strings.HasPrefix(err.Error(), model.ErrorPasswordMismatch.Error()) ||
+	if strings.HasPrefix(err.Error(), dbhelper.ErrorPasswordMismatch.Error()) ||
 		strings.HasPrefix(err.Error(), ErrorOAuthTokenNotValid.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorExpiredToken.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorInvalidToken.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorEmptyUserName.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorEmptyPhone.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorEmptyEmail.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorInvalidOAuth.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorEmptyPassword.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyUserName.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyPhone.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyEmail.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorInvalidOAuth.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyPassword.Error()) ||
 		strings.HasPrefix(err.Error(), token.ErrorEmptyDevID.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorUserExists.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorEmailExists.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorPhoneExists.Error()) ||
-		strings.HasPrefix(err.Error(), model.ErrorAppIDExists.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorUserExists.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorEmailExists.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorPhoneExists.Error()) ||
+		strings.HasPrefix(err.Error(), dbhelper.ErrorAppIDExists.Error()) ||
 		strings.HasPrefix(err.Error(), oauth.ErrorUnsupportedApp.Error()) {
 		return true
 	}
@@ -94,7 +94,7 @@ conf Config, lg token.Logger, oa OAuthHandler, quitCh chan error) (*Auth, error)
 	if pg == nil {
 		return nil, ErrorNilPasswordGenerator
 	}
-	usrM, err := model.New(db)
+	usrM, err := db.New(db)
 	if err != nil {
 		return nil, err
 	}
@@ -113,24 +113,24 @@ conf Config, lg token.Logger, oa OAuthHandler, quitCh chan error) (*Auth, error)
 		passwordG: pg, oAuthHandler: oa}, nil
 }
 
-func (a *Auth) RegisterUserName(userName, pass string) (model.User, error) {
-	u, err := model.NewByUserName(userName, pass, hashF)
+func (a *Auth) RegisterUserName(userName, pass string) (dbhelper.User, error) {
+	u, err := dbhelper.NewByUserName(userName, pass, hashF)
 	if err != nil {
 		return nil, err
 	}
 	return a.usrM.Save(*u)
 }
 
-func (a *Auth) RegisterEmail(email string, pass string) (model.User, error) {
-	u, err := model.NewByEmail(email, pass, hashF)
+func (a *Auth) RegisterEmail(email string, pass string) (dbhelper.User, error) {
+	u, err := dbhelper.NewByEmail(email, pass, hashF)
 	if err != nil {
 		return nil, err
 	}
 	return a.usrM.Save(*u)
 }
 
-func (a *Auth) RegisterPhone(phone string, pass string) (model.User, error) {
-	u, err := model.NewByPhone(phone, pass, hashF)
+func (a *Auth) RegisterPhone(phone string, pass string) (dbhelper.User, error) {
+	u, err := dbhelper.NewByPhone(phone, pass, hashF)
 	if err != nil {
 		return nil, err
 	}
@@ -144,7 +144,7 @@ func (a *Auth) RegisterOAuth(user *authms.User) error {
 	return a.usrM.Save(user)
 }
 
-func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (model.User, error) {
+func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (dbhelper.User, error) {
 	usr, err := a.usrM.GetByUserName(uName, pass, valHashF)
 	if err != nil {
 		if usr.ID() < 1 {
@@ -181,7 +181,7 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP, srvID, ref string) (model.
 	return usr, nil
 }
 
-func (a *Auth) LoginOAuth(app model.App, devID, rIP, srvID, ref string) (model.User, error) {
+func (a *Auth) LoginOAuth(app dbhelper.App, devID, rIP, srvID, ref string) (dbhelper.User, error) {
 	if err := a.validateOAuth(app); err != nil {
 		return nil, err
 	}
@@ -218,7 +218,7 @@ func (a *Auth) LoginOAuth(app model.App, devID, rIP, srvID, ref string) (model.U
 	return usr, nil
 }
 
-func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (model.User, error) {
+func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (dbhelper.User, error) {
 
 	claimsTkn, err := a.tokenG.Validate(tknStr)
 	if err != nil {
@@ -233,7 +233,7 @@ func (a *Auth) AuthenticateToken(tknStr, rIP, srvID, ref string) (model.User, er
 		return nil, a.saveHistory(tkn.UserID(), rIP, srvID, ref, history.TokenValidationAccess, err)
 	}
 
-	usr, err := model.NewByToken(tkn.UserID(), tkn.Token())
+	usr, err := dbhelper.NewByToken(tkn.UserID(), tkn.Token())
 	if err != nil {
 		return nil, err
 	}

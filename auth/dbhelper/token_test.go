@@ -1,4 +1,4 @@
-package model_test
+package dbhelper_test
 
 //var quitCh chan error
 

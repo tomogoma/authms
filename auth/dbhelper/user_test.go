@@ -1,4 +1,4 @@
-package model_test
+package dbhelper_test
 
 import (
 	"github.com/tomogoma/authms/proto/authms"
@@ -6,7 +6,7 @@ import (
 	"database/sql"
 	"testing"
 	"github.com/tomogoma/go-commons/auth/token"
-	"github.com/tomogoma/authms/auth/model"
+	"github.com/tomogoma/authms/auth/dbhelper"
 )
 
 type UpdateTestCase struct {
@@ -193,7 +193,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 		{Desc: "Correct old password", OldPass: expUsr.Password,
 			expErr: nil},
 		{Desc: "Incorrect old password", OldPass: "some-invalid",
-			expErr: model.ErrorPasswordMismatch},
+			expErr: dbhelper.ErrorPasswordMismatch},
 	}
 	newPass := "test-updated-password"
 	for _, tc := range tcs {

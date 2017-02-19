@@ -1,9 +1,9 @@
-package model_test
+package dbhelper_test
 
 import (
 	"testing"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/auth/model"
+	"github.com/tomogoma/authms/auth/dbhelper"
 )
 
 func TestModel_SaveHistory(t *testing.T) {
@@ -29,7 +29,7 @@ func TestModel_SaveHistory(t *testing.T) {
 			Hist: &authms.History{
 				UserID: -1,
 				IpAddress: "127.0.0.1",
-				AccessType: model.AccessLogin,
+				AccessType: dbhelper.AccessLogin,
 				SuccessStatus: true,
 				DevID: "test-app-id",
 			},
@@ -40,7 +40,7 @@ func TestModel_SaveHistory(t *testing.T) {
 			Hist: &authms.History{
 				UserID: 1,
 				IpAddress: "127.0.0.1",
-				AccessType: model.AccessLogin,
+				AccessType: dbhelper.AccessLogin,
 				SuccessStatus: true,
 				DevID: "test-app-id",
 			},
@@ -125,7 +125,7 @@ func completeHistory(userID int64) *authms.History {
 	return &authms.History{
 		UserID: userID,
 		IpAddress: "127.0.0.1",
-		AccessType: model.AccessLogin,
+		AccessType: dbhelper.AccessLogin,
 		SuccessStatus: true,
 		DevID: "test-app-id",
 	}

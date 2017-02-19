@@ -1,4 +1,4 @@
-package model
+package dbhelper
 
 import (
 	"errors"
@@ -19,7 +19,7 @@ type Logger interface {
 	Info(interface{}, ...interface{})
 }
 
-func (m *Model) RunGarbageCollector(quitCh chan error, lg Logger) error {
+func (m *DBHelper) RunGarbageCollector(quitCh chan error, lg Logger) error {
 	if quitCh == nil {
 		return ErrorNilQuitChanel
 	}
@@ -34,7 +34,7 @@ func (m *Model) RunGarbageCollector(quitCh chan error, lg Logger) error {
 	return nil
 }
 
-func (m *Model) Save(t *token.Token) error {
+func (m *DBHelper) Save(t *token.Token) error {
 	qStr := `
 	INSERT INTO tokens (userID, devID, token, issued, expiry)
 		VALUES ($1, $2, $3, $4, $5)
@@ -51,7 +51,7 @@ func (m *Model) Save(t *token.Token) error {
 	return nil
 }
 
-func (m *Model) Get(usrID int, devID, tknStr string) (*token.Token, error) {
+func (m *DBHelper) Get(usrID int, devID, tknStr string) (*token.Token, error) {
 	qStr := `
 	SELECT id, userID, devID, token, issued, expiry
 		FROM tokens
@@ -73,7 +73,7 @@ func (m *Model) Get(usrID int, devID, tknStr string) (*token.Token, error) {
 	return tkn, err
 }
 
-func (m *Model) Delete(tknStr string) (bool, error) {
+func (m *DBHelper) Delete(tknStr string) (bool, error) {
 	if tknStr == "" {
 		return false, ErrorEmptyToken
 	}
@@ -98,7 +98,7 @@ func (m *Model) Delete(tknStr string) (bool, error) {
 	return true, nil
 }
 
-func (um *Model) ValidateExpiry(tkn *token.Token) error {
+func (um *DBHelper) ValidateExpiry(tkn *token.Token) error {
 	if time.Now().Before(tkn.Expiry()) {
 		return nil
 	}
@@ -110,7 +110,7 @@ func (um *Model) ValidateExpiry(tkn *token.Token) error {
 	return ErrorExpiredToken
 }
 
-func (um *Model) GetSmallestExpiry() (*token.Token, error) {
+func (um *DBHelper) GetSmallestExpiry() (*token.Token, error) {
 	qStr := `
 	SELECT id, userID, devID, token, issued, expiry
 		FROM tokens
@@ -131,7 +131,7 @@ func (um *Model) GetSmallestExpiry() (*token.Token, error) {
 
 // um.concurrentDelete() deletes a token with token string tknstr and
 // sends to delCh on success or delErrCh on failure
-func (um *Model) concurrentDelete(tknStr string, errCh chan error) {
+func (um *DBHelper) concurrentDelete(tknStr string, errCh chan error) {
 	if errCh == nil {
 		return
 	}
@@ -148,7 +148,7 @@ func (um *Model) concurrentDelete(tknStr string, errCh chan error) {
 // 1. Token with earliest expiry time has just expired (garbage collect it).
 // 2. A token has been inserted (recalculate token with earliest expiry time).
 // 3. A token has been deleted (recalculate token with earliest expiry time).
-func (um *Model) garbageCollect(smallest *token.Token, log Logger, quitCh chan error) {
+func (um *DBHelper) garbageCollect(smallest *token.Token, log Logger, quitCh chan error) {
 	if quitCh == nil {
 		return
 	}

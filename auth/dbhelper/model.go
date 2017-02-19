@@ -1,4 +1,4 @@
-package model
+package dbhelper
 
 import (
 	"github.com/tomogoma/go-commons/errors"
@@ -7,7 +7,7 @@ import (
 	"github.com/tomogoma/go-commons/auth/token"
 )
 
-type Model struct {
+type DBHelper struct {
 	db          *sql.DB
 	hasher      Hasher
 	gen         PasswordGenerator
@@ -21,7 +21,7 @@ var ErrorNilHashFunc = errors.New("HashFunc cannot be nil")
 var ErrorNilPasswordGenerator = errors.New("password generator was nil")
 var ErrorNilTokenValidator = errors.New("token validator was nil")
 
-func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher, tv TokenValidator) (*Model, error) {
+func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher, tv TokenValidator) (*DBHelper, error) {
 	if h == nil {
 		return nil, ErrorNilHashFunc
 	}
@@ -41,7 +41,7 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher, tv TokenVa
 	}
 	iCh := make(chan *token.Token)
 	dCh := make(chan string)
-	return &Model{db: db, gen: pg, hasher: h, token: tv, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
+	return &DBHelper{db: db, gen: pg, hasher: h, token: tv, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {

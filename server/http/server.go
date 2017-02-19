@@ -11,8 +11,8 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/model/history"
-	"github.com/tomogoma/authms/auth/model/user"
+	"github.com/tomogoma/authms/auth/dbhelper/history"
+	"github.com/tomogoma/authms/auth/dbhelper/user"
 	"github.com/tomogoma/authms/server/helper"
 )
 
