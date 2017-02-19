@@ -106,7 +106,7 @@ func (m *DBHelper) GetByEmail(email, pass string) (*authms.User, error) {
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *DBHelper) GetByAppUserID(appName, appUserID, appToken string) (*authms.User, error) {
+func (m *DBHelper) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
 	usr := &authms.User{}
 	query := `SELECT userID FROM appUserIDs WHERE appName = $1 AND appUserID = $2`
 	err := m.db.QueryRow(query, appName, appUserID).Scan(&usr.ID)

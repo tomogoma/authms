@@ -233,7 +233,7 @@ func TestModel_GetByAppUserID(t *testing.T) {
 	expUsr := completeUser()
 	insertUser(expUsr, t)
 	actUser, err := m.GetByAppUserID(expUsr.OAuth.AppName,
-		expUsr.OAuth.AppUserID, "")
+		expUsr.OAuth.AppUserID)
 	if err != nil {
 		t.Fatalf("model.Get(): %s", err)
 	}

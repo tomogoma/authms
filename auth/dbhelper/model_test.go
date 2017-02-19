@@ -3,15 +3,13 @@ package dbhelper_test
 import (
 	"testing"
 	"github.com/tomogoma/authms/auth/dbhelper"
-	"io/ioutil"
 	"flag"
-	"gopkg.in/yaml.v2"
 	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/go-commons/errors"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"database/sql"
 	"github.com/tomogoma/go-commons/auth/token"
+	"github.com/tomogoma/go-commons/config"
 )
 
 type Token struct {
@@ -67,7 +65,7 @@ func getDB(t *testing.T) *sql.DB {
 }
 
 func setUp(t *testing.T) {
-	if err := readConfig(*confFile, conf); err != nil {
+	if err := config.ReadConfig(*confFile, conf); err != nil {
 		t.Fatal(err)
 	}
 	conf.Database.DB = conf.Database.DB + "_test"
@@ -79,17 +77,4 @@ func tearDown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unable to tear down db: %s", err)
 	}
-}
-
-func readConfig(confFile string, conf interface{}) error {
-	configB, err := ioutil.ReadFile(confFile)
-	if err != nil {
-		return errors.Newf("unable to read conf file at '%s': %s",
-			confFile, err)
-	}
-	if err := yaml.Unmarshal(configB, conf); err != nil {
-		return errors.Newf("unable to unmarshal conf file values for" +
-			" file at '%s': %s", confFile, err)
-	}
-	return nil
 }

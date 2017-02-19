@@ -34,7 +34,7 @@ func (m *DBHelper) RunGarbageCollector(quitCh chan error, lg Logger) error {
 	return nil
 }
 
-func (m *DBHelper) Save(t *token.Token) error {
+func (m *DBHelper) SaveToken(t *token.Token) error {
 	qStr := `
 	INSERT INTO tokens (userID, devID, token, issued, expiry)
 		VALUES ($1, $2, $3, $4, $5)
@@ -51,7 +51,7 @@ func (m *DBHelper) Save(t *token.Token) error {
 	return nil
 }
 
-func (m *DBHelper) Get(usrID int, devID, tknStr string) (*token.Token, error) {
+func (m *DBHelper) GetToken(usrID int, devID, tknStr string) (*token.Token, error) {
 	qStr := `
 	SELECT id, userID, devID, token, issued, expiry
 		FROM tokens
