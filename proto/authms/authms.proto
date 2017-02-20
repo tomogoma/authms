@@ -47,7 +47,7 @@ message User {
     repeated History loginHistory = 5;
     Value phone = 6;
     Value email = 7;
-    OAuth oAuth = 8;
+    map<string, OAuth> oAuths = 8;
 }
 
 message BasicAuthRequest {
@@ -65,6 +65,7 @@ message UpdateRequest {
     string token = 1;
     string deviceID = 2;
     User user = 3;
+    string appName = 4;
 }
 
 message OAuthRequest {

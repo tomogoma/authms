@@ -100,11 +100,14 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if devID == "" {
 		return errors.NewClient("Dev ID was empty")
 	}
-	if err := a.validateOAuth(user.OAuth); err != nil {
-		return err
-	}
-	if user.OAuth != nil {
-		user.OAuth.Verified = false
+	for appName, oauth := range user.OAuths {
+		if appName != oauth.AppName {
+			return errors.NewClient("an OAuth's key does not match its app name")
+		}
+		if err := a.validateOAuth(oauth); err != nil {
+			return err
+		}
+		user.OAuths[appName].Verified = false
 	}
 	if user.Phone != nil {
 		user.Phone.Verified = false
@@ -145,7 +148,7 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	return nil
 }
 
-func (a *Auth) UpdateOAuth(user *authms.User, token, devID, rIP string) error {
+func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string) error {
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
@@ -156,17 +159,18 @@ func (a *Auth) UpdateOAuth(user *authms.User, token, devID, rIP string) error {
 	if err != nil {
 		return err
 	}
-	if user.OAuth == nil {
+	if user.OAuths == nil || user.OAuths[appName] == nil {
 		return errors.NewClient("OAuth was not provided")
 	}
-	if err := a.validateOAuth(user.OAuth); err != nil {
+	oauth := user.OAuths[appName]
+	if err := a.validateOAuth(oauth); err != nil {
 		return err
 	}
 	if devID == "" {
 		return errors.NewClient("device ID was empty")
 	}
-	user.OAuth.Verified = false
-	err = a.dbHelper.UpdateAppUserID(user.ID, user.OAuth)
+	oauth.Verified = true
+	err = a.dbHelper.UpdateAppUserID(user.ID, oauth)
 	if err != nil {
 		return err
 	}

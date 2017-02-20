@@ -75,10 +75,10 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 				return err
 			}
 		}
-		if u.OAuth != nil {
+		for _, oAuth := range u.OAuths {
 			extqStr := `INSERT INTO appUserIDs (userID, appUserID, appName, validated, createDate)
 	 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP())`
-			_, err = tx.Exec(extqStr, u.ID, u.OAuth.AppUserID, u.OAuth.AppName, u.OAuth.Verified)
+			_, err = tx.Exec(extqStr, u.ID, oAuth.AppUserID, oAuth.AppName, oAuth.Verified)
 			if err != nil {
 				return err
 			}
@@ -248,7 +248,7 @@ func (m *DBHelper) get(where string, whereArgs... interface{}) (*authms.User, er
 	usr := &authms.User{
 		Email: &authms.Value{},
 		Phone: &authms.Value{},
-		OAuth: &authms.OAuth{},
+		OAuths: make(map[string]*authms.OAuth),
 	}
 	query := `
 	SELECT
@@ -275,7 +275,7 @@ func (m *DBHelper) get(where string, whereArgs... interface{}) (*authms.User, er
 		}
 		return usr, ErrorPasswordMismatch
 	}
-	query = `SELECT appUserID, appName FROM appUserIDs WHERE userID=$1`
+	query = `SELECT appUserID, appName, validated FROM appUserIDs WHERE userID=$1`
 	rslt, err := m.db.Query(query, usr.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
@@ -283,18 +283,16 @@ func (m *DBHelper) get(where string, whereArgs... interface{}) (*authms.User, er
 		}
 		return usr, err
 	}
-	apps := make([]*authms.OAuth, 0)
 	for rslt.Next() {
 		app := new(authms.OAuth)
-		if err := rslt.Scan(&app.AppUserID, &app.AppName); err != nil {
+		if err := rslt.Scan(&app.AppUserID, &app.AppName, &app.Verified); err != nil {
 			return usr, err
 		}
-		apps = append(apps, app)
+		usr.OAuths[app.AppName] = app
 	}
 	if err = rslt.Close(); err != nil {
 		return usr, err
 	}
-	usr.OAuth = apps[0]
 	return usr, nil
 }
 
@@ -346,15 +344,18 @@ func validateUser(u *authms.User) error {
 	}
 	hasPhone := HasValue(u.Phone)
 	hasMail := HasValue(u.Email)
-	if u.UserName == "" && !hasPhone && !hasMail && u.OAuth == nil {
+	if u.UserName == "" && !hasPhone && !hasMail && u.OAuths == nil {
 		return errors.NewClient("A user must have at least one" +
 			" identifier (UserName, Phone, Email, OAuthApp")
 	}
 	if havePasswordComboAuth(u) && u.Password == "" {
 		return ErrorEmptyPassword
 	}
-	if u.OAuth != nil {
-		if err := validateOAuth(u.OAuth); err != nil {
+	for name, oauth := range u.OAuths {
+		if name != oauth.AppName {
+			return errors.NewClient("an OAuth key did not match AppName")
+		}
+		if err := validateOAuth(oauth); err != nil {
 			return err
 		}
 	}

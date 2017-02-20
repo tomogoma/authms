@@ -87,7 +87,7 @@ func (s *Server) UpdatePhone(c context.Context, req *authms.UpdateRequest, resp 
 func (s *Server) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
 	tID := <-s.tIDCh
 	s.lg.Fine("%d - update OAuth...", tID)
-	err := s.auth.UpdateOAuth(req.User, req.Token, req.DeviceID, "")
+	err := s.auth.UpdateOAuth(req.User, req.AppName, req.Token, req.DeviceID, "")
 	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
 }
 

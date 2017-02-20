@@ -13,16 +13,20 @@ type UpdateTestCase struct {
 	User *authms.User
 }
 
+var completeUserAppName = "test-app"
+
 func TestModel_SaveUser(t *testing.T) {
 	setUp(t)
 	defer tearDown(t)
 	m := newModel(t)
 	usr := &authms.User{
-		OAuth: &authms.OAuth{
-			AppName: "test-app",
-			AppUserID: "test-user-id",
-			AppToken: "test-app.test-user-id.test-token",
-			Verified: true,
+		OAuths: map[string]*authms.OAuth{
+			completeUserAppName: {
+				AppName: completeUserAppName,
+				AppUserID: "test-user-id",
+				AppToken: "test-app.test-user-id.test-token",
+				Verified: true,
+			},
 		},
 	}
 	if err := m.SaveUser(usr); err != nil {
@@ -38,8 +42,8 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 		Password: "test-password",
 	}
 	cmpltUsr := completeUser()
-	appName := cmpltUsr.OAuth.AppName
-	appToken := cmpltUsr.OAuth.AppToken
+	appName := completeUserAppName
+	appToken := cmpltUsr.OAuths[appName].AppToken
 	tcs := []UpdateTestCase{
 		{Desc: "Is to update", User: cmpltUsr},
 		{Desc: "Is to insert", User: bareBoneUser},
@@ -51,15 +55,17 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 			defer tearDown(t)
 			m := newModel(t)
 			insertUser(tc.User, t)
-			if expUsr.OAuth == nil {
-				expUsr.OAuth = &authms.OAuth{
-					AppName: appName,
-					AppToken: appToken,
-					Verified: true,
+			if expUsr.OAuths == nil {
+				expUsr.OAuths = map[string]*authms.OAuth{
+					appName: {
+						AppName: appName,
+						AppToken: appToken,
+						Verified: true,
+					},
 				}
 			}
-			expUsr.OAuth.AppUserID = "test-user-id-updated"
-			err := m.UpdateAppUserID(tc.User.ID, expUsr.OAuth)
+			expUsr.OAuths[appName].AppUserID = "test-user-id-updated"
+			err := m.UpdateAppUserID(tc.User.ID, expUsr.OAuths[appName])
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return
@@ -215,8 +221,8 @@ func TestModel_GetByAppUserID(t *testing.T) {
 	m := newModel(t)
 	expUsr := completeUser()
 	insertUser(expUsr, t)
-	actUser, err := m.GetByAppUserID(expUsr.OAuth.AppName,
-		expUsr.OAuth.AppUserID)
+	actUser, err := m.GetByAppUserID(expUsr.OAuths[completeUserAppName].AppName,
+		expUsr.OAuths[completeUserAppName].AppUserID)
 	if err != nil {
 		t.Fatalf("model.Get(): %s", err)
 	}
@@ -273,11 +279,13 @@ func completeUser() (*authms.User) {
 			Value: "+254712345678",
 			Verified: false,
 		},
-		OAuth: &authms.OAuth{
-			AppName: "test-app",
-			AppUserID: "test-user-id",
-			AppToken: "test-app.test-user-id.test-token",
-			Verified: false,
+		OAuths: map[string]*authms.OAuth{
+			completeUserAppName: {
+				AppName: completeUserAppName,
+				AppUserID: "test-user-id",
+				AppToken: "test-app.test-user-id.test-token",
+				Verified: false,
+			},
 		},
 		Password: "test-password",
 	}
@@ -298,7 +306,7 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 	dbUsr := &authms.User{
 		Email: &authms.Value{},
 		Phone: &authms.Value{},
-		OAuth: &authms.OAuth{},
+		OAuths: make(map[string]*authms.OAuth),
 	}
 	var dbUserName, dbPhone, dbEmail, dbAppName, dbAppUsrID sql.NullString
 	var dbPhoneValidated, dbEmailValidated, dbAppValidated sql.NullBool
@@ -310,9 +318,9 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 	dbUsr.Phone.Verified = dbPhoneValidated.Bool
 	dbUsr.Email.Value = dbEmail.String
 	dbUsr.Email.Verified = dbEmailValidated.Bool
-	dbUsr.OAuth.AppName = dbAppName.String
-	dbUsr.OAuth.AppUserID = dbAppUsrID.String
-	dbUsr.OAuth.Verified = dbAppValidated.Bool
+	oa := &authms.OAuth{AppName: dbAppName.String, AppUserID: dbAppUsrID.String,
+		Verified: dbAppValidated.Bool}
+	dbUsr.OAuths[oa.AppName] = oa
 	if err != nil {
 		t.Fatalf("Error checking db contents for validation: %s", err)
 	}
@@ -365,13 +373,13 @@ func insertUser(u *authms.User, t *testing.T) {
 			t.Fatalf("Error seting up (inserting phone) %s", err)
 		}
 	}
-	if u.OAuth != nil {
+	for _, oauth := range u.OAuths {
 		query = `
 		INSERT INTO appUserIDs (userID, appUserID, appName, createDate)
 		 VALUES ($1, $2, $3, CURRENT_TIMESTAMP());
 		 `
-		if _, err := db.Exec(query, u.ID, u.OAuth.AppUserID,
-			u.OAuth.AppName); err != nil {
+		if _, err := db.Exec(query, u.ID, oauth.AppUserID,
+			oauth.AppName); err != nil {
 			t.Fatalf("Error seting up (inserting appUserID): %s", err)
 		}
 	}
@@ -390,8 +398,11 @@ func assertUsersEqual(act *authms.User, exp *authms.User, t *testing.T) {
 		t.Errorf("Expected a value %+v but got nil\n", exp)
 		return
 	}
-	if !oAuthEqual(act.OAuth, exp.OAuth) {
-		t.Errorf("Expected oauth %+v but got %+v", exp.OAuth, act.OAuth)
+	for appName, expOAuth := range exp.OAuths {
+		actOAuth := act.OAuths[appName]
+		if !oAuthEqual(actOAuth, expOAuth) {
+			t.Errorf("Expected oauth %+v but got %+v", expOAuth, actOAuth)
+		}
 	}
 	if !valuesEqual(act.Phone, exp.Phone) {
 		t.Errorf("Expected phone %+v but got %+v", exp.Phone, act.Phone)
