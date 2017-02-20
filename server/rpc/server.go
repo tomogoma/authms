@@ -91,6 +91,39 @@ func (s *Server) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp 
 	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
 }
 
+func (s *Server) VerifyPhone(c context.Context, req *authms.SMSVerificationRequest, resp *authms.SMSVerificationResponse) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - verify phone...", tID)
+	r, err := s.auth.VerifyPhone(req, "")
+	return s.respondOnSMS(r, resp, tID, err)
+}
+
+func (s *Server) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationCodeRequest, resp *authms.SMSVerificationResponse) error {
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - verify phone...", tID)
+	r, err := s.auth.VerifyPhoneCode(req, "")
+	return s.respondOnSMS(r, resp, tID, err)
+}
+
+func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, tID int, err error) error {
+	if err != nil {
+		if !auth.AuthError(err) {
+			s.lg.Error("%d - internal auth error: %s", tID, err)
+			resp.Detail = internalErrorMessage
+			resp.Code = http.StatusInternalServerError
+			return nil
+		}
+		// FIXME the error message may have TMI, sanitize
+		resp.Detail = err.Error()
+		resp.Code = http.StatusUnauthorized
+		return nil
+	}
+	resp.Id = s.name
+	resp.Code = http.StatusOK
+	resp.Status = r
+	return nil
+}
+
 func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int32, tID int, err error) error {
 	if err != nil {
 		if !auth.AuthError(err) {

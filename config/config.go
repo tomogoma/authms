@@ -34,12 +34,44 @@ func (sc ServiceConfig) Validate() error {
 	return nil
 }
 
+type TwilioConfig struct {
+	ID              string `json:"ID" yaml:"ID"`
+	SenderPhone     string `json:"senderPhone" yaml:"senderPhone"`
+	TokenKeyFile    string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
+	TestNumber      string `json:"testNumber" yaml:"testNumber"`
+	MessageFmt      string `json:"messageFormat" yaml:"messageFormat"`
+	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
+}
+
+func (c TwilioConfig) TwilioID() string {
+	return c.ID
+}
+func (c TwilioConfig) TwilioTokenKeyFile() string {
+	return c.TokenKeyFile
+}
+func (c TwilioConfig) TwilioSenderPhone() string {
+	return c.SenderPhone
+}
+
+func (c TwilioConfig) TwilioTestNumber() string {
+	return c.TestNumber
+}
+
+func (c TwilioConfig) MessageFormat() string {
+	return c.MessageFmt
+}
+
+func (c TwilioConfig) ValidityPeriod() time.Duration {
+	return c.SMSCodeValidity
+}
+
 type Config struct {
-	Service        ServiceConfig `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
-	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
-	Authentication auth.Config   `json:"authentication,omitempty" yaml:"authentication"`
-	Token          token.DefaultConfig  `json:"token,omitempty" yaml:"token"`
-	OAuth          oauth.Config  `json:"OAuth,omitempty" yaml:"OAuth"`
+	Service        ServiceConfig`json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Database       cockroach.DSN`json:"database,omitempty" yaml:"database"`
+	Authentication auth.Config`json:"authentication,omitempty" yaml:"authentication"`
+	Token          token.DefaultConfig`json:"token,omitempty" yaml:"token"`
+	OAuth          oauth.Config`json:"OAuth,omitempty" yaml:"OAuth"`
+	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
 }
 
 func (c Config) Validate() error {

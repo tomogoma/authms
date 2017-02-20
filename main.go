@@ -16,6 +16,8 @@ import (
 	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
+	"github.com/tomogoma/authms/auth/phone/verification"
+	"github.com/tomogoma/authms/auth/phone/sms"
 )
 
 const (
@@ -60,7 +62,21 @@ func main() {
 		return
 	}
 	db, err := dbhelper.New(conf.Database, pg, hash.Hasher{})
-	a, err := auth.New(tg, lg, db, oa)
+	if err != nil {
+		lg.Critical("Error instantiating db helper: %v", err)
+		return
+	}
+	s, err := sms.New(conf.Twilio)
+	if err != nil {
+		lg.Critical("Error instantiating SMS API client: %v", err)
+		return
+	}
+	pv, err := verification.New(conf.Twilio, s, pg, tg)
+	if err != nil {
+		lg.Critical("Error instantiating SMS code verifier: %v", err)
+		return
+	}
+	a, err := auth.New(tg, lg, db, oa, pv)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return
