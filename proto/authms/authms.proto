@@ -73,6 +73,27 @@ message OAuthRequest {
     OAuth OAuth = 2;
 }
 
+message SMSVerificationRequest {
+    string deviceID = 1;
+    string phone = 2;
+}
+
+message SMSVerificationCodeRequest {
+    string deviceID = 1;
+    string token = 2;
+    string code = 3;
+}
+
+message SMSVerificationStatus {
+    string token = 1;
+    string phone = 2;
+    int32 retries = 3;
+    string expiresAt = 4;
+    bool isBlocked = 5;
+    string blockedUntil = 6;
+    bool verified = 8;
+}
+
 message Response {
     string id = 1;
     int32 code = 2;
