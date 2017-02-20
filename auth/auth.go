@@ -107,7 +107,7 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 		if err := a.validateOAuth(oa); err != nil {
 			return err
 		}
-		user.OAuths[appName].Verified = false
+		user.OAuths[appName].Verified = true
 	}
 	if user.Phone != nil {
 		user.Phone.Verified = false

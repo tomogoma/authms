@@ -63,8 +63,8 @@ type DBHelperMock struct {
 
 func (d *DBHelperMock) SaveUser(u *authms.User) error {
 	for _, oauth := range u.OAuths {
-		if oauth.Verified == true {
-			d.T.Error("expected OAuth verified=false but got true")
+		if oauth.Verified == false {
+			d.T.Error("expected OAuth verified=true but got false")
 		}
 	}
 	if u.Phone != nil && u.Phone.Verified == true {
@@ -138,7 +138,7 @@ func init() {
 
 func TestNew(t *testing.T) {
 	setUp(t)
-	newAuth(t, &DBHelperMock{}, &OAuthHandlerMock{})
+	newAuth(t, &DBHelperMock{T: t}, &OAuthHandlerMock{})
 }
 
 func TestAuth_Register(t *testing.T) {
@@ -148,7 +148,7 @@ func TestAuth_Register(t *testing.T) {
 			Desc: "Valid args",
 			User: &authms.User{ID: 123},
 			OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: "test-dev",
 		},
@@ -173,7 +173,7 @@ func TestAuth_Register(t *testing.T) {
 		{
 			Desc: "Nil user",
 			User: nil, OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: "test-dev"},
 		{
@@ -189,12 +189,12 @@ func TestAuth_Register(t *testing.T) {
 				ExpValid:true,
 				AppUserID: "test-oauth-app-uid",
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: "test-dev",
 		},
 		{Desc: "Missing DevID", User: &authms.User{}, OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{}, ExpErr: true},
+			DBHelper: &DBHelperMock{T: t}, ExpErr: true},
 	}
 	for _, c := range cases {
 		func() {
@@ -239,7 +239,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 				ID: usrID,
 				Phone: &authms.Value{Value:"+254123456789"},
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: devID,
 			Token: tkn,
@@ -252,7 +252,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 					Value:"+254123456789",
 					Verified:true},
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: devID,
 			Token: tkn,
@@ -263,7 +263,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 				ID: usrID,
 				Phone: &authms.Value{},
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -273,14 +273,14 @@ func TestAuth_UpdatePhone(t *testing.T) {
 			User: &authms.User{
 				ID: usrID,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
 		},
 		{
 			Desc: "nil user",
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -290,7 +290,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 			User: &authms.User{
 				Phone: &authms.Value{Value:"+254123456789"},
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -301,7 +301,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 				ID: usrID + 5,
 				Phone: &authms.Value{Value:"+254123456789"},
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -360,7 +360,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID: appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: devID,
 			Token: tkn,
@@ -379,7 +379,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 			OAHandler: &OAuthHandlerMock{
 				ExpValTknClld: false,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -398,7 +398,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID: appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -418,7 +418,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ExpValid: true,
 				AppUserID: appUsrID,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -433,7 +433,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ExpValid: true,
 				AppUserID: appUsrID,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -456,7 +456,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID: appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: devID,
 			Token: tkn,
@@ -477,7 +477,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ExpValid: true,
 				AppUserID: appUsrID,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -499,7 +499,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID: appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: devID,
 			Token: tkn,
@@ -520,7 +520,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ExpValid: true,
 				AppUserID: appUsrID,
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: true,
 			DevID: "",
 			Token: tkn,
@@ -565,7 +565,7 @@ func TestAuth_UpdatePassword(t *testing.T) {
 				ID: usrID,
 				Password: "some-new-password",
 			},
-			DBHelper: &DBHelperMock{},
+			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
 			DevID: devID,
 		},
@@ -613,7 +613,7 @@ func TestAuth_LoginOAuth(t *testing.T) {
 				AppUserID:"test-app-user-id", ExpValid: true},
 			OAuth: &authms.OAuth{AppUserID:"test-app-user-id"}, DevID:"Tes-devID"},
 		{Desc:"Invalid OAuth Creds", ExpErr:true,
-			DBHelper:&DBHelperMock{},
+			DBHelper:&DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld:true, ExpErr: errors.New("")},
 			OAuth: &authms.OAuth{}, DevID:"Tes-devID"},
 	}
