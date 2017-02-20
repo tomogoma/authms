@@ -642,6 +642,9 @@ func TestAuth_LoginOAuth(t *testing.T) {
 				t.Errorf("%s - user %+v was not expected %+v",
 					c.Desc, usr, c.DBHelper.ExpUser)
 			}
+			if usr.Token == "" {
+				t.Errorf("%s - missing token for user", c.Desc)
+			}
 			if !c.DBHelper.GetUserCalled {
 				t.Errorf("%s - get user not called", c.Desc)
 			}

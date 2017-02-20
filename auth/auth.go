@@ -100,11 +100,11 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if devID == "" {
 		return errors.NewClient("Dev ID was empty")
 	}
-	for appName, oauth := range user.OAuths {
-		if appName != oauth.AppName {
+	for appName, oa := range user.OAuths {
+		if appName != oa.AppName {
 			return errors.NewClient("an OAuth's key does not match its app name")
 		}
-		if err := a.validateOAuth(oauth); err != nil {
+		if err := a.validateOAuth(oa); err != nil {
 			return err
 		}
 		user.OAuths[appName].Verified = false
@@ -162,15 +162,15 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	if user.OAuths == nil || user.OAuths[appName] == nil {
 		return errors.NewClient("OAuth was not provided")
 	}
-	oauth := user.OAuths[appName]
-	if err := a.validateOAuth(oauth); err != nil {
+	oa := user.OAuths[appName]
+	if err := a.validateOAuth(oa); err != nil {
 		return err
 	}
 	if devID == "" {
 		return errors.NewClient("device ID was empty")
 	}
-	oauth.Verified = true
-	err = a.dbHelper.UpdateAppUserID(user.ID, oauth)
+	oa.Verified = true
+	err = a.dbHelper.UpdateAppUserID(user.ID, oa)
 	if err != nil {
 		return errors.Newf("error persisting OAuth changes: %v", err)
 	}
@@ -223,6 +223,7 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 		loginErr = errors.Newf("error persisting login token: %v", loginErr)
 		return loginErr
 	}
+	usr.Token = tkn.Token()
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
 		dbhelper.AccessLogin)
 	if loginErr != nil {
