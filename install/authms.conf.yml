@@ -17,3 +17,8 @@ token:
 OAuth:
   facebookSecretFileLoc: /etc/authms/keys/facebooksecret.key
   facebookID:
+twilio:
+  ID:
+  senderPhone:
+  testNumber:
+  tokenKeyFile: /etc/authms/keys/twiliotoken.key
