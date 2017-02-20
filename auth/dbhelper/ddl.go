@@ -81,4 +81,13 @@ CREATE TABLE IF NOT EXISTS history (
   INDEX         history_UserDate_indx (userID, DATE )
 );
 `
+	historyUpdate1 = `
+ALTER TABLE history DROP COLUMN IF EXISTS referral;
+`
+	historyUpdate3 = `
+ALTER TABLE history DROP COLUMN IF EXISTS forServiceID;
+`
+	historyUpdate2 = `
+ALTER TABLE history ADD COLUMN IF NOT EXISTS devID STRING;
+`
 )

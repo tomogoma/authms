@@ -117,7 +117,7 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	}
 	err := a.dbHelper.SaveUser(user)
 	if err != nil {
-		return err
+		return errors.Newf("error persisting user: %v", err)
 	}
 	go a.saveHistory(user, devID, dbhelper.AccessRegistration, rIP, nil)
 	return nil
@@ -143,7 +143,7 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	user.Phone.Verified = false
 	err = a.dbHelper.UpdatePhone(user.ID, user.Phone)
 	if err != nil {
-		return err
+		return errors.Newf("error persisting phone update: %v", err)
 	}
 	return nil
 }
@@ -172,7 +172,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	oauth.Verified = true
 	err = a.dbHelper.UpdateAppUserID(user.ID, oauth)
 	if err != nil {
-		return err
+		return errors.Newf("error persisting OAuth changes: %v", err)
 	}
 	return nil
 }
@@ -215,15 +215,18 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	}
 	tkn, loginErr := a.tokenG.Generate(int(usr.ID), devID, token.ShortExpType)
 	if loginErr != nil {
+		loginErr = errors.Newf("error generating token: %v", loginErr)
 		return loginErr
 	}
 	loginErr = a.dbHelper.SaveToken(tkn)
 	if loginErr != nil {
+		loginErr = errors.Newf("error persisting login token: %v", loginErr)
 		return loginErr
 	}
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
 		dbhelper.AccessLogin)
 	if loginErr != nil {
+		loginErr = errors.Newf("error fetching login history: %v", loginErr)
 		return loginErr
 	}
 	usr.LoginHistory = prevLogins
@@ -236,7 +239,7 @@ func (a *Auth) validateOAuth(claimOA *authms.OAuth) error {
 	}
 	oa, err := a.oAuthHandler.ValidateToken(claimOA.AppName, claimOA.AppToken)
 	if err != nil {
-		return err
+		return errors.Newf("error validating OAuth token: %v", err)
 	}
 	if !oa.IsValid() || oa.UserID() != claimOA.AppUserID {
 		return ErrorOAuthTokenNotValid

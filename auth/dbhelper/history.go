@@ -5,6 +5,7 @@ import (
 
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
+	"database/sql"
 )
 
 const (
@@ -58,9 +59,12 @@ func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) (
 	defer r.Close()
 	hists := make([]*authms.History, 0)
 	for r.Next() {
+		var devID, ipAddr sql.NullString
 		d := &authms.History{}
 		err = r.Scan(&d.ID, &d.AccessType, &d.SuccessStatus, &d.UserID,
-			&d.Date, &d.DevID, &d.IpAddress)
+			&d.Date, &devID, &ipAddr)
+		d.DevID = devID.String
+		d.IpAddress = ipAddr.String
 		if err != nil {
 			return nil, err
 		}

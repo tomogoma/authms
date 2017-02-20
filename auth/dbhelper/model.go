@@ -31,7 +31,8 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper
 		return nil, errors.Newf("error connecting to db: %s", err)
 	}
 	if err := cockroach.InstantiateDB(db, dsnF.DBName(), users, usernames,
-		emails, phones, appUserIDs, history, tokens); err != nil {
+		emails, phones, appUserIDs, history, tokens, historyUpdate1,
+		historyUpdate2, historyUpdate3); err != nil {
 		return nil, errors.Newf("error instantiating db: %s", err)
 	}
 	iCh := make(chan *token.Token)

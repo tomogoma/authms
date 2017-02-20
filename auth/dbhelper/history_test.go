@@ -93,31 +93,57 @@ func TestModel_SaveHistory(t *testing.T) {
 }
 
 func TestModel_GetHistory(t *testing.T) {
-	setUp(t)
-	defer tearDown(t)
-	m := newModel(t)
-	usr := completeUser()
-	insertUser(usr, t)
-	q := `INSERT INTO history (userID, accessMethod, successful, devID, ipAddress, date)
-		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())`
-	db := getDB(t)
-	hist := completeHistory(usr.ID)
-	_, err := db.Exec(q, hist.UserID, hist.AccessType, hist.SuccessStatus, hist.DevID,
-		hist.IpAddress)
-	if err != nil {
-		t.Fatalf("Error setting up (inserting history): %s", err)
+	type TestCase struct {
+		Desc string
+		Hist *authms.History
 	}
-	offset := 0
-	count := 1
-	hists, err := m.GetHistory(hist.UserID, offset, count, hist.AccessType)
-	if err != nil {
-		t.Fatalf("model.GetHistory(): %s", err)
+	tcs := []TestCase{
+		{Desc: "All values provided", Hist: completeHistory(1)},
+		{
+			Desc: "Missing devID, IP Addr",
+			Hist: &authms.History{
+				AccessType: dbhelper.AccessLogin,
+				SuccessStatus: true,
+			},
+		},
 	}
-	if len(hists) != 1 {
-		t.Fatalf("Expected 1 history entry but got %d", len(hists))
-	}
-	if !compareHistory(hist, hists[0]) {
-		t.Errorf("Expected %+v but got %+v", hist, hists[0])
+	for _, tc := range tcs {
+		func() {
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			usr := completeUser()
+			insertUser(usr, t)
+			q := `INSERT INTO history (userID, accessMethod,
+			 		successful, devID, ipAddress, date)
+				VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())`
+			db := getDB(t)
+			tc.Hist.UserID = usr.ID
+			_, err := db.Exec(q, tc.Hist.UserID, tc.Hist.AccessType,
+				tc.Hist.SuccessStatus, tc.Hist.DevID, tc.Hist.IpAddress)
+			if err != nil {
+				t.Errorf("%s - Error setting up" +
+					" (inserting history): %s", tc.Desc, err)
+				return
+			}
+			offset := 0
+			count := 1
+			hists, err := m.GetHistory(tc.Hist.UserID, offset,
+				count, tc.Hist.AccessType)
+			if err != nil {
+				t.Errorf("%s - model.GetHistory(): %s", tc.Desc, err)
+				return
+			}
+			if len(hists) != 1 {
+				t.Errorf("%s - Expected 1 history entry but got %d",
+					tc.Desc, len(hists))
+				return
+			}
+			if !compareHistory(tc.Hist, hists[0]) {
+				t.Errorf("%s\nExpected:\t%+v\nGot:\t\t%+v",
+					tc.Desc, tc.Hist, hists[0])
+			}
+		}()
 	}
 }
 
