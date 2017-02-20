@@ -24,6 +24,7 @@ type TokenerMock struct {
 	ExpJwt                   *jwt.Token
 	GenerateWithClaimsCalled bool
 	ValidateClaimsCalled     bool
+	ExpCode                  string
 }
 
 func (t *TokenerMock) GenerateWithClaims(claims jwt.Claims) (string, error) {
@@ -32,8 +33,12 @@ func (t *TokenerMock) GenerateWithClaims(claims jwt.Claims) (string, error) {
 }
 func (t *TokenerMock) ValidateClaims(token string, claims jwt.Claims) (*jwt.Token, error) {
 	t.ValidateClaimsCalled = true
+	cl, ok := claims.(*verification.Claims)
+	if ok {
+		cl.Code = t.ExpCode
+	}
 	if t.ExpJwt != nil {
-		t.ExpJwt.Claims = claims
+		t.ExpJwt.Claims = cl
 	}
 	return t.ExpJwt, t.ExpErr
 }
@@ -206,6 +211,7 @@ func TestVerifier_VerifySMSCode(t *testing.T) {
 	validDeps := validDependencies()
 	validDeps.ExpVerStatus = &authms.SMSVerificationStatus{Verified:true}
 	validDeps.Tokener.ExpJwt = &jwt.Token{Valid:true}
+	validDeps.Tokener.ExpCode = "123"
 	validDeps.CodeReq = &authms.SMSVerificationCodeRequest{Code: "123"}
 	tcs := []VerifierTestCase{
 		validDeps,

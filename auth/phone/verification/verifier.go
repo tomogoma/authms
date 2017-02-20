@@ -108,7 +108,10 @@ func (v *Verifier) VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.
 	if claims.Code != r.Code {
 		return nil, errors.NewClient("invalid SMS code")
 	}
-	return nil, errors.New("Not yet implemented")
+	return &authms.SMSVerificationStatus{
+		Phone: claims.Phone,
+		Verified: true,
+	}, nil
 }
 
 func testConfig(c Config) error {
