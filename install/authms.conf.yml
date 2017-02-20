@@ -22,3 +22,6 @@ twilio:
   senderPhone:
   testNumber:
   tokenKeyFile: /etc/authms/keys/twiliotoken.key
+  testNumber:
+  messageFormat: Your verification code for Gawana Rideshare is %s
+  smsCodeValidity: 5m
