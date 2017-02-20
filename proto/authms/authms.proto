@@ -75,14 +75,17 @@ message OAuthRequest {
 
 message SMSVerificationRequest {
     string deviceID = 1;
-    string phone = 2;
+    string token = 2;
+    int64 userID = 3;
+    string phone = 4;
 }
 
 message SMSVerificationCodeRequest {
     string deviceID = 1;
     string token = 2;
-    string smsToken = 3;
-    string code = 4;
+    int64 userID = 3;
+    string smsToken = 4;
+    string code = 5;
 }
 
 message SMSVerificationStatus {

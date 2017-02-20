@@ -12,6 +12,8 @@ const (
 	AccessLogin = "LOGIN"
 	AccessRegistration = "REGISTER"
 	AccessUpdate = "UPDATE"
+	AccessVerification = "VERIFICATION"
+	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
 	AccessPassChange = "PASSWORD_CHANGE"
 )
 

@@ -41,11 +41,17 @@ type DBHelper interface {
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
 }
 
+type PhoneVerifier interface {
+	SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error)
+	VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.SMSVerificationStatus, error)
+}
+
 type Auth struct {
-	dbHelper     DBHelper
-	tokenG       TokenGenerator
-	logger       Logger
-	oAuthHandler OAuthHandler
+	dbHelper      DBHelper
+	tokenG        TokenGenerator
+	logger        Logger
+	oAuthHandler  OAuthHandler
+	phoneVerifier PhoneVerifier
 }
 
 const (
@@ -57,6 +63,7 @@ var ErrorNilLogger = errors.New("Logger was nil")
 var ErrorNilDBHelper = errors.New("DBHelper was nil")
 var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
 var ErrorOAuthTokenNotValid = errors.New("oauth token is invalid")
+var ErrorNilPhoneVerifier = errors.New("ErrorNilPhoneVerifier was nil")
 
 func AuthError(err error) bool {
 	if strings.HasPrefix(err.Error(), dbhelper.ErrorPasswordMismatch.Error()) ||
@@ -77,7 +84,7 @@ func AuthError(err error) bool {
 }
 
 func New(tg TokenGenerator, lg Logger, db DBHelper,
-oa OAuthHandler) (*Auth, error) {
+oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
 	if tg == nil {
 		return nil, ErrorNilTokenGenerator
 	}
@@ -90,7 +97,11 @@ oa OAuthHandler) (*Auth, error) {
 	if oa == nil {
 		return nil, ErrorNilOAuthHandler
 	}
-	return &Auth{dbHelper: db, tokenG: tg, oAuthHandler: oa, logger: lg}, nil
+	if pv == nil {
+		return nil, ErrorNilPhoneVerifier
+	}
+	return &Auth{dbHelper: db, tokenG: tg, oAuthHandler: oa,
+		logger: lg, phoneVerifier: pv}, nil
 }
 
 func (a *Auth) Register(user *authms.User, devID, rIP string) error {
@@ -146,6 +157,52 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 		return errors.Newf("error persisting phone update: %v", err)
 	}
 	return nil
+}
+
+func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*authms.SMSVerificationStatus, error) {
+	if req == nil {
+		return nil, errors.NewClient("SMSVerificationRequest was empty")
+	}
+	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
+	defer func() {
+		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
+			dbhelper.AccessVerification, rIP, err)
+	}()
+	if err != nil {
+		return nil, err
+	}
+	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
+	if err != nil {
+		return nil, errors.Newf("unable to send SMS code: %v", err)
+	}
+	return vs, nil
+}
+
+func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP string) (*authms.SMSVerificationStatus, error) {
+	if req == nil {
+		return nil, errors.NewClient("SMSVerificationRequest was empty")
+	}
+	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
+	defer func() {
+		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
+			dbhelper.AccessCodeValidation, rIP, err)
+	}()
+	if err != nil {
+		return nil, err
+	}
+	vs, err := a.phoneVerifier.VerifySMSCode(req)
+	if err != nil {
+		return nil, errors.Newf("unable to verify SMS code: %v", err)
+	}
+	phone := &authms.Value{
+		Verified: vs.Verified,
+		Value: vs.Phone,
+	}
+	err = a.dbHelper.UpdatePhone(req.UserID, phone)
+	if err != nil {
+		return nil, errors.Newf("error persisting phone update: %v", err)
+	}
+	return vs, nil
 }
 
 func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string) error {
