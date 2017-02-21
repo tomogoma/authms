@@ -50,15 +50,10 @@ func main() {
 		lg.Critical("Error instantiating token generator: %s", err)
 		return
 	}
+	authQuitCh := make(chan error)
 	pg, err := password.NewGenerator(password.AllChars)
 	if err != nil {
-		lg.Critical("Error instantiating token generator: %s", err)
-		return
-	}
-	authQuitCh := make(chan error)
-	oa, err := oauth.New(conf.OAuth)
-	if err != nil {
-		lg.Critical("Error instantiating OAuth module: %s", err)
+		lg.Critical("Error instantiating password generator: %s", err)
 		return
 	}
 	db, err := dbhelper.New(conf.Database, pg, hash.Hasher{})
@@ -71,9 +66,19 @@ func main() {
 		lg.Critical("Error instantiating SMS API client: %v", err)
 		return
 	}
-	pv, err := verification.New(conf.Twilio, s, pg, tg)
+	ng, err := password.NewGenerator(password.NumberChars)
+	if err != nil {
+		lg.Critical("Error instantiating number generator: %s", err)
+		return
+	}
+	pv, err := verification.New(conf.Twilio, s, ng, tg)
 	if err != nil {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
+		return
+	}
+	oa, err := oauth.New(conf.OAuth)
+	if err != nil {
+		lg.Critical("Error instantiating OAuth module: %s", err)
 		return
 	}
 	a, err := auth.New(tg, lg, db, oa, pv)
