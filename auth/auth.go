@@ -1,14 +1,10 @@
 package auth
 
 import (
-	"strings"
-
-	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/oauth/response"
-	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/authms/auth/errors"
 )
 
 type OAuthHandler interface {
@@ -39,6 +35,7 @@ type DBHelper interface {
 	SaveHistory(*authms.History) error
 	UpdatePhone(userID int64, newPhone *authms.Value) error
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
+	IsNotFoundErr(err error) bool
 }
 
 type PhoneVerifier interface {
@@ -67,26 +64,7 @@ var ErrorNilTokenGenerator = errors.New("token generator was nil")
 var ErrorNilLogger = errors.New("Logger was nil")
 var ErrorNilDBHelper = errors.New("DBHelper was nil")
 var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
-var ErrorOAuthTokenNotValid = errors.New("oauth token is invalid")
-var ErrorNilPhoneVerifier = errors.New("ErrorNilPhoneVerifier was nil")
-
-func AuthError(err error) bool {
-	if strings.HasPrefix(err.Error(), dbhelper.ErrorPasswordMismatch.Error()) ||
-		strings.HasPrefix(err.Error(), ErrorOAuthTokenNotValid.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyUserName.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyPhone.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyEmail.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorInvalidOAuth.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorEmptyPassword.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorUserExists.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorEmailExists.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorPhoneExists.Error()) ||
-		strings.HasPrefix(err.Error(), dbhelper.ErrorAppIDExists.Error()) ||
-		strings.HasPrefix(err.Error(), oauth.ErrorUnsupportedApp.Error()) {
-		return true
-	}
-	return false
-}
+var ErrorNilPhoneVerifier = errors.New("PhoneVerifier was nil")
 
 func New(tg TokenGenerator, lg Logger, db DBHelper,
 oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
@@ -148,9 +126,9 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
 	if err != nil {
-		return err
+		return errors.NewAuthf("invalid token: %v", err)
 	}
-	if !dbhelper.HasValue(user.Phone) {
+	if !hasValue(user.Phone) {
 		return errors.NewClient("phone was invalid")
 	}
 	if devID == "" {
@@ -174,7 +152,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 			AccessVerification, rIP, err)
 	}()
 	if err != nil {
-		return nil, err
+		return nil, errors.NewAuthf("invalid token: %v", err)
 	}
 	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
 	if err != nil {
@@ -193,11 +171,11 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 			AccessCodeValidation, rIP, err)
 	}()
 	if err != nil {
-		return nil, err
+		return nil, errors.NewAuthf("invalid token: %v", err)
 	}
 	vs, err := a.phoneVerifier.VerifySMSCode(req)
 	if err != nil {
-		return nil, errors.Newf("unable to verify SMS code: %v", err)
+		return nil, errors.NewClientf("%v", err)
 	}
 	phone := &authms.Value{
 		Verified: vs.Verified,
@@ -219,7 +197,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
 	if err != nil {
-		return err
+		return errors.NewAuthf("invalid token: %v", err)
 	}
 	if user.OAuths == nil || user.OAuths[appName] == nil {
 		return errors.NewClient("OAuth was not provided")
@@ -248,6 +226,9 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP string) (*authms.User, erro
 		return nil, errors.NewClient("Dev ID was empty")
 	}
 	usr, err := a.dbHelper.GetByUserName(uName, pass)
+	if a.dbHelper.IsNotFoundErr(err) {
+		err = errors.NewAuth("invalid credentials")
+	}
 	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
 		return nil, err
 	}
@@ -262,10 +243,23 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 		return nil, err
 	}
 	usr, err := a.dbHelper.GetByAppUserID(app.AppName, app.AppUserID)
+	if a.dbHelper.IsNotFoundErr(err) {
+		err = errors.NewAuth("invalid credentials")
+	}
 	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
 		return nil, err
 	}
 	return usr, nil
+}
+
+func (a *Auth) IsAuthError(err error) bool {
+	errC, ok := err.(errors.Error)
+	return ok && errC.Auth()
+}
+
+func (a *Auth) IsClientError(err error) bool {
+	errC, ok := err.(errors.Error)
+	return ok && errC.Client()
 }
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
@@ -305,7 +299,7 @@ func (a *Auth) validateOAuth(claimOA *authms.OAuth) error {
 		return errors.Newf("error validating OAuth token: %v", err)
 	}
 	if !oa.IsValid() || oa.UserID() != claimOA.AppUserID {
-		return ErrorOAuthTokenNotValid
+		return errors.NewAuth("OAuth token was not valid")
 	}
 	return nil
 }
@@ -327,15 +321,15 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 }
 
 func havePasswordComboAuth(u *authms.User) bool {
-	return dbhelper.HasValue(u.Phone) || dbhelper.HasValue(u.Email) || u.UserName != ""
+	return hasValue(u.Phone) || hasValue(u.Email) || u.UserName != ""
 }
 
 func validateUser(u *authms.User) error {
 	if u == nil {
 		return errors.NewClient("user was not provided")
 	}
-	hasPhone := dbhelper.HasValue(u.Phone)
-	hasMail := dbhelper.HasValue(u.Email)
+	hasPhone := hasValue(u.Phone)
+	hasMail := hasValue(u.Email)
 	if u.UserName == "" && !hasPhone && !hasMail && u.OAuths == nil {
 		return errors.NewClient("A user must have at least one" +
 			" identifier (UserName, Phone, Email, OAuthApp")
@@ -368,4 +362,8 @@ func validateOAuth(oa *authms.OAuth) error {
 		return errors.NewClient("AppUserID was not provided")
 	}
 	return nil
+}
+
+func hasValue(v *authms.Value) bool {
+	return v != nil && v.Value != ""
 }

@@ -420,7 +420,7 @@ func assertUsersEqual(act *authms.User, exp *authms.User, t *testing.T) {
 
 func valuesEqual(act, exp *authms.Value) bool {
 	if exp == nil {
-		return act == nil || !dbhelper.HasValue(exp)
+		return act == nil || act.Value == ""
 	} else if act == nil {
 		return false
 	}

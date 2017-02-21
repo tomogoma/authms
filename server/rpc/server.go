@@ -107,15 +107,18 @@ func (s *Server) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationC
 
 func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, tID int, err error) error {
 	if err != nil {
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - internal auth error: %s", tID, err)
-			resp.Detail = internalErrorMessage
-			resp.Code = http.StatusInternalServerError
+		if s.auth.IsAuthError(err) {
+			resp.Detail = err.Error()
+			resp.Code = http.StatusUnauthorized
 			return nil
 		}
-		// FIXME the error message may have TMI, sanitize
-		resp.Detail = err.Error()
-		resp.Code = http.StatusUnauthorized
+		if s.auth.IsClientError(err) {
+			resp.Detail = err.Error()
+			resp.Code = http.StatusBadRequest
+		}
+		s.lg.Error("%d - internal auth error: %s", tID, err)
+		resp.Detail = internalErrorMessage
+		resp.Code = http.StatusInternalServerError
 		return nil
 	}
 	resp.Id = s.name
@@ -126,15 +129,18 @@ func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSV
 
 func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int32, tID int, err error) error {
 	if err != nil {
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - internal auth error: %s", tID, err)
-			resp.Detail = internalErrorMessage
-			resp.Code = http.StatusInternalServerError
+		if s.auth.IsAuthError(err) {
+			resp.Detail = err.Error()
+			resp.Code = http.StatusUnauthorized
 			return nil
 		}
-		// FIXME the error message may have TMI, sanitize
-		resp.Detail = err.Error()
-		resp.Code = http.StatusUnauthorized
+		if s.auth.IsClientError(err) {
+			resp.Detail = err.Error()
+			resp.Code = http.StatusBadRequest
+		}
+		s.lg.Error("%d - internal auth error: %s", tID, err)
+		resp.Detail = internalErrorMessage
+		resp.Code = http.StatusInternalServerError
 		return nil
 	}
 	resp.Id = s.name

@@ -51,7 +51,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 		if err != nil {
 			return err
 		}
-		if HasValue(u.Email) {
+		if hasValue(u.Email) {
 			emailqStr := `INSERT INTO emails (userID, email, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
 			_, err = tx.Exec(emailqStr, u.ID, u.Email.Value, u.Email.Verified)
@@ -67,7 +67,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 				return err
 			}
 		}
-		if HasValue(u.Phone) {
+		if hasValue(u.Phone) {
 			phoneqStr := `INSERT INTO phones (userID, phone, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
 			_, err = tx.Exec(phoneqStr, u.ID, u.Phone.Value, u.Phone.Verified)
@@ -165,7 +165,7 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 }
 
 func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
-	if !HasValue(newEmail) {
+	if !hasValue(newEmail) {
 		return errors.New("the email provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM emails WHERE userID=$1`
@@ -187,7 +187,7 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 }
 
 func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
-	if !HasValue(newPhone) {
+	if !hasValue(newPhone) {
 		return errors.New("the phone provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM phones WHERE userID=$1`
@@ -335,6 +335,6 @@ func extractDuplicateError(err error) error {
 	return err
 }
 
-func HasValue(v *authms.Value) bool {
+func hasValue(v *authms.Value) bool {
 	return v != nil && v.Value != ""
 }

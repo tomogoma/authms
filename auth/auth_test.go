@@ -63,6 +63,7 @@ type DBHelperMock struct {
 	ExpErr                     error
 	ExpUser                    *authms.User
 	ExpHist                    []*authms.History
+	ExpIsNotFound              bool
 	SaveUserCalled             bool
 	SaveHistoryCalled          bool
 	GetUserCalled              bool
@@ -107,6 +108,9 @@ func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ..
 func (d *DBHelperMock) SaveHistory(*authms.History) error {
 	d.SaveHistoryCalled = true
 	return d.ExpErr
+}
+func (d *DBHelperMock) IsNotFoundErr(err error) bool {
+	return d.ExpIsNotFound
 }
 
 func (d *DBHelperMock) UpdatePhone(userID int64, newPhone *authms.Value) error {
