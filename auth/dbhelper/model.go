@@ -40,6 +40,10 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper
 	return &DBHelper{db: db, gen: pg, hasher: h, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
 }
 
+func (m *DBHelper) IsNotFoundErr(err error) bool {
+	return err == sql.ErrNoRows
+}
+
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
 	if err != nil {
 		return err
