@@ -8,17 +8,6 @@ import (
 	"database/sql"
 )
 
-const (
-	AccessLogin = "LOGIN"
-	AccessRegistration = "REGISTER"
-	AccessUpdate = "UPDATE"
-	AccessVerification = "VERIFICATION"
-	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
-	AccessPassChange = "PASSWORD_CHANGE"
-)
-
-var accessTypes = []string{AccessLogin, AccessRegistration, AccessUpdate, AccessPassChange}
-
 func (m *DBHelper) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
@@ -28,16 +17,17 @@ func (m *DBHelper) SaveHistory(h *authms.History) error {
 		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())
 		 RETURNING id
 	`
-	return m.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
+	err := m.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
 		h.DevID, h.IpAddress).Scan(&h.ID)
+	if err != nil {
+		return errors.Newf("error inserting history: %v", err)
+	}
+	return nil
 }
 
 func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
 	acMFilter := ""
 	for i, acM := range acMs {
-		if err := in(acM, accessTypes); err != nil {
-			return nil, errors.Newf("access type not valid: %v", err)
-		}
 		if i == 0 {
 			acMFilter = fmt.Sprintf("AND (accessMethod = '%s'", acM)
 			continue
@@ -68,28 +58,23 @@ func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) (
 		d.DevID = devID.String
 		d.IpAddress = ipAddr.String
 		if err != nil {
-			return nil, err
+			return nil, errors.Newf("error scanning result row: %v",
+				err)
 		}
 		hists = append(hists, d)
 	}
-	return hists, r.Err()
+	if err := r.Err(); err != nil {
+		return nil, errors.Newf("error iterating resultset: %v", err)
+	}
+	return hists, nil
 }
 
 func validateHistory(h *authms.History) error {
 	if h.UserID < 1 {
 		return errors.New("userID was invalid")
 	}
-	if err := in(h.AccessType, accessTypes); err != nil {
-		return errors.Newf("access type not valid: %v", err)
+	if h.AccessType == "" {
+		return errors.New("access type was empty")
 	}
 	return nil
-}
-
-func in(check string, valids []string) error {
-	for _, valid := range valids {
-		if check == valid {
-			return nil
-		}
-	}
-	return errors.Newf("%s not found in %v", check, valids)
 }

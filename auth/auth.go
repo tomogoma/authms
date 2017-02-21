@@ -56,6 +56,12 @@ type Auth struct {
 
 const (
 	numPrevLogins = 5
+	AccessLogin = "LOGIN"
+	AccessRegistration = "REGISTER"
+	AccessUpdate = "UPDATE"
+	AccessVerification = "VERIFICATION"
+	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
+	AccessPassChange = "PASSWORD_CHANGE"
 )
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
@@ -130,7 +136,7 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if err != nil {
 		return errors.Newf("error persisting user: %v", err)
 	}
-	go a.saveHistory(user, devID, dbhelper.AccessRegistration, rIP, nil)
+	go a.saveHistory(user, devID, AccessRegistration, rIP, nil)
 	return nil
 }
 
@@ -140,7 +146,7 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	}
 	_, err := a.tokenG.ValidateUser(token, int(user.ID))
 	defer func() {
-		go a.saveHistory(user, devID, dbhelper.AccessUpdate, rIP, err)
+		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
 	if err != nil {
 		return err
@@ -166,7 +172,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
-			dbhelper.AccessVerification, rIP, err)
+			AccessVerification, rIP, err)
 	}()
 	if err != nil {
 		return nil, err
@@ -185,7 +191,7 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
-			dbhelper.AccessCodeValidation, rIP, err)
+			AccessCodeValidation, rIP, err)
 	}()
 	if err != nil {
 		return nil, err
@@ -211,7 +217,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	}
 	_, err := a.tokenG.ValidateUser(token, int(user.ID))
 	defer func() {
-		go a.saveHistory(user, devID, dbhelper.AccessUpdate, rIP, err)
+		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
 	if err != nil {
 		return err
@@ -265,7 +271,7 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
 	defer func() {
-		go a.saveHistory(usr, devID, dbhelper.AccessLogin, rIP, loginErr)
+		go a.saveHistory(usr, devID, AccessLogin, rIP, loginErr)
 	}()
 	if loginErr != nil {
 		return loginErr
@@ -282,7 +288,7 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	}
 	usr.Token = tkn.Token()
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
-		dbhelper.AccessLogin)
+		AccessLogin)
 	if loginErr != nil {
 		loginErr = errors.Newf("error fetching login history: %v", loginErr)
 		return loginErr

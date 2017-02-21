@@ -3,7 +3,6 @@ package dbhelper_test
 import (
 	"testing"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/auth/dbhelper"
 )
 
 func TestModel_SaveHistory(t *testing.T) {
@@ -29,7 +28,7 @@ func TestModel_SaveHistory(t *testing.T) {
 			Hist: &authms.History{
 				UserID: -1,
 				IpAddress: "127.0.0.1",
-				AccessType: dbhelper.AccessLogin,
+				AccessType: "LOGIN",
 				SuccessStatus: true,
 				DevID: "test-app-id",
 			},
@@ -40,18 +39,18 @@ func TestModel_SaveHistory(t *testing.T) {
 			Hist: &authms.History{
 				UserID: 1,
 				IpAddress: "127.0.0.1",
-				AccessType: dbhelper.AccessLogin,
+				AccessType: "LOGIN",
 				SuccessStatus: true,
 				DevID: "test-app-id",
 			},
 		},
 		{
-			Desc: "Invalid access type",
+			Desc: "Empty access type",
 			ExpErr: true,
 			Hist: &authms.History{
 				UserID: usr.ID,
 				IpAddress: "127.0.0.1",
-				AccessType: "invalid-access-type",
+				AccessType: "",
 				SuccessStatus: true,
 				DevID: "test-app-id",
 			},
@@ -102,7 +101,7 @@ func TestModel_GetHistory(t *testing.T) {
 		{
 			Desc: "Missing devID, IP Addr",
 			Hist: &authms.History{
-				AccessType: dbhelper.AccessLogin,
+				AccessType: "LOGIN",
 				SuccessStatus: true,
 			},
 		},
@@ -151,7 +150,7 @@ func completeHistory(userID int64) *authms.History {
 	return &authms.History{
 		UserID: userID,
 		IpAddress: "127.0.0.1",
-		AccessType: dbhelper.AccessLogin,
+		AccessType: "LOGIN",
 		SuccessStatus: true,
 		DevID: "test-app-id",
 	}
