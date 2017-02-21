@@ -37,8 +37,8 @@ var ErrorEmptyPassword = errors.New("password cannot be empty")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
 func (m *DBHelper) SaveUser(u *authms.User) error {
-	if err := validateUser(u); err != nil {
-		return err
+	if u == nil {
+		return errors.New("user was nil")
 	}
 	passHB, err := m.getPasswordHash(u)
 	if err != nil {
@@ -122,7 +122,7 @@ func (m *DBHelper) GetByAppUserID(appName, appUserID string) (*authms.User, erro
 
 func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
 	if newUserName == "" {
-		return errors.NewClient("the userName provided was invlaid")
+		return errors.New("the userName provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM userNames WHERE userID=$1`
 	var count int
@@ -143,8 +143,8 @@ func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
 }
 
 func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
-	if err := validateOAuth(new); err != nil {
-		return err
+	if new == nil {
+		return errors.New("new OAuth was nil")
 	}
 	q := `SELECT COUNT(id) FROM appUserIDs WHERE userID=$1 AND appName=$2`
 	var count int
@@ -166,7 +166,7 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 
 func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	if !HasValue(newEmail) {
-		return errors.NewClient("the email provided was invlaid")
+		return errors.New("the email provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM emails WHERE userID=$1`
 	var count int
@@ -188,7 +188,7 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 
 func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	if !HasValue(newPhone) {
-		return errors.NewClient("the phone provided was invlaid")
+		return errors.New("the phone provided was invlaid")
 	}
 	q := `SELECT COUNT(id) FROM phones WHERE userID=$1`
 	var count int
@@ -314,10 +314,11 @@ func (m *DBHelper) validatePassword(id int64, password string) error {
 
 func (m *DBHelper) getPasswordHash(u *authms.User) ([]byte, error) {
 	passStr := u.Password
-	if passStr == "" && !havePasswordComboAuth(u) {
+	if passStr == "" {
 		passB, err := m.gen.SecureRandomString(36)
 		if err != nil {
-			return nil, err
+			return nil, errors.Newf("error generating password: %v",
+				err)
 		}
 		passStr = string(passB)
 	}
@@ -332,50 +333,6 @@ func extractDuplicateError(err error) error {
 		return ErrorUserExists
 	}
 	return err
-}
-
-func havePasswordComboAuth(u *authms.User) bool {
-	return HasValue(u.Phone) || HasValue(u.Email) || u.UserName != ""
-}
-
-func validateUser(u *authms.User) error {
-	if u == nil {
-		return errors.NewClient("user was not provided")
-	}
-	hasPhone := HasValue(u.Phone)
-	hasMail := HasValue(u.Email)
-	if u.UserName == "" && !hasPhone && !hasMail && u.OAuths == nil {
-		return errors.NewClient("A user must have at least one" +
-			" identifier (UserName, Phone, Email, OAuthApp")
-	}
-	if havePasswordComboAuth(u) && u.Password == "" {
-		return ErrorEmptyPassword
-	}
-	for name, oauth := range u.OAuths {
-		if name != oauth.AppName {
-			return errors.NewClient("an OAuth key did not match AppName")
-		}
-		if err := validateOAuth(oauth); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func validateOAuth(oa *authms.OAuth) error {
-	if oa == nil {
-		return errors.NewClient("OAuth was not provided")
-	}
-	if oa.AppName == "" {
-		return errors.NewClient("AppName was not provided")
-	}
-	if oa.AppToken == "" {
-		return errors.NewClient("AppToken was not provided")
-	}
-	if oa.AppUserID == "" {
-		return errors.NewClient("AppUserID was not provided")
-	}
-	return nil
 }
 
 func HasValue(v *authms.Value) bool {

@@ -61,7 +61,6 @@ const (
 	AccessUpdate = "UPDATE"
 	AccessVerification = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
-	AccessPassChange = "PASSWORD_CHANGE"
 )
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
@@ -111,8 +110,8 @@ oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
 }
 
 func (a *Auth) Register(user *authms.User, devID, rIP string) error {
-	if user == nil {
-		return errors.NewClient("user was empty")
+	if err := validateUser(user); err != nil {
+		return err
 	}
 	if devID == "" {
 		return errors.NewClient("Dev ID was empty")
@@ -325,4 +324,48 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 	if err != nil {
 		a.logger.Error("unable to save auth history entry (' %+v '): %s", h, err)
 	}
+}
+
+func havePasswordComboAuth(u *authms.User) bool {
+	return dbhelper.HasValue(u.Phone) || dbhelper.HasValue(u.Email) || u.UserName != ""
+}
+
+func validateUser(u *authms.User) error {
+	if u == nil {
+		return errors.NewClient("user was not provided")
+	}
+	hasPhone := dbhelper.HasValue(u.Phone)
+	hasMail := dbhelper.HasValue(u.Email)
+	if u.UserName == "" && !hasPhone && !hasMail && u.OAuths == nil {
+		return errors.NewClient("A user must have at least one" +
+			" identifier (UserName, Phone, Email, OAuthApp")
+	}
+	if havePasswordComboAuth(u) && u.Password == "" {
+		return errors.NewClient("password was not provided")
+	}
+	for name, oa := range u.OAuths {
+		if name != oa.AppName {
+			return errors.NewClient("an OAuth key did not match AppName")
+		}
+		if err := validateOAuth(oa); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateOAuth(oa *authms.OAuth) error {
+	if oa == nil {
+		return errors.NewClient("OAuth was not provided")
+	}
+	if oa.AppName == "" {
+		return errors.NewClient("AppName was not provided")
+	}
+	if oa.AppToken == "" {
+		return errors.NewClient("AppToken was not provided")
+	}
+	if oa.AppUserID == "" {
+		return errors.NewClient("AppUserID was not provided")
+	}
+	return nil
 }

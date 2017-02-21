@@ -159,7 +159,7 @@ func TestAuth_Register(t *testing.T) {
 	cases := []RegisterTestCase{
 		{
 			Desc: "Valid args",
-			User: &authms.User{ID: 123},
+			User: &authms.User{ID: 123, UserName:"some-name", Password:"some-password"},
 			OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{T: t},
 			ExpErr: false,
@@ -173,7 +173,9 @@ func TestAuth_Register(t *testing.T) {
 					appName: {
 						AppName: appName,
 						AppUserID: "1",
-						Verified:true},
+						Verified:true,
+						AppToken: "some-app-token",
+					},
 				},
 				Phone: &authms.Value{Verified:true},
 				Email: &authms.Value{Verified:true},
@@ -194,7 +196,11 @@ func TestAuth_Register(t *testing.T) {
 			User: &authms.User{
 				ID: 123,
 				OAuths: map[string]*authms.OAuth{
-					appName: {AppName: appName, AppUserID: "test-oauth-app-uid"},
+					appName: {
+						AppName: appName,
+						AppUserID: "test-oauth-app-uid",
+						AppToken: "some-test-app-token",
+					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
