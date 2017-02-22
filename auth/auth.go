@@ -49,6 +49,7 @@ type Auth struct {
 	logger        Logger
 	oAuthHandler  OAuthHandler
 	phoneVerifier PhoneVerifier
+	errors.IsClientErrorer
 }
 
 const (
@@ -156,7 +157,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	}
 	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
 	if err != nil {
-		return nil, errors.Newf("unable to send SMS code: %v", err)
+		return nil, err
 	}
 	return vs, nil
 }
@@ -255,11 +256,6 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 func (a *Auth) IsAuthError(err error) bool {
 	errC, ok := err.(errors.Error)
 	return ok && errC.Auth()
-}
-
-func (a *Auth) IsClientError(err error) bool {
-	errC, ok := err.(errors.Error)
-	return ok && errC.Client()
 }
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {

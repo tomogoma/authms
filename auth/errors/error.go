@@ -1,13 +1,17 @@
 package errors
 
 import (
+	"github.com/tomogoma/go-commons/errors"
 	"fmt"
 )
 
 type Error struct {
 	IsAuthErr bool
-	IsClErr   bool
 	Message   string
+}
+
+type IsClientErrorer struct {
+	errors.IsClientErrorer
 }
 
 func (e Error) Error() string {
@@ -18,35 +22,29 @@ func (e Error) Auth() bool {
 	return e.IsAuthErr
 }
 
-func (e Error) Client() bool {
-	return e.IsClErr
+func NewAuth(message string) error {
+	return Error{Message: message, IsAuthErr: true}
 }
 
-func New(message string) Error {
-	return Error{Message:message, IsClErr: false}
-}
-
-func Newf(format string, a... interface{}) Error {
-	message := fmt.Sprintf(format, a...)
-	return New(message)
-}
-
-func NewClient(message string) Error {
-	return Error{Message: message, IsClErr: true}
-}
-
-func NewClientf(format string, a... interface{}) Error {
-	message := fmt.Sprintf(format, a...)
-	return NewClient(message)
-}
-
-func NewAuth(message string) Error {
-	return Error{Message: message, IsClErr: true, IsAuthErr: true}
-}
-
-func NewAuthf(format string, a... interface{}) Error {
+func NewAuthf(format string, a... interface{}) error {
 	message := fmt.Sprintf(format, a...)
 	return NewAuth(message)
+}
+
+func New(message string) error {
+	return errors.New(message)
+}
+
+func Newf(format string, a... interface{}) error {
+	return errors.Newf(format, a)
+}
+
+func NewClient(message string) error {
+	return errors.NewClient(message)
+}
+
+func NewClientf(format string, a... interface{}) error {
+	return errors.NewClientf(format, a)
 }
 
 

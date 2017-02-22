@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"net/url"
 	"strings"
+	"encoding/json"
 )
 
 const (
@@ -24,6 +25,24 @@ type Config interface {
 	TwilioTokenKeyFile() string
 	TwilioSenderPhone() string
 	TwilioTestNumber() string
+}
+
+const (
+	phoneBlockedRcv = 30004
+	unknownPhone = 30005
+	unreachablePhone = 3006
+	invalidPhone = 21211
+	invalidTrialPhone = 14111
+	phoneNoSMS = 21407
+)
+
+var rcvErrors = map[int]string{
+	phoneBlockedRcv:"the phone provided is blocked",
+	unknownPhone:"the phone provided is unknown",
+	unreachablePhone: "the phone provided is unreachable",
+	invalidPhone: "the phone provided is invalid",
+	invalidTrialPhone: "the phone provided is invalid",
+	phoneNoSMS: "the phone provided cannot receive SMS",
 }
 
 type SMS struct {
@@ -72,6 +91,16 @@ func (s *SMS) SMS(toPhone, message string) error {
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
+		type ResponseError struct {
+			Code    int `json:"code"`
+			Message string `json:"message"`
+		}
+		rErr := ResponseError{}
+		if err := json.Unmarshal(body, &rErr); err == nil {
+			if errMsg, ok := rcvErrors[rErr.Code]; ok {
+				return errors.NewClient(errMsg)
+			}
+		}
 		return errors.Newf("%s: %s", resp.Status, body)
 	}
 	return nil

@@ -81,9 +81,8 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 		return nil, errors.Newf("error generting SMS token: %v", err)
 	}
 	smsBody := fmt.Sprintf(v.config.MessageFormat(), codeB)
-	fmt.Println(smsBody)
 	if err = v.smser.SMS(toPhone, smsBody); err != nil {
-		return nil, errors.Newf("error sending SMS: %s", err)
+		return nil, err
 	}
 	return &authms.SMSVerificationStatus{
 		Token: token,
@@ -97,7 +96,7 @@ func (v *Verifier) VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.
 	if r == nil {
 		return nil, errors.New("request was empty")
 	}
-	token, err := v.tokener.ValidateClaims(r.Token, &Claims{})
+	token, err := v.tokener.ValidateClaims(r.SmsToken, &Claims{})
 	if err != nil {
 		return nil, errors.NewClientf("invalid token: %v", err)
 	}

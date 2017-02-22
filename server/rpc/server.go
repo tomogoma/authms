@@ -115,6 +115,7 @@ func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSV
 		if s.auth.IsClientError(err) {
 			resp.Detail = err.Error()
 			resp.Code = http.StatusBadRequest
+			return nil
 		}
 		s.lg.Error("%d - internal auth error: %s", tID, err)
 		resp.Detail = internalErrorMessage
