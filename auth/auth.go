@@ -28,14 +28,17 @@ type Logger interface {
 
 type DBHelper interface {
 	SaveUser(*authms.User) error
+	SaveHistory(*authms.History) error
+	SaveToken(*token.Token) error
 	GetByUserName(uname, pass string) (*authms.User, error)
 	GetByAppUserID(appName, appUserID string) (*authms.User, error)
-	SaveToken(*token.Token) error
+	GetByPhone(phone, pass string) (*authms.User, error)
+	GetByEmail(email, pass string) (*authms.User, error)
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
-	SaveHistory(*authms.History) error
 	UpdatePhone(userID int64, newPhone *authms.Value) error
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
 	IsNotFoundErr(err error) bool
+	IsDuplicateError(err error) bool
 }
 
 type PhoneVerifier interface {
@@ -112,6 +115,10 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	}
 	err := a.dbHelper.SaveUser(user)
 	if err != nil {
+		if a.dbHelper.IsDuplicateError(err) {
+			return errors.NewClient("a user with some of the" +
+				" provided credentials already exists")
+		}
 		return errors.Newf("error persisting user: %v", err)
 	}
 	go a.saveHistory(user, devID, AccessRegistration, rIP, nil)
@@ -227,9 +234,28 @@ func (a *Auth) LoginUserName(uName, pass, devID, rIP string) (*authms.User, erro
 		return nil, errors.NewClient("Dev ID was empty")
 	}
 	usr, err := a.dbHelper.GetByUserName(uName, pass)
-	if a.dbHelper.IsNotFoundErr(err) {
-		err = errors.NewAuth("invalid credentials")
+	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
+		return nil, err
 	}
+	return usr, nil
+}
+
+func (a *Auth) LoginPhone(phone, pass, devID, rIP string) (*authms.User, error) {
+	if devID == "" {
+		return nil, errors.NewClient("Dev ID was empty")
+	}
+	usr, err := a.dbHelper.GetByPhone(phone, pass)
+	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
+		return nil, err
+	}
+	return usr, nil
+}
+
+func (a *Auth) LoginEmail(email, pass, devID, rIP string) (*authms.User, error) {
+	if devID == "" {
+		return nil, errors.NewClient("Dev ID was empty")
+	}
+	usr, err := a.dbHelper.GetByEmail(email, pass)
 	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
 		return nil, err
 	}
@@ -244,9 +270,6 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 		return nil, err
 	}
 	usr, err := a.dbHelper.GetByAppUserID(app.AppName, app.AppUserID)
-	if a.dbHelper.IsNotFoundErr(err) {
-		err = errors.NewAuth("invalid credentials")
-	}
 	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
 		return nil, err
 	}
@@ -259,6 +282,9 @@ func (a *Auth) IsAuthError(err error) bool {
 }
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
+	if a.dbHelper.IsNotFoundErr(loginErr) {
+		loginErr = errors.NewAuth("invalid credentials")
+	}
 	defer func() {
 		go a.saveHistory(usr, devID, AccessLogin, rIP, loginErr)
 	}()

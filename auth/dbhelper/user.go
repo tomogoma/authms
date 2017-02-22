@@ -25,7 +25,6 @@ type Hasher interface {
 }
 
 var ErrorPasswordMismatch = errors.NewAuth("username/password combo mismatch")
-var ErrorUserExists = errors.NewClient("A user with some of the provided details already exists")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
 func (m *DBHelper) SaveUser(u *authms.User) error {
@@ -77,7 +76,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 		}
 		return nil
 	})
-	return extractDuplicateError(err)
+	return err
 }
 
 func (m *DBHelper) GetByUserName(uName, pass string) (*authms.User, error) {
@@ -225,6 +224,11 @@ func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) err
 	return checkRowsAffected(rslt, err, 1)
 }
 
+func (m *DBHelper) IsDuplicateError(err error) bool {
+	pqErr, ok := err.(*pq.Error)
+	return ok && pqErr.Code == "23505"
+}
+
 func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass string) (
 *authms.User, error) {
 	if getErr != nil {
@@ -315,16 +319,6 @@ func (m *DBHelper) getPasswordHash(u *authms.User) ([]byte, error) {
 		passStr = string(passB)
 	}
 	return m.hasher.Hash(passStr)
-}
-
-func extractDuplicateError(err error) error {
-	if err == nil {
-		return nil
-	}
-	if pqErr, ok := err.(*pq.Error); ok && pqErr.Code == "23505" {
-		return ErrorUserExists
-	}
-	return err
 }
 
 func hasValue(v *authms.Value) bool {

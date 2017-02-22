@@ -73,6 +73,7 @@ type DBHelperMock struct {
 	UpdateAppUserIDCalled      bool
 	T                          *testing.T
 	IgnoreDefaultVerifiedCheck bool
+	ExpIsDuplicate             bool
 }
 
 func (d *DBHelperMock) SaveUser(u *authms.User) error {
@@ -94,6 +95,14 @@ func (d *DBHelperMock) GetByUserName(uname, pass string) (*authms.User, error) {
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
 }
+func (d *DBHelperMock) GetByEmail(email, pass string) (*authms.User, error) {
+	d.GetUserCalled = true
+	return d.ExpUser, d.ExpErr
+}
+func (d *DBHelperMock) GetByPhone(phone, pass string) (*authms.User, error) {
+	d.GetUserCalled = true
+	return d.ExpUser, d.ExpErr
+}
 func (d *DBHelperMock) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
@@ -111,6 +120,9 @@ func (d *DBHelperMock) SaveHistory(*authms.History) error {
 }
 func (d *DBHelperMock) IsNotFoundErr(err error) bool {
 	return d.ExpIsNotFound
+}
+func (d *DBHelperMock) IsDuplicateError(err error) bool {
+	return d.ExpIsDuplicate
 }
 
 func (d *DBHelperMock) UpdatePhone(userID int64, newPhone *authms.Value) error {

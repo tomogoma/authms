@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"testing"
 	"github.com/tomogoma/authms/auth/dbhelper"
-	"github.com/tomogoma/authms/auth/errors"
 )
 
 type UpdateTestCase struct {
@@ -51,17 +50,16 @@ func TestModel_SaveUser_duplicate(t *testing.T) {
 			},
 		},
 	}
-	if err := m.SaveUser(usr); err != nil {
+	err := m.SaveUser(usr)
+	if err != nil {
 		t.Fatalf("model.Save(): %s", err)
 	}
-	err := m.SaveUser(usr)
-	if err != dbhelper.ErrorUserExists {
-		t.Fatalf("Expected error %v but got %v",
-			dbhelper.ErrorUserExists, err)
+	if m.IsDuplicateError(err) {
+		t.Error("Expected no duplicate error assigned on nil error")
 	}
-	check := errors.IsClientErrorer{}
-	if !check.IsClientError(err) {
-		t.Errorf("Expected the error %v to be a client error", err)
+	err = m.SaveUser(usr)
+	if !m.IsDuplicateError(err) {
+		t.Errorf("Expected the error %v to be a duplicate error", err)
 	}
 }
 

@@ -63,11 +63,19 @@ func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, 
 }
 
 func (s *Server) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
-	return errors.New("Not implemented")
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - login user by email...", tID)
+	authUsr, err := s.auth.LoginEmail(req.BasicID, req.Password,
+		req.DeviceID, "")
+	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
 func (s *Server) LoginPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
-	return errors.New("Not implemented")
+	tID := <-s.tIDCh
+	s.lg.Fine("%d - login user by phone...", tID)
+	authUsr, err := s.auth.LoginPhone(req.BasicID, req.Password,
+		req.DeviceID, "")
+	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }
 
 func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
@@ -138,6 +146,7 @@ func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int
 		if s.auth.IsClientError(err) {
 			resp.Detail = err.Error()
 			resp.Code = http.StatusBadRequest
+			return nil
 		}
 		s.lg.Error("%d - internal auth error: %s", tID, err)
 		resp.Detail = internalErrorMessage
