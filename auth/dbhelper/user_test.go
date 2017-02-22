@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"testing"
 	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/auth/errors"
 )
 
 type UpdateTestCase struct {
@@ -34,6 +35,34 @@ func TestModel_SaveUser(t *testing.T) {
 	}
 	dbUsr := fetchUser(usr.ID, t)
 	assertUsersEqual(dbUsr, usr, t)
+}
+
+func TestModel_SaveUser_duplicate(t *testing.T) {
+	setUp(t)
+	defer tearDown(t)
+	m := newModel(t)
+	usr := &authms.User{
+		OAuths: map[string]*authms.OAuth{
+			completeUserAppName: {
+				AppName: completeUserAppName,
+				AppUserID: "test-user-id",
+				AppToken: "test-app.test-user-id.test-token",
+				Verified: true,
+			},
+		},
+	}
+	if err := m.SaveUser(usr); err != nil {
+		t.Fatalf("model.Save(): %s", err)
+	}
+	err := m.SaveUser(usr)
+	if err != dbhelper.ErrorUserExists {
+		t.Fatalf("Expected error %v but got %v",
+			dbhelper.ErrorUserExists, err)
+	}
+	check := errors.IsClientErrorer{}
+	if !check.IsClientError(err) {
+		t.Errorf("Expected the error %v to be a client error", err)
+	}
 }
 
 func TestModel_UpdateAppUserID(t *testing.T) {

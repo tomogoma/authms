@@ -4,7 +4,7 @@ import (
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"fmt"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/authms/auth/errors"
 	"database/sql"
 	"github.com/lib/pq"
 	"github.com/tomogoma/go-commons/auth/token"
@@ -24,16 +24,8 @@ type Hasher interface {
 	CompareHash(pass string, passHB []byte) bool
 }
 
-var ErrorPasswordMismatch = errors.New("username/password combo mismatch")
-var ErrorUserExists = errors.New("A user with some of the provided details already exists")
-var ErrorEmailExists = errors.New("A user with the provided email already exists")
-var ErrorAppIDExists = errors.New("A user with the provided app ID for the provided app name already exists")
-var ErrorPhoneExists = errors.New("A user with the provided phone already exists")
-var ErrorInvalidOAuth = errors.New("the oauth provided was invalid")
-var ErrorEmptyEmail = errors.New("email was empty")
-var ErrorEmptyPhone = errors.New("phone was empty")
-var ErrorEmptyUserName = errors.New("username was empty")
-var ErrorEmptyPassword = errors.New("password cannot be empty")
+var ErrorPasswordMismatch = errors.NewAuth("username/password combo mismatch")
+var ErrorUserExists = errors.NewClient("A user with some of the provided details already exists")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
 func (m *DBHelper) SaveUser(u *authms.User) error {
