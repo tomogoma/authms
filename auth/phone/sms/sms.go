@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 	"encoding/json"
+	"fmt"
 )
 
 const (
@@ -17,7 +18,7 @@ const (
 	formKeyTo = "To"
 	formKeyFrom = "From"
 	formKeyBody = "Body"
-	testMessage = "this is a test message"
+	testMessage = "The SMS API is being used for account %s. This is a test message"
 )
 
 type Config interface {
@@ -59,7 +60,8 @@ func New(c Config) (*SMS, error) {
 		return nil, err
 	}
 	sms := &SMS{config:c, token:token}
-	if err := sms.SMS(c.TwilioTestNumber(), testMessage); err != nil {
+	msg := fmt.Sprintf(testMessage, c.TwilioID())
+	if err := sms.SMS(c.TwilioTestNumber(), msg); err != nil {
 		return nil, errors.Newf("Unable to access twilio, probably" +
 			" SMS config values are invalid?: %s", err)
 	}
