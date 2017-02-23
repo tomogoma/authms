@@ -228,14 +228,22 @@ func TestAuth_Register(t *testing.T) {
 			ExpErr: false,
 			DevID: "test-dev",
 		},
-		{Desc: "Missing DevID", User: &authms.User{}, OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{T: t}, ExpErr: true},
+		{
+			Desc: "Missing DevID",
+			User: &authms.User{ID: 123, UserName:"some-name", Password:"some-password"},
+			OAHandler: &OAuthHandlerMock{},
+			DBHelper: &DBHelperMock{T: t},
+			ExpErr: true},
 	}
 	for _, c := range cases {
 		func() {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
 			err := a.Register(c.User, c.DevID, "")
+			if (c.User != nil && c.User.Password != "") {
+				t.Errorf("%s - expected password to be cleared" +
+					" but was not", c.Desc)
+			}
 			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
 				t.Errorf("%s - validate oath token not called", c.Desc)

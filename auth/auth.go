@@ -95,6 +95,9 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if err := validateUser(user); err != nil {
 		return err
 	}
+	defer func() {
+		user.Password = ""
+	}()
 	if devID == "" {
 		return errors.NewClient("Dev ID was empty")
 	}
