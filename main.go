@@ -18,6 +18,7 @@ import (
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/auth/phone/sms"
+	"time"
 )
 
 const (
@@ -44,7 +45,10 @@ func main() {
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
 	log.SetOutput(defLogWriter{lg: lg})
-	defer runtime.Gosched()
+	defer func() {
+		runtime.Gosched()
+		time.Sleep(100 * time.Millisecond)
+	}()
 	tg, err := token.NewGenerator(conf.Token)
 	if err != nil {
 		lg.Critical("Error instantiating token generator: %s", err)
