@@ -202,6 +202,14 @@ func TestAuth_Register(t *testing.T) {
 			DevID: "test-dev",
 		},
 		{
+			Desc: "Invalid user (has password only)",
+			User: &authms.User{Password:"exp-password-deleted"},
+			OAHandler: &OAuthHandlerMock{},
+			DBHelper: &DBHelperMock{T: t},
+			ExpErr: true,
+			DevID: "test-dev",
+		},
+		{
 			Desc: "Nil user",
 			User: nil, OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{T: t},
@@ -233,7 +241,8 @@ func TestAuth_Register(t *testing.T) {
 			User: &authms.User{ID: 123, UserName:"some-name", Password:"some-password"},
 			OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true},
+			ExpErr: true,
+		},
 	}
 	for _, c := range cases {
 		func() {
