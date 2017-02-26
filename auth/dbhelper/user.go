@@ -79,6 +79,39 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 	return err
 }
 
+func (m *DBHelper) UserExists(u *authms.User) (int64, error) {
+	userID := int64(-1)
+	if u.UserName != "" {
+		q := `SELECT userID FROM userNames WHERE userName=$1`
+		err := m.db.QueryRow(q, u.UserName).Scan(&userID)
+		if err != sql.ErrNoRows {
+			return userID, err
+		}
+	}
+	if hasValue(u.Email) {
+		q := `SELECT userID FROM emails WHERE email=$1`
+		err := m.db.QueryRow(q, u.Email.Value).Scan(&userID)
+		if err != sql.ErrNoRows {
+			return userID, err
+		}
+	}
+	if hasValue(u.Phone) {
+		q := `SELECT userID FROM phones WHERE phone=$1`
+		err := m.db.QueryRow(q, u.Phone.Value).Scan(&userID)
+		if err != sql.ErrNoRows {
+			return userID, err
+		}
+	}
+	for _, oAuth := range u.OAuths {
+		q := `SELECT userID FROM appUserIDs WHERE appName=$1 AND appUserID=$2`
+		err := m.db.QueryRow(q, oAuth.AppName, oAuth.AppUserID).Scan(&userID)
+		if err != sql.ErrNoRows {
+			return userID, err
+		}
+	}
+	return -1, nil
+}
+
 func (m *DBHelper) GetByUserName(uName, pass string) (*authms.User, error) {
 	where := "usernames.userName = $1"
 	usr, err := m.get(where, uName)

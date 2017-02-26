@@ -5,6 +5,8 @@ import (
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/authms/auth/errors"
+	"regexp"
+	"strings"
 )
 
 type OAuthHandler interface {
@@ -27,6 +29,7 @@ type Logger interface {
 }
 
 type DBHelper interface {
+	UserExists(u *authms.User) (int64, error)
 	SaveUser(*authms.User) error
 	SaveHistory(*authms.History) error
 	SaveToken(*token.Token) error
@@ -62,6 +65,7 @@ const (
 	AccessUpdate = "UPDATE"
 	AccessVerification = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
+	numExp = `[0-9]+`
 )
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
@@ -69,6 +73,7 @@ var ErrorNilLogger = errors.New("Logger was nil")
 var ErrorNilDBHelper = errors.New("DBHelper was nil")
 var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
 var ErrorNilPhoneVerifier = errors.New("PhoneVerifier was nil")
+var rePhone = regexp.MustCompile(numExp);
 
 func New(tg TokenGenerator, lg Logger, db DBHelper,
 oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
@@ -113,10 +118,14 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 		user.OAuths[appName].Verified = true
 	}
 	if user.Phone != nil {
+		user.Phone.Value = formatPhone(user.Phone.Value)
 		user.Phone.Verified = false
 	}
 	if user.Email != nil {
 		user.Email.Verified = false
+	}
+	if err := a.checkUserExists(user); err != nil {
+		return err
 	}
 	err := a.dbHelper.SaveUser(user)
 	if err != nil {
@@ -147,7 +156,11 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	if devID == "" {
 		return errors.NewClient("device ID was empty")
 	}
+	user.Phone.Value = formatPhone(user.Phone.Value)
 	user.Phone.Verified = false
+	if err := a.checkUserExists(user); err != nil {
+		return err
+	}
 	err = a.dbHelper.UpdatePhone(user.ID, user.Phone)
 	if err != nil {
 		return errors.Newf("error persisting phone update: %v", err)
@@ -166,6 +179,14 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	}()
 	if err != nil {
 		return nil, errors.NewAuthf("invalid token: %v", err)
+	}
+	req.Phone = formatPhone(req.Phone)
+	testExistsUsr := &authms.User{
+		ID: req.UserID,
+		Phone: &authms.Value{Value: req.Phone},
+	}
+	if err := a.checkUserExists(testExistsUsr); err != nil {
+		return nil, err
 	}
 	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
 	if err != nil {
@@ -192,7 +213,14 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 	}
 	phone := &authms.Value{
 		Verified: vs.Verified,
-		Value: vs.Phone,
+		Value: formatPhone(vs.Phone),
+	}
+	testExistsUsr := &authms.User{
+		ID: req.UserID,
+		Phone: phone,
+	}
+	if err := a.checkUserExists(testExistsUsr); err != nil {
+		return nil, err
 	}
 	err = a.dbHelper.UpdatePhone(req.UserID, phone)
 	if err != nil {
@@ -223,6 +251,9 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 		return errors.NewClient("device ID was empty")
 	}
 	oa.Verified = true
+	if err := a.checkUserExists(user); err != nil {
+		return err
+	}
 	err = a.dbHelper.UpdateAppUserID(user.ID, oa)
 	if err != nil {
 		return errors.Newf("error persisting OAuth changes: %v", err)
@@ -249,6 +280,7 @@ func (a *Auth) LoginPhone(phone, pass, devID, rIP string) (*authms.User, error) 
 	if devID == "" {
 		return nil, errors.NewClient("Dev ID was empty")
 	}
+	phone = formatPhone(phone)
 	usr, err := a.dbHelper.GetByPhone(phone, pass)
 	if err = a.processLoginResults(usr, devID, rIP, err); err != nil {
 		return nil, err
@@ -284,6 +316,18 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 func (a *Auth) IsAuthError(err error) bool {
 	errC, ok := err.(errors.Error)
 	return ok && errC.Auth()
+}
+
+func (a *Auth) checkUserExists(user *authms.User) error {
+	existUsrID, err := a.dbHelper.UserExists(user)
+	if err != nil {
+		return errors.Newf("Error checking if user exists")
+	}
+	if existUsrID >= 1 && user.ID != existUsrID {
+		return errors.NewClient("A user with some of the provided" +
+			" credentials already exists")
+	}
+	return nil
 }
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
@@ -345,6 +389,18 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 	if err != nil {
 		a.logger.Error("unable to save auth history entry (' %+v '): %s", h, err)
 	}
+}
+
+func formatPhone(phone string) string {
+	parts := rePhone.FindAllString(phone, -1)
+	formatted := ""
+	if strings.HasPrefix(phone, "+") {
+		formatted = "+"
+	}
+	for _, part := range parts {
+		formatted = formatted + part
+	}
+	return formatted
 }
 
 func havePasswordComboAuth(u *authms.User) bool {

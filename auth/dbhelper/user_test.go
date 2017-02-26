@@ -103,6 +103,73 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 	}
 }
 
+func TestDBHelper_UserExists(t *testing.T) {
+	type TestCase struct {
+		Desc       string
+		InsertUser *authms.User
+		TestUser   *authms.User
+		ExpExists  bool
+	}
+	cmpltUsr := completeUser()
+	tcs := []TestCase{
+		{
+			Desc: "Not exist",
+			InsertUser: nil,
+			TestUser: cmpltUsr,
+			ExpExists: false,
+		},
+		{
+			Desc: "UserName Exists",
+			InsertUser: cmpltUsr,
+			TestUser: &authms.User{UserName: cmpltUsr.UserName},
+			ExpExists: true,
+		},
+		{
+			Desc: "Phone Exists",
+			InsertUser: cmpltUsr,
+			TestUser: &authms.User{Phone: cmpltUsr.Phone},
+			ExpExists: true,
+		},
+		{
+			Desc: "Email Exists",
+			InsertUser: cmpltUsr,
+			TestUser: &authms.User{Email: cmpltUsr.Email},
+			ExpExists: true,
+		},
+		{
+			Desc: "OAuth Exists",
+			InsertUser: cmpltUsr,
+			TestUser: &authms.User{OAuths: cmpltUsr.OAuths},
+			ExpExists: true,
+		},
+	}
+	for _, tc := range tcs {
+		func() {
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			if tc.InsertUser != nil {
+				insertUser(tc.InsertUser, t)
+			}
+			usrID, err := m.UserExists(tc.TestUser)
+			if err != nil {
+				t.Errorf("%s - dbhelper.UserExists(): %v",
+					tc.Desc, err)
+				return
+			}
+			if tc.ExpExists && usrID != tc.InsertUser.ID {
+				t.Errorf("%s - expected existing userID %d " +
+					"but got %d", tc.Desc, tc.InsertUser.ID,
+					usrID)
+			}
+			if !tc.ExpExists && usrID != -1 {
+				t.Errorf("%s - expected non-existing userID -1" +
+					" but got %d", tc.Desc, usrID)
+			}
+		}()
+	}
+}
+
 func TestModel_UpdatePhone(t *testing.T) {
 	bareBoneUser := &authms.User{
 		UserName: "test-username",
