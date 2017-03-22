@@ -63,6 +63,7 @@ type DBHelperMock struct {
 	ExpErr                     error
 	ExpUser                    *authms.User
 	ExpHist                    []*authms.History
+	ExpUserID                  int64
 	ExpIsNotFound              bool
 	SaveUserCalled             bool
 	SaveHistoryCalled          bool
@@ -144,6 +145,10 @@ func (d *DBHelperMock)UpdateAppUserID(userID int64, new *authms.OAuth) error {
 		d.T.Error("expected OAuth verified=true but got false")
 	}
 	return d.ExpErr
+}
+
+func (d *DBHelperMock) UserExists(u *authms.User) (int64, error) {
+	return d.ExpUserID, d.ExpErr
 }
 
 type RegisterTestCase struct {

@@ -11,7 +11,7 @@ type Error struct {
 }
 
 type IsClientErrorer struct {
-	errors.IsClientErrorer
+	errors.ClErrCheck
 }
 
 func (e Error) Error() string {
