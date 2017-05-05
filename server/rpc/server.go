@@ -80,7 +80,7 @@ func (s *Server) LoginPhone(c context.Context, req *authms.BasicAuthRequest, res
 
 func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
 	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user by OAuth...", tID)
+	s.lg.Fine("%d - login user by OAuth... %+v", tID, c)
 	authUsr, err := s.auth.LoginOAuth(req.OAuth, req.DeviceID, "")
 	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
 }

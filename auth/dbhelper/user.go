@@ -4,19 +4,14 @@ import (
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"fmt"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/auth/errors"
 	"database/sql"
 	"github.com/lib/pq"
-	"github.com/tomogoma/go-commons/auth/token"
 	"log"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 type PasswordGenerator interface {
 	SecureRandomString(length int) ([]byte, error)
-}
-
-type TokenValidator interface {
-	Validate(tokenStr string) (*token.Token, error)
 }
 
 type Hasher interface {
@@ -263,7 +258,7 @@ func (m *DBHelper) IsDuplicateError(err error) bool {
 }
 
 func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass string) (
-*authms.User, error) {
+	*authms.User, error) {
 	if getErr != nil {
 		return usr, getErr
 	}
@@ -273,10 +268,10 @@ func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass stri
 	return usr, nil
 }
 
-func (m *DBHelper) get(where string, whereArgs... interface{}) (*authms.User, error) {
+func (m *DBHelper) get(where string, whereArgs ... interface{}) (*authms.User, error) {
 	usr := &authms.User{
-		Email: &authms.Value{},
-		Phone: &authms.Value{},
+		Email:  &authms.Value{},
+		Phone:  &authms.Value{},
 		OAuths: make(map[string]*authms.OAuth),
 	}
 	query := `

@@ -4,16 +4,14 @@ import (
 	"github.com/tomogoma/go-commons/errors"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"database/sql"
-	"github.com/tomogoma/go-commons/auth/token"
 )
 
 type DBHelper struct {
-	db          *sql.DB
-	hasher      Hasher
-	gen         PasswordGenerator
-	tokenSaveCh chan *token.Token
-	tokenDelCh  chan string
-	gcRunning   bool
+	db        *sql.DB
+	hasher    Hasher
+	gen       PasswordGenerator
+	gcRunning bool
+	errors.NotFoundErrCheck
 }
 
 var ErrorNilHashFunc = errors.New("HashFunc cannot be nil")
@@ -31,17 +29,10 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper
 		return nil, errors.Newf("error connecting to db: %s", err)
 	}
 	if err := cockroach.InstantiateDB(db, dsnF.DBName(), users, usernames,
-		emails, phones, appUserIDs, history, tokens, historyUpdate1,
-		historyUpdate2, historyUpdate3); err != nil {
+		emails, phones, appUserIDs, history); err != nil {
 		return nil, errors.Newf("error instantiating db: %s", err)
 	}
-	iCh := make(chan *token.Token)
-	dCh := make(chan string)
-	return &DBHelper{db: db, gen: pg, hasher: h, tokenSaveCh: iCh, tokenDelCh: dCh}, nil
-}
-
-func (m *DBHelper) IsNotFoundErr(err error) bool {
-	return err == sql.ErrNoRows
+	return &DBHelper{db: db, gen: pg, hasher: h}, nil
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {

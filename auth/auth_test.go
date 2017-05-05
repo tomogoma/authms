@@ -14,13 +14,15 @@ import (
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 	"runtime"
+	"github.com/tomogoma/authms/claim"
+	"time"
 )
 
 type TokenConfigMock struct {
 	TknKyFile string `yaml:"tokenKeyFile,omitempty"`
 }
 
-func (c TokenConfigMock) TokenKeyFile() string {
+func (c TokenConfigMock) KeyFile() string {
 	return c.TknKyFile
 }
 
@@ -68,7 +70,6 @@ type DBHelperMock struct {
 	SaveUserCalled             bool
 	SaveHistoryCalled          bool
 	GetUserCalled              bool
-	SaveTokenCalled            bool
 	UpdatePhoneCalled          bool
 	UpdatePassCalled           bool
 	UpdateAppUserIDCalled      bool
@@ -108,10 +109,6 @@ func (d *DBHelperMock) GetByAppUserID(appName, appUserID string) (*authms.User, 
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
 }
-func (d *DBHelperMock) SaveToken(*token.Token) error {
-	d.SaveTokenCalled = true
-	return d.ExpErr
-}
 func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error) {
 	return d.ExpHist, d.ExpErr
 }
@@ -119,7 +116,7 @@ func (d *DBHelperMock) SaveHistory(*authms.History) error {
 	d.SaveHistoryCalled = true
 	return d.ExpErr
 }
-func (d *DBHelperMock) IsNotFoundErr(err error) bool {
+func (d *DBHelperMock) IsNotFoundError(err error) bool {
 	return d.ExpIsNotFound
 }
 func (d *DBHelperMock) IsDuplicateError(err error) bool {
@@ -139,7 +136,7 @@ func (d *DBHelperMock) UpdatePassword(userID int64, oldPass, newPassword string)
 	return d.ExpErr
 }
 
-func (d *DBHelperMock)UpdateAppUserID(userID int64, new *authms.OAuth) error {
+func (d *DBHelperMock) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	d.UpdateAppUserIDCalled = true
 	if new.Verified == false {
 		d.T.Error("expected OAuth verified=true but got false")
@@ -158,11 +155,11 @@ type RegisterTestCase struct {
 	DBHelper  *DBHelperMock
 	ExpErr    bool
 	DevID     string
-	Token     *token.Token
+	Token     string
 }
 
 var conf = &ConfigMock{}
-var tokenGen *token.Generator
+var tokenGen *token.JWTHandler
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml",
 	"/path/to/config/file.conf.yml")
 
@@ -179,12 +176,12 @@ func TestAuth_Register(t *testing.T) {
 	appName := "test-app"
 	cases := []RegisterTestCase{
 		{
-			Desc: "Valid args",
-			User: &authms.User{ID: 123, UserName:"some-name", Password:"some-password"},
+			Desc:      "Valid args",
+			User:      &authms.User{ID: 123, UserName: "some-name", Password: "some-password"},
 			OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: "test-dev",
+			DBHelper:  &DBHelperMock{T: t},
+			ExpErr:    false,
+			DevID:     "test-dev",
 		},
 		{
 			Desc: "Valid args, verified=true",
@@ -192,61 +189,61 @@ func TestAuth_Register(t *testing.T) {
 				ID: 123,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: "1",
-						Verified:true,
-						AppToken: "some-app-token",
+						Verified:  true,
+						AppToken:  "some-app-token",
 					},
 				},
-				Phone: &authms.Value{Verified:true},
-				Email: &authms.Value{Verified:true},
+				Phone: &authms.Value{Verified: true},
+				Email: &authms.Value{Verified: true},
 			},
-			OAHandler: &OAuthHandlerMock{AppUserID:"1", ExpValid:true},
-			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: "test-dev",
+			OAHandler: &OAuthHandlerMock{AppUserID: "1", ExpValid: true},
+			DBHelper:  &DBHelperMock{T: t},
+			ExpErr:    false,
+			DevID:     "test-dev",
 		},
 		{
-			Desc: "Invalid user (has password only)",
-			User: &authms.User{Password:"exp-password-deleted"},
+			Desc:      "Invalid user (has password only)",
+			User:      &authms.User{Password: "exp-password-deleted"},
 			OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: "test-dev",
+			DBHelper:  &DBHelperMock{T: t},
+			ExpErr:    true,
+			DevID:     "test-dev",
 		},
 		{
-			Desc: "Nil user",
-			User: nil, OAHandler: &OAuthHandlerMock{},
+			Desc:     "Nil user",
+			User:     nil, OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: "test-dev"},
+			ExpErr:   true,
+			DevID:    "test-dev"},
 		{
 			Desc: "OAuth user",
 			User: &authms.User{
 				ID: 123,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: "test-oauth-app-uid",
-						AppToken: "some-test-app-token",
+						AppToken:  "some-test-app-token",
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
 				ExpValTknClld: true,
-				ExpValid:true,
-				AppUserID: "test-oauth-app-uid",
+				ExpValid:      true,
+				AppUserID:     "test-oauth-app-uid",
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: "test-dev",
+			ExpErr:   false,
+			DevID:    "test-dev",
 		},
 		{
-			Desc: "Missing DevID",
-			User: &authms.User{ID: 123, UserName:"some-name", Password:"some-password"},
+			Desc:      "Missing DevID",
+			User:      &authms.User{ID: 123, UserName: "some-name", Password: "some-password"},
 			OAHandler: &OAuthHandlerMock{},
-			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
+			DBHelper:  &DBHelperMock{T: t},
+			ExpErr:    true,
 		},
 	}
 	for _, c := range cases {
@@ -254,8 +251,8 @@ func TestAuth_Register(t *testing.T) {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
 			err := a.Register(c.User, c.DevID, "")
-			if (c.User != nil && c.User.Password != "") {
-				t.Errorf("%s - expected password to be cleared" +
+			if c.User != nil && c.User.Password != "" {
+				t.Errorf("%s - expected password to be cleared"+
 					" but was not", c.Desc)
 			}
 			runtime.Gosched()
@@ -264,7 +261,7 @@ func TestAuth_Register(t *testing.T) {
 			}
 			if c.ExpErr {
 				if err == nil {
-					t.Errorf("%s - Expected an error but" +
+					t.Errorf("%s - Expected an error but"+
 						" got nil", c.Desc)
 				}
 				return
@@ -282,48 +279,54 @@ func TestAuth_Register(t *testing.T) {
 	}
 }
 
-func TestAuth_UpdatePhone(t *testing.T) {
-	usrID := int64(123)
-	devID := "test-dev"
-	tkn, err := tokenGen.Generate(int(usrID), devID, token.ShortExpType)
+func genToken(t *testing.T, usrID int64, devID string) string {
+	clm := claim.NewAuth(usrID, devID, 1*time.Hour)
+	tkn, err := tokenGen.Generate(clm)
 	if err != nil {
 		t.Fatalf("Error setting up: token.Generate(): %v", err)
 	}
+	return tkn
+}
+
+func TestAuth_UpdatePhone(t *testing.T) {
+	usrID := int64(123)
+	devID := "test-dev"
+	tkn := genToken(t, usrID, devID)
 	cases := []RegisterTestCase{
 		{
 			Desc: "Valid phone",
 			User: &authms.User{
-				ID: usrID,
-				Phone: &authms.Value{Value:"+254123456789"},
+				ID:    usrID,
+				Phone: &authms.Value{Value: "+254123456789"},
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   false,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Valid phone and verified=true (exp verified=false sent to dbhelper)",
 			User: &authms.User{
 				ID: usrID,
 				Phone: &authms.Value{
-					Value:"+254123456789",
-					Verified:true},
+					Value:    "+254123456789",
+					Verified: true},
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   false,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Invalid phone",
 			User: &authms.User{
-				ID: usrID,
+				ID:    usrID,
 				Phone: &authms.Value{},
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "nil phone",
@@ -331,48 +334,48 @@ func TestAuth_UpdatePhone(t *testing.T) {
 				ID: usrID,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
-			Desc: "nil user",
+			Desc:     "nil user",
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "no userID",
 			User: &authms.User{
-				Phone: &authms.Value{Value:"+254123456789"},
+				Phone: &authms.Value{Value: "+254123456789"},
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Invalid token",
 			User: &authms.User{
-				ID: usrID + 5,
-				Phone: &authms.Value{Value:"+254123456789"},
+				ID:    usrID + 5,
+				Phone: &authms.Value{Value: "+254123456789"},
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 	}
 	for _, c := range cases {
 		func() {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
-			err := a.UpdatePhone(c.User, c.Token.Token(), c.DevID, "")
+			err := a.UpdatePhone(c.User, c.Token, c.DevID, "")
 			runtime.Gosched()
 			if c.ExpErr {
 				if err == nil {
-					t.Errorf("%s - Expected an error but" +
+					t.Errorf("%s - Expected an error but"+
 						" got nil", c.Desc)
 				}
 				return
@@ -393,10 +396,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 func TestAuth_UpdateOAuth(t *testing.T) {
 	usrID := int64(123)
 	devID := "test-dev"
-	tkn, err := tokenGen.Generate(int(usrID), devID, token.ShortExpType)
-	if err != nil {
-		t.Fatalf("Error setting up: token.Generate(): %v", err)
-	}
+	tkn := genToken(t, usrID, devID)
 	appName := "test-app"
 	appUsrID := "test-app-userID"
 	cases := []RegisterTestCase{
@@ -406,21 +406,21 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
-				AppUserID: appUsrID,
+				ExpErr:        nil,
+				ExpValid:      true,
+				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   false,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Mismatched OAuth names",
@@ -428,7 +428,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 				OAuths: map[string]*authms.OAuth{
 					"mismatched-name": {
-						AppName: "mismatched-name",
+						AppName:   "mismatched-name",
 						AppUserID: appUsrID,
 					},
 				},
@@ -437,9 +437,9 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ExpValTknClld: false,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "missing app user ID",
@@ -450,35 +450,35 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
-				AppUserID: appUsrID,
+				ExpErr:        nil,
+				ExpValid:      true,
+				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Missing user ID",
 			User: &authms.User{
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
+				ExpErr:    nil,
+				ExpValid:  true,
 				AppUserID: appUsrID,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Nil OAuth",
@@ -486,14 +486,14 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
+				ExpErr:    nil,
+				ExpValid:  true,
 				AppUserID: appUsrID,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Valid OAuth and verified=true (exp dbhelper to be passed to false)",
@@ -501,22 +501,22 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
-						Verified: true,
+						Verified:  true,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
-				AppUserID: appUsrID,
+				ExpErr:        nil,
+				ExpValid:      true,
+				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   false,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Invalid token",
@@ -524,20 +524,20 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID + 5,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
+				ExpErr:    nil,
+				ExpValid:  true,
 				AppUserID: appUsrID,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "OAuth report error",
@@ -545,21 +545,21 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: errors.New(""),
-				ExpValid: true,
-				AppUserID: appUsrID,
+				ExpErr:        errors.New(""),
+				ExpValid:      true,
+				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: devID,
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    devID,
+			Token:    tkn,
 		},
 		{
 			Desc: "Missing device ID",
@@ -567,34 +567,34 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				ID: usrID,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:   appName,
 						AppUserID: appUsrID,
 					},
 				},
 			},
 			OAHandler: &OAuthHandlerMock{
-				ExpErr: nil,
-				ExpValid: true,
+				ExpErr:    nil,
+				ExpValid:  true,
 				AppUserID: appUsrID,
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: true,
-			DevID: "",
-			Token: tkn,
+			ExpErr:   true,
+			DevID:    "",
+			Token:    tkn,
 		},
 	}
 	for _, c := range cases {
 		func() {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
-			err := a.UpdateOAuth(c.User, appName, c.Token.Token(), c.DevID, "")
+			err := a.UpdateOAuth(c.User, appName, c.Token, c.DevID, "")
 			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
 				t.Errorf("%s - validate token was not called", c.Desc)
 			}
 			if c.ExpErr {
 				if err == nil {
-					t.Errorf("%s - Expected an error but" +
+					t.Errorf("%s - Expected an error but"+
 						" got nil", c.Desc)
 				}
 				return
@@ -622,27 +622,24 @@ func TestAuth_VerifyPhone(t *testing.T) {
 	phone := "+254712345678"
 	devID := "test-dev"
 	userID := int64(1234)
-	validToken, err := tokenGen.Generate(int(userID), devID, token.ShortExpType)
-	if err != nil {
-		t.Fatalf("error setting up (generatng token): %v", err)
-	}
+	validToken := genToken(t, userID, devID)
 	tcs := []VerifyTestCase{
 		{
-			Desc: "Successful validation",
+			Desc:   "Successful validation",
 			ExpErr: false,
 			Req: &authms.SMSVerificationRequest{
 				DeviceID: devID,
-				UserID: userID,
-				Token: validToken.Token(),
-				Phone: phone,
+				UserID:   userID,
+				Token:    validToken,
+				Phone:    phone,
 			},
 			PV: &PhoneVerifierMock{
 				ExpErr: nil,
 				ExpStatus: &authms.SMSVerificationStatus{
-					Token: "some-sms-token",
-					Phone: phone,
+					Token:     "some-sms-token",
+					Phone:     phone,
 					ExpiresAt: "2017-02-20T22:07:00+03:00",
-					Verified: false,
+					Verified:  false,
 				},
 			},
 		},
@@ -656,7 +653,7 @@ func TestAuth_VerifyPhone(t *testing.T) {
 			runtime.Gosched()
 			if tc.ExpErr {
 				if err == nil {
-					t.Errorf("%s - expected error but " +
+					t.Errorf("%s - expected error but "+
 						"got nil", tc.Desc)
 				}
 				return
@@ -687,24 +684,21 @@ func TestAuth_VerifyPhoneCode(t *testing.T) {
 	phone := "+254712345678"
 	devID := "test-dev"
 	userID := int64(1234)
-	validToken, err := tokenGen.Generate(int(userID), devID, token.ShortExpType)
-	if err != nil {
-		t.Fatalf("error setting up (generatng token): %v", err)
-	}
+	validToken := genToken(t, userID, devID)
 	tcs := []VerifyTestCase{
 		{
-			Desc: "Successful validation",
+			Desc:   "Successful validation",
 			ExpErr: false,
 			Req: &authms.SMSVerificationCodeRequest{
 				DeviceID: devID,
-				UserID: userID,
+				UserID:   userID,
 				SmsToken: "some-sms-token",
-				Token: validToken.Token(),
+				Token:    validToken,
 			},
 			PV: &PhoneVerifierMock{
 				ExpErr: nil,
 				ExpStatus: &authms.SMSVerificationStatus{
-					Phone: phone,
+					Phone:    phone,
 					Verified: true,
 				},
 			},
@@ -719,7 +713,7 @@ func TestAuth_VerifyPhoneCode(t *testing.T) {
 			runtime.Gosched()
 			if tc.ExpErr {
 				if err == nil {
-					t.Errorf("%s - expected error but " +
+					t.Errorf("%s - expected error but "+
 						"got nil", tc.Desc)
 				}
 				return
@@ -749,12 +743,12 @@ func TestAuth_UpdatePassword(t *testing.T) {
 		{
 			Desc: "Valid password",
 			User: &authms.User{
-				ID: usrID,
+				ID:       usrID,
 				Password: "some-new-password",
 			},
 			DBHelper: &DBHelperMock{T: t},
-			ExpErr: false,
-			DevID: devID,
+			ExpErr:   false,
+			DevID:    devID,
 		},
 	}
 	for _, c := range cases {
@@ -766,7 +760,7 @@ func TestAuth_UpdatePassword(t *testing.T) {
 			runtime.Gosched()
 			if c.ExpErr {
 				if err == nil {
-					t.Errorf("%s - Expected an error but" +
+					t.Errorf("%s - Expected an error but"+
 						" got nil", c.Desc)
 				}
 				return
@@ -794,15 +788,15 @@ func TestAuth_LoginOAuth(t *testing.T) {
 		DevID     string
 	}
 	cases := []LoginOAuthTestCase{
-		{Desc:"Valid Creds", ExpErr:false,
-			DBHelper:&DBHelperMock{ExpUser:&authms.User{ID:123}},
-			OAHandler: &OAuthHandlerMock{ExpValTknClld:true,
-				AppUserID:"test-app-user-id", ExpValid: true},
-			OAuth: &authms.OAuth{AppUserID:"test-app-user-id"}, DevID:"Tes-devID"},
-		{Desc:"Invalid OAuth Creds", ExpErr:true,
-			DBHelper:&DBHelperMock{T: t},
-			OAHandler: &OAuthHandlerMock{ExpValTknClld:true, ExpErr: errors.New("")},
-			OAuth: &authms.OAuth{}, DevID:"Tes-devID"},
+		{Desc:            "Valid Creds", ExpErr: false,
+			DBHelper: &DBHelperMock{ExpUser: &authms.User{ID: 123}},
+			OAHandler: &OAuthHandlerMock{ExpValTknClld: true,
+				AppUserID:                          "test-app-user-id", ExpValid: true},
+			OAuth: &authms.OAuth{AppUserID: "test-app-user-id"}, DevID: "Tes-devID"},
+		{Desc:             "Invalid OAuth Creds", ExpErr: true,
+			DBHelper:  &DBHelperMock{T: t},
+			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
+			OAuth:     &authms.OAuth{}, DevID: "Tes-devID"},
 	}
 	for _, c := range cases {
 		func() {
@@ -835,16 +829,13 @@ func TestAuth_LoginOAuth(t *testing.T) {
 			if !c.DBHelper.GetUserCalled {
 				t.Errorf("%s - get user not called", c.Desc)
 			}
-			if !c.DBHelper.SaveTokenCalled {
-				t.Errorf("%s - save token not called", c.Desc)
-			}
 		}()
 	}
 }
 
 func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVerifierMock) *auth.Auth {
 	var err error
-	tokenGen, err = token.NewGenerator(conf.Token)
+	tokenGen, err = token.NewJWTHandler(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}

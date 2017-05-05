@@ -3,10 +3,12 @@ package auth
 import (
 	"github.com/tomogoma/authms/auth/oauth/response"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/go-commons/auth/token"
-	"github.com/tomogoma/authms/auth/errors"
+	"github.com/tomogoma/go-commons/errors"
 	"regexp"
 	"strings"
+	"github.com/dgrijalva/jwt-go"
+	"github.com/tomogoma/authms/claim"
+	"time"
 )
 
 type OAuthHandler interface {
@@ -14,9 +16,8 @@ type OAuthHandler interface {
 }
 
 type TokenGenerator interface {
-	Generate(usrID int, devID string, expType token.ExpiryType) (*token.Token, error)
-	Validate(tokenStr string) (*token.Token, error)
-	ValidateUser(tokenStr string, userID int) (*token.Token, error)
+	Generate(claims jwt.Claims) (string, error)
+	Validate(token string, claims jwt.Claims) (*jwt.Token, error)
 }
 
 type PasswordGenerator interface {
@@ -32,7 +33,6 @@ type DBHelper interface {
 	UserExists(u *authms.User) (int64, error)
 	SaveUser(*authms.User) error
 	SaveHistory(*authms.History) error
-	SaveToken(*token.Token) error
 	GetByUserName(uname, pass string) (*authms.User, error)
 	GetByAppUserID(appName, appUserID string) (*authms.User, error)
 	GetByPhone(phone, pass string) (*authms.User, error)
@@ -40,7 +40,7 @@ type DBHelper interface {
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	UpdatePhone(userID int64, newPhone *authms.Value) error
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
-	IsNotFoundErr(err error) bool
+	IsNotFoundError(err error) bool
 	IsDuplicateError(err error) bool
 }
 
@@ -55,17 +55,19 @@ type Auth struct {
 	logger        Logger
 	oAuthHandler  OAuthHandler
 	phoneVerifier PhoneVerifier
-	errors.IsClientErrorer
+	errors.ClErrCheck
+	errors.AuthErrCheck
 }
 
 const (
-	numPrevLogins = 5
-	AccessLogin = "LOGIN"
-	AccessRegistration = "REGISTER"
-	AccessUpdate = "UPDATE"
-	AccessVerification = "VERIFICATION"
+	numPrevLogins        = 5
+	AccessLogin          = "LOGIN"
+	AccessRegistration   = "REGISTER"
+	AccessUpdate         = "UPDATE"
+	AccessVerification   = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
-	numExp = `[0-9]+`
+	numExp               = `[0-9]+`
+	tokenValidity        = 1 * time.Hour
 )
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
@@ -73,10 +75,10 @@ var ErrorNilLogger = errors.New("Logger was nil")
 var ErrorNilDBHelper = errors.New("DBHelper was nil")
 var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
 var ErrorNilPhoneVerifier = errors.New("PhoneVerifier was nil")
-var rePhone = regexp.MustCompile(numExp);
+var rePhone = regexp.MustCompile(numExp)
 
 func New(tg TokenGenerator, lg Logger, db DBHelper,
-oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
+	oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
 	if tg == nil {
 		return nil, ErrorNilTokenGenerator
 	}
@@ -93,7 +95,7 @@ oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
 		return nil, ErrorNilPhoneVerifier
 	}
 	return &Auth{dbHelper: db, tokenG: tg, oAuthHandler: oa,
-		logger: lg, phoneVerifier: pv}, nil
+		logger:        lg, phoneVerifier: pv}, nil
 }
 
 func (a *Auth) Register(user *authms.User, devID, rIP string) error {
@@ -129,10 +131,6 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	}
 	err := a.dbHelper.SaveUser(user)
 	if err != nil {
-		if a.dbHelper.IsDuplicateError(err) {
-			return errors.NewClient("a user with some of the" +
-				" provided credentials already exists")
-		}
 		return errors.Newf("error persisting user: %v", err)
 	}
 	go a.saveHistory(user, devID, AccessRegistration, rIP, nil)
@@ -143,11 +141,12 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	_, err := a.tokenG.ValidateUser(token, int(user.ID))
+	clm := claim.Auth{}
+	_, err := a.tokenG.Validate(token, &clm)
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if err != nil {
+	if err != nil || clm.UsrID != user.ID {
 		return errors.NewAuthf("invalid token: %v", err)
 	}
 	if !hasValue(user.Phone) {
@@ -172,17 +171,18 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
+	clm := claim.Auth{}
+	_, err := a.tokenG.Validate(req.Token, &clm)
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessVerification, rIP, err)
 	}()
-	if err != nil {
+	if err != nil || clm.UsrID != req.UserID {
 		return nil, errors.NewAuthf("invalid token: %v", err)
 	}
 	req.Phone = formatPhone(req.Phone)
 	testExistsUsr := &authms.User{
-		ID: req.UserID,
+		ID:    req.UserID,
 		Phone: &authms.Value{Value: req.Phone},
 	}
 	if err := a.checkUserExists(testExistsUsr); err != nil {
@@ -199,12 +199,13 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	_, err := a.tokenG.ValidateUser(req.Token, int(req.UserID))
+	clm := claim.Auth{}
+	_, err := a.tokenG.Validate(req.Token, &clm)
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessCodeValidation, rIP, err)
 	}()
-	if err != nil {
+	if err != nil || clm.UsrID != req.UserID {
 		return nil, errors.NewAuthf("invalid token: %v", err)
 	}
 	vs, err := a.phoneVerifier.VerifySMSCode(req)
@@ -213,10 +214,10 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 	}
 	phone := &authms.Value{
 		Verified: vs.Verified,
-		Value: formatPhone(vs.Phone),
+		Value:    formatPhone(vs.Phone),
 	}
 	testExistsUsr := &authms.User{
-		ID: req.UserID,
+		ID:    req.UserID,
 		Phone: phone,
 	}
 	if err := a.checkUserExists(testExistsUsr); err != nil {
@@ -233,11 +234,12 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	_, err := a.tokenG.ValidateUser(token, int(user.ID))
+	clm := claim.Auth{}
+	_, err := a.tokenG.Validate(token, &clm)
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if err != nil {
+	if err != nil || clm.UsrID != user.ID {
 		return errors.NewAuthf("invalid token: %v", err)
 	}
 	if user.OAuths == nil || user.OAuths[appName] == nil {
@@ -313,11 +315,6 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 	return usr, nil
 }
 
-func (a *Auth) IsAuthError(err error) bool {
-	errC, ok := err.(errors.Error)
-	return ok && errC.Auth()
-}
-
 func (a *Auth) checkUserExists(user *authms.User) error {
 	existUsrID, err := a.dbHelper.UserExists(user)
 	if err != nil {
@@ -331,7 +328,7 @@ func (a *Auth) checkUserExists(user *authms.User) error {
 }
 
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
-	if a.dbHelper.IsNotFoundErr(loginErr) {
+	if a.dbHelper.IsNotFoundError(loginErr) {
 		loginErr = errors.NewAuth("invalid credentials")
 	}
 	defer func() {
@@ -340,17 +337,13 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	if loginErr != nil {
 		return loginErr
 	}
-	tkn, loginErr := a.tokenG.Generate(int(usr.ID), devID, token.ShortExpType)
+	clm := claim.NewAuth(usr.ID, devID, tokenValidity)
+	tkn, loginErr := a.tokenG.Generate(clm)
 	if loginErr != nil {
 		loginErr = errors.Newf("error generating token: %v", loginErr)
 		return loginErr
 	}
-	loginErr = a.dbHelper.SaveToken(tkn)
-	if loginErr != nil {
-		loginErr = errors.Newf("error persisting login token: %v", loginErr)
-		return loginErr
-	}
-	usr.Token = tkn.Token()
+	usr.Token = tkn
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
 		AccessLogin)
 	if loginErr != nil {
@@ -384,7 +377,7 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 		accSuccessful = false
 	}
 	h := &authms.History{UserID: user.ID, AccessType: accType,
-		SuccessStatus: accSuccessful, IpAddress: rIP, DevID: devID}
+		SuccessStatus:       accSuccessful, IpAddress: rIP, DevID: devID}
 	err = a.dbHelper.SaveHistory(h)
 	if err != nil {
 		a.logger.Error("unable to save auth history entry (' %+v '): %s", h, err)

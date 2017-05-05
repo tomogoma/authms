@@ -69,26 +69,7 @@ type Config struct {
 	Service        ServiceConfig`json:"serviceConfig,omitempty" yaml:"serviceConfig"`
 	Database       cockroach.DSN`json:"database,omitempty" yaml:"database"`
 	Authentication auth.Config`json:"authentication,omitempty" yaml:"authentication"`
-	Token          token.DefaultConfig`json:"token,omitempty" yaml:"token"`
+	Token          token.ConfigStub`json:"token,omitempty" yaml:"token"`
 	OAuth          oauth.Config`json:"OAuth,omitempty" yaml:"OAuth"`
 	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
-}
-
-func (c Config) Validate() error {
-	if err := c.Service.Validate(); err != nil {
-		return err
-	}
-	if c.Token.TokenKeyFile() == "" {
-		return errors.New("Token key file not provided")
-	}
-	if err := c.Authentication.Validate(); err != nil {
-		return err
-	}
-	if err := c.Database.Validate(); err != nil {
-		return err
-	}
-	if err := c.OAuth.Validate(); err != nil {
-		return err
-	}
-	return nil
 }

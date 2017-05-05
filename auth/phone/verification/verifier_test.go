@@ -27,11 +27,11 @@ type TokenerMock struct {
 	ExpCode                  string
 }
 
-func (t *TokenerMock) GenerateWithClaims(claims jwt.Claims) (string, error) {
+func (t *TokenerMock) Generate(claims jwt.Claims) (string, error) {
 	t.GenerateWithClaimsCalled = true
 	return t.ExpToken, t.ExpErr
 }
-func (t *TokenerMock) ValidateClaims(token string, claims jwt.Claims) (*jwt.Token, error) {
+func (t *TokenerMock) Validate(token string, claims jwt.Claims) (*jwt.Token, error) {
 	t.ValidateClaimsCalled = true
 	cl, ok := claims.(*verification.Claims)
 	if ok {

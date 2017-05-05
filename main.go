@@ -19,6 +19,7 @@ import (
 	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/auth/phone/sms"
 	"time"
+	configH "github.com/tomogoma/go-commons/config"
 )
 
 const (
@@ -39,7 +40,8 @@ var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "location of c
 
 func main() {
 	flag.Parse()
-	conf, err := config.ReadFile(*confFile)
+	conf := config.Config{}
+	err := configH.ReadYamlConfig(*confFile, &conf)
 	if err != nil {
 		log.Fatalf("Error Reading config file: %s", err)
 	}
@@ -49,7 +51,7 @@ func main() {
 		runtime.Gosched()
 		time.Sleep(100 * time.Millisecond)
 	}()
-	tg, err := token.NewGenerator(conf.Token)
+	tg, err := token.NewJWTHandler(conf.Token)
 	if err != nil {
 		lg.Critical("Error instantiating token generator: %s", err)
 		return

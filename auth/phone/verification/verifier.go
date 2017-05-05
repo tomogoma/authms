@@ -15,15 +15,15 @@ type SMSer interface {
 	SMS(toPhone, message string) error
 }
 
-type Claims  struct {
+type Claims struct {
 	jwt.StandardClaims
 	Code  string
 	Phone string
 }
 
 type Tokener interface {
-	GenerateWithClaims(claims jwt.Claims) (string, error)
-	ValidateClaims(token string, claims jwt.Claims) (*jwt.Token, error)
+	Generate(claims jwt.Claims) (string, error)
+	Validate(token string, claims jwt.Claims) (*jwt.Token, error)
 }
 
 type SecureRandomer interface {
@@ -70,13 +70,13 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 	expiry := time.Now().Add(v.config.ValidityPeriod())
 	claims := &Claims{
 		StandardClaims: jwt.StandardClaims{
-			IssuedAt: issue.Unix(),
+			IssuedAt:  issue.Unix(),
 			ExpiresAt: expiry.Unix(),
 		},
-		Code: string(codeB),
+		Code:  string(codeB),
 		Phone: toPhone,
 	}
-	token, err := v.tokener.GenerateWithClaims(claims)
+	token, err := v.tokener.Generate(claims)
 	if err != nil {
 		return nil, errors.Newf("error generting SMS token: %v", err)
 	}
@@ -85,10 +85,10 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 		return nil, err
 	}
 	return &authms.SMSVerificationStatus{
-		Token: token,
-		Phone: toPhone,
+		Token:     token,
+		Phone:     toPhone,
 		ExpiresAt: expiry.Format(timeFormat),
-		Verified: false,
+		Verified:  false,
 	}, nil
 }
 
@@ -96,19 +96,16 @@ func (v *Verifier) VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.
 	if r == nil {
 		return nil, errors.New("request was empty")
 	}
-	token, err := v.tokener.ValidateClaims(r.SmsToken, &Claims{})
+	clms := Claims{}
+	_, err := v.tokener.Validate(r.SmsToken, &clms)
 	if err != nil {
 		return nil, errors.NewClientf("invalid token: %v", err)
 	}
-	claims, ok := token.Claims.(*Claims)
-	if !ok || !token.Valid {
-		return nil, errors.NewClient("invalid token claims")
-	}
-	if claims.Code != r.Code {
+	if clms.Code != r.Code {
 		return nil, errors.NewClient("invalid SMS code")
 	}
 	return &authms.SMSVerificationStatus{
-		Phone: claims.Phone,
+		Phone:    clms.Phone,
 		Verified: true,
 	}, nil
 }
