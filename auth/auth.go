@@ -67,7 +67,7 @@ const (
 	AccessVerification   = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
 	numExp               = `[0-9]+`
-	tokenValidity        = 1 * time.Hour
+	tokenValidity        = 8 * time.Hour
 )
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
