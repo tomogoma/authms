@@ -86,6 +86,7 @@ type SMSConfig struct {
 	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
 	AfricasTalking AfricasTalkingConfig`json:"africasTalking" yaml:"africasTalking"`
 	Verification   VerificationConfig`json:"verification" yaml:"verification"`
+	ActiveAPI      string `json:"activeAPI" yaml:"activeAPI"`
 }
 
 type Config struct {

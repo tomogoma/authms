@@ -69,9 +69,19 @@ func main() {
 		lg.Critical("Error instantiating db helper: %v", err)
 		return
 	}
-	s, err := sms.NewAfricasTalking(conf.SMS.AfricasTalking)
+	var s verification.SMSer
+	switch conf.SMS.ActiveAPI {
+	case "africasTalking":
+		s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking)
+	case "twilio":
+		s, err = sms.NewTwilio(conf.SMS.Twilio)
+	default:
+		lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
+		return
+	}
 	if err != nil {
-		lg.Critical("Error instantiating SMS API client: %v", err)
+		lg.Critical("Error instantiating %s API client: %v",
+			conf.SMS.ActiveAPI, err)
 		return
 	}
 	var testMessage string

@@ -22,6 +22,7 @@ sms:
   verification:
     messageFormat: Your verification code is %s
     smsCodeValidity: 5m
+  activeAPI: twilio
   twilio:
     ID:
     senderPhone:
