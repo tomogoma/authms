@@ -6,9 +6,9 @@ database:
   password: ""
   host: localhost:26257
   dbName: authms
-  sslCert: /etc/cockroachdb/certs/node.cert
+  sslCert: /etc/cockroachdb/certs/node.crt
   sslKey: /etc/cockroachdb/certs/node.key
-  sslRootCert: /etc/cockroachdb/certs/ca.cert
+  sslRootCert: /etc/cockroachdb/certs/ca.crt
 authentication:
   blacklistfailcount: 3
   blacklistwindow: 30m0s
