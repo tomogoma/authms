@@ -44,8 +44,8 @@ func Test(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error setting up (reading config file): %v", err)
 	}
-	_, err = sms.New(conf.Twilio)
+	_, err = sms.NewTwilio(conf.Twilio)
 	if err != nil {
-		t.Fatalf("sms.New(): %v", err)
+		t.Fatalf("sms.NewTwilio(): %v", err)
 	}
 }

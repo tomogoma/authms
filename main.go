@@ -67,9 +67,9 @@ func main() {
 		lg.Critical("Error instantiating db helper: %v", err)
 		return
 	}
-	s, err := sms.New(conf.Twilio)
+	s, err := sms.NewTwilio(conf.Twilio)
 	if err != nil {
-		lg.Critical("Error instantiating SMS API client: %v", err)
+		lg.Critical("Error instantiating Twilio API client: %v", err)
 		return
 	}
 	ng, err := password.NewGenerator(password.NumberChars)

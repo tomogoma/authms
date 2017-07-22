@@ -46,12 +46,12 @@ var rcvErrors = map[int]string{
 	phoneNoSMS: "the phone provided cannot receive SMS",
 }
 
-type SMS struct {
+type Twilio struct {
 	token  string
 	config Config
 }
 
-func New(c Config) (*SMS, error) {
+func NewTwilio(c Config) (*Twilio, error) {
 	if c == nil {
 		return nil, errors.New("Config was nil")
 	}
@@ -59,16 +59,16 @@ func New(c Config) (*SMS, error) {
 	if err != nil {
 		return nil, err
 	}
-	sms := &SMS{config:c, token:token}
+	sms := &Twilio{config: c, token: token}
 	msg := fmt.Sprintf(testMessage, c.TwilioID())
 	if err := sms.SMS(c.TwilioTestNumber(), msg); err != nil {
 		return nil, errors.Newf("Unable to access twilio, probably" +
-			" SMS config values are invalid?: %s", err)
+			" Twilio config values are invalid?: %s", err)
 	}
 	return sms, nil
 }
 
-func (s *SMS) SMS(toPhone, message string) error {
+func (s *Twilio) SMS(toPhone, message string) error {
 	client := &http.Client{}
 	URL, err := url.Parse(accountsURL)
 	if err != nil {
