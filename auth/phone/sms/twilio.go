@@ -8,50 +8,47 @@ import (
 	"net/url"
 	"strings"
 	"encoding/json"
-	"fmt"
 )
 
 const (
-	accountsURL = "https://api.twilio.com/2010-04-01/Accounts/"
+	accountsURL  = "https://api.twilio.com/2010-04-01/Accounts/"
 	messagesPath = "Messages.json"
-	httpMethod = "POST"
-	formKeyTo = "To"
-	formKeyFrom = "From"
-	formKeyBody = "Body"
-	testMessage = "The SMS API is being used for account %s. This is a test message"
+	httpMethod   = "POST"
+	formKeyTo    = "To"
+	formKeyFrom  = "From"
+	formKeyBody  = "Body"
 )
 
-type Config interface {
+type TwConfig interface {
 	TwilioID() string
 	TwilioTokenKeyFile() string
 	TwilioSenderPhone() string
-	TwilioTestNumber() string
 }
 
 const (
-	phoneBlockedRcv = 30004
-	unknownPhone = 30005
-	unreachablePhone = 3006
-	invalidPhone = 21211
+	phoneBlockedRcv   = 30004
+	unknownPhone      = 30005
+	unreachablePhone  = 3006
+	invalidPhone      = 21211
 	invalidTrialPhone = 14111
-	phoneNoSMS = 21407
+	phoneNoSMS        = 21407
 )
 
 var rcvErrors = map[int]string{
-	phoneBlockedRcv:"the phone provided is blocked",
-	unknownPhone:"the phone provided is unknown",
-	unreachablePhone: "the phone provided is unreachable",
-	invalidPhone: "the phone provided is invalid",
+	phoneBlockedRcv:   "the phone provided is blocked",
+	unknownPhone:      "the phone provided is unknown",
+	unreachablePhone:  "the phone provided is unreachable",
+	invalidPhone:      "the phone provided is invalid",
 	invalidTrialPhone: "the phone provided is invalid",
-	phoneNoSMS: "the phone provided cannot receive SMS",
+	phoneNoSMS:        "the phone provided cannot receive SMS",
 }
 
 type Twilio struct {
 	token  string
-	config Config
+	config TwConfig
 }
 
-func NewTwilio(c Config) (*Twilio, error) {
+func NewTwilio(c TwConfig) (*Twilio, error) {
 	if c == nil {
 		return nil, errors.New("Config was nil")
 	}
@@ -59,20 +56,20 @@ func NewTwilio(c Config) (*Twilio, error) {
 	if err != nil {
 		return nil, err
 	}
-	sms := &Twilio{config: c, token: token}
-	msg := fmt.Sprintf(testMessage, c.TwilioID())
-	if err := sms.SMS(c.TwilioTestNumber(), msg); err != nil {
-		return nil, errors.Newf("Unable to access twilio, probably" +
-			" Twilio config values are invalid?: %s", err)
-	}
-	return sms, nil
+	return &Twilio{config: c, token: token}, nil
 }
 
 func (s *Twilio) SMS(toPhone, message string) error {
+	if toPhone == "" {
+		return errors.New("toPhone was empty")
+	}
+	if message == "" {
+		return errors.New("message was empty")
+	}
 	client := &http.Client{}
 	URL, err := url.Parse(accountsURL)
 	if err != nil {
-		return errors.Newf("problem with the twilio URL (%v)" +
+		return errors.Newf("problem with the twilio URL (%v)"+
 			" contact support", err)
 	}
 	URL.Path = path.Join(URL.Path, s.config.TwilioID(), messagesPath)

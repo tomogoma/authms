@@ -9,11 +9,12 @@ import (
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/auth/token"
+	"io/ioutil"
 )
 
 const (
 	RunTypeHttp = "http"
-	RunTypeRPC = "rpc"
+	RunTypeRPC  = "rpc"
 )
 
 var ErrorInvalidRunType = fmt.Errorf("Invalid runtype; expected one of %s, %s", RunTypeRPC, RunTypeHttp)
@@ -28,19 +29,29 @@ func (sc ServiceConfig) Validate() error {
 	if sc.RunType != RunTypeHttp && sc.RunType != RunTypeRPC {
 		return ErrorInvalidRunType
 	}
-	if sc.RegisterInterval <= 1 * time.Millisecond {
+	if sc.RegisterInterval <= 1*time.Millisecond {
 		return ErrorInvalidRegInterval
 	}
 	return nil
 }
 
-type TwilioConfig struct {
-	ID              string `json:"ID" yaml:"ID"`
-	SenderPhone     string `json:"senderPhone" yaml:"senderPhone"`
-	TokenKeyFile    string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
-	TestNumber      string `json:"testNumber" yaml:"testNumber"`
+type VerificationConfig struct {
 	MessageFmt      string `json:"messageFormat" yaml:"messageFormat"`
 	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
+}
+
+func (c VerificationConfig) MessageFormat() string {
+	return c.MessageFmt
+}
+
+func (c VerificationConfig) ValidityPeriod() time.Duration {
+	return c.SMSCodeValidity
+}
+
+type TwilioConfig struct {
+	ID           string `json:"ID" yaml:"ID"`
+	SenderPhone  string `json:"senderPhone" yaml:"senderPhone"`
+	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
 }
 
 func (c TwilioConfig) TwilioID() string {
@@ -53,16 +64,28 @@ func (c TwilioConfig) TwilioSenderPhone() string {
 	return c.SenderPhone
 }
 
-func (c TwilioConfig) TwilioTestNumber() string {
-	return c.TestNumber
+type AfricasTalkingConfig struct {
+	UserName   string `json:"username" yaml:"username"`
+	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
-func (c TwilioConfig) MessageFormat() string {
-	return c.MessageFmt
+func (atc AfricasTalkingConfig) Username() string {
+	return atc.UserName
 }
 
-func (c TwilioConfig) ValidityPeriod() time.Duration {
-	return c.SMSCodeValidity
+func (atc AfricasTalkingConfig) APIKey() string {
+	keyB, err := ioutil.ReadFile(atc.APIKeyFile)
+	if err != nil {
+		return ""
+	}
+	return string(keyB)
+}
+
+type SMSConfig struct {
+	TestNumber     string `json:"testNumber" yaml:"testNumber"`
+	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
+	AfricasTalking AfricasTalkingConfig`json:"africasTalking" yaml:"africasTalking"`
+	Verification   VerificationConfig`json:"verification" yaml:"verification"`
 }
 
 type Config struct {
@@ -71,5 +94,5 @@ type Config struct {
 	Authentication auth.Config`json:"authentication,omitempty" yaml:"authentication"`
 	Token          token.ConfigStub`json:"token,omitempty" yaml:"token"`
 	OAuth          oauth.Config`json:"OAuth,omitempty" yaml:"OAuth"`
-	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
+	SMS            SMSConfig`json:"sms" yaml:"sms"`
 }

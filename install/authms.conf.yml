@@ -17,11 +17,15 @@ token:
 OAuth:
   facebookSecretFileLoc: /etc/authms/keys/facebooksecret.key
   facebookID:
-twilio:
-  ID:
-  senderPhone:
+sms:
   testNumber:
-  tokenKeyFile: /etc/authms/keys/twiliotoken.key
-  testNumber:
-  messageFormat: Your verification code for Gawana Rideshare is %s
-  smsCodeValidity: 5m
+  verification:
+    messageFormat: Your verification code is %s
+    smsCodeValidity: 5m
+  twilio:
+    ID:
+    senderPhone:
+    tokenKeyFile: /etc/authms/keys/twiliotoken.key
+  africasTalking:
+    username:
+    apiKeyFile: /etc/authms/keys/africastalkingapi.key

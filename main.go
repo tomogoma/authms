@@ -20,10 +20,12 @@ import (
 	"github.com/tomogoma/authms/auth/phone/sms"
 	"time"
 	configH "github.com/tomogoma/go-commons/config"
+	"fmt"
+	"os"
 )
 
 const (
-	serviceName = "authms"
+	serviceName    = "authms"
 	serviceVersion = "0.0.1"
 )
 
@@ -67,9 +69,19 @@ func main() {
 		lg.Critical("Error instantiating db helper: %v", err)
 		return
 	}
-	s, err := sms.NewTwilio(conf.Twilio)
+	s, err := sms.NewAfricasTalking(conf.SMS.AfricasTalking)
 	if err != nil {
-		lg.Critical("Error instantiating Twilio API client: %v", err)
+		lg.Critical("Error instantiating SMS API client: %v", err)
+		return
+	}
+	var testMessage string
+	if hostName, err := os.Hostname(); err == nil {
+		testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
+	} else {
+		testMessage = "The SMS API is being used on an unknown host"
+	}
+	if err := s.SMS(conf.SMS.TestNumber, testMessage); err != nil {
+		lg.Critical("Error sending test SMS during start up: %v", err)
 		return
 	}
 	ng, err := password.NewGenerator(password.NumberChars)
@@ -77,7 +89,7 @@ func main() {
 		lg.Critical("Error instantiating number generator: %s", err)
 		return
 	}
-	pv, err := verification.New(conf.Twilio, s, ng, tg)
+	pv, err := verification.New(conf.SMS.Verification, s, ng, tg)
 	if err != nil {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
 		return
