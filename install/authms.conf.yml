@@ -3,7 +3,7 @@
 # - mind the case
 # - all strings containing special characters `` [] {} : > | `` .
 #   should be escaped by double quotes
-# - mind the indentation
+# - mind the indentation (2 spaces for each indentation level)
 # - comments should start with a "#" sign.
 
 
