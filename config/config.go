@@ -15,6 +15,9 @@ import (
 const (
 	RunTypeHttp = "http"
 	RunTypeRPC  = "rpc"
+
+	SMSAPITwilio = "twilio"
+	SMSAPIAfricasTalking = "africasTalking"
 )
 
 var ErrorInvalidRunType = fmt.Errorf("Invalid runtype; expected one of %s, %s", RunTypeRPC, RunTypeHttp)

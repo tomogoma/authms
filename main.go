@@ -71,9 +71,9 @@ func main() {
 	}
 	var s verification.SMSer
 	switch conf.SMS.ActiveAPI {
-	case "africasTalking":
+	case config.SMSAPIAfricasTalking:
 		s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking)
-	case "twilio":
+	case config.SMSAPITwilio:
 		s, err = sms.NewTwilio(conf.SMS.Twilio)
 	default:
 		lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
