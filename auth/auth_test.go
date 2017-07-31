@@ -3,18 +3,18 @@ package auth_test
 import (
 	"testing"
 
+	"flag"
 	"github.com/limetext/log4go"
 	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/auth/oauth/facebook"
+	"github.com/tomogoma/authms/auth/oauth/response"
+	"github.com/tomogoma/authms/claim"
+	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/go-commons/config"
-	"flag"
 	"github.com/tomogoma/go-commons/database/cockroach"
-	"github.com/tomogoma/authms/auth/oauth/response"
-	"github.com/tomogoma/authms/auth/oauth/facebook"
-	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 	"runtime"
-	"github.com/tomogoma/authms/claim"
 	"time"
 )
 
@@ -27,8 +27,8 @@ func (c TokenConfigMock) KeyFile() string {
 }
 
 type ConfigMock struct {
-	Database cockroach.DSN    `json:"database,omitempty"`
-	Token    TokenConfigMock  `json:"token,omitempty"`
+	Database cockroach.DSN   `json:"database,omitempty"`
+	Token    TokenConfigMock `json:"token,omitempty"`
 }
 
 type OAuthHandlerMock struct {
@@ -212,8 +212,8 @@ func TestAuth_Register(t *testing.T) {
 			DevID:     "test-dev",
 		},
 		{
-			Desc:     "Nil user",
-			User:     nil, OAHandler: &OAuthHandlerMock{},
+			Desc: "Nil user",
+			User: nil, OAHandler: &OAuthHandlerMock{},
 			DBHelper: &DBHelperMock{T: t},
 			ExpErr:   true,
 			DevID:    "test-dev"},
@@ -788,12 +788,12 @@ func TestAuth_LoginOAuth(t *testing.T) {
 		DevID     string
 	}
 	cases := []LoginOAuthTestCase{
-		{Desc:            "Valid Creds", ExpErr: false,
+		{Desc: "Valid Creds", ExpErr: false,
 			DBHelper: &DBHelperMock{ExpUser: &authms.User{ID: 123}},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true,
-				AppUserID:                          "test-app-user-id", ExpValid: true},
+				AppUserID: "test-app-user-id", ExpValid: true},
 			OAuth: &authms.OAuth{AppUserID: "test-app-user-id"}, DevID: "Tes-devID"},
-		{Desc:             "Invalid OAuth Creds", ExpErr: true,
+		{Desc: "Invalid OAuth Creds", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
 			OAuth:     &authms.OAuth{}, DevID: "Tes-devID"},

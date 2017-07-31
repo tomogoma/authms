@@ -3,10 +3,10 @@ package oauth
 import (
 	"errors"
 
+	"fmt"
 	"github.com/tomogoma/authms/auth/oauth/facebook"
 	"github.com/tomogoma/authms/auth/oauth/response"
 	"io/ioutil"
-	"fmt"
 )
 
 const (
@@ -26,7 +26,7 @@ var ErrorUnsupportedApp = errors.New("the app provided is not supported")
 func New(c Config) (*OAuth, error) {
 	secretBytes, err := ioutil.ReadFile(c.FacebookSecretFileLoc)
 	if err != nil {
-		return nil, fmt.Errorf("error reading facebook secret from" +
+		return nil, fmt.Errorf("error reading facebook secret from"+
 			" file: %s", err)
 	}
 	fb, err := facebook.New(c.FacebookID, string(secretBytes))

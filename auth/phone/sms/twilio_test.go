@@ -1,10 +1,10 @@
 package sms_test
 
 import (
-	"testing"
-	"github.com/tomogoma/authms/auth/phone/sms"
 	"flag"
+	"github.com/tomogoma/authms/auth/phone/sms"
 	"github.com/tomogoma/go-commons/config"
+	"testing"
 )
 
 type ConfigMock struct {

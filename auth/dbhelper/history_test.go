@@ -1,8 +1,8 @@
 package dbhelper_test
 
 import (
-	"testing"
 	"github.com/tomogoma/authms/proto/authms"
+	"testing"
 )
 
 func TestModel_SaveHistory(t *testing.T) {
@@ -18,41 +18,41 @@ func TestModel_SaveHistory(t *testing.T) {
 	}
 	tcs := []SaveHistoryTestCase{
 		{
-			Desc: "Valid history",
+			Desc:   "Valid history",
 			ExpErr: false,
-			Hist: completeHistory(usr.ID),
+			Hist:   completeHistory(usr.ID),
 		},
 		{
-			Desc: "Invalid user ID",
+			Desc:   "Invalid user ID",
 			ExpErr: true,
 			Hist: &authms.History{
-				UserID: -1,
-				IpAddress: "127.0.0.1",
-				AccessType: "LOGIN",
+				UserID:        -1,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "LOGIN",
 				SuccessStatus: true,
-				DevID: "test-app-id",
+				DevID:         "test-app-id",
 			},
 		},
 		{
-			Desc: "Non existent user ID",
+			Desc:   "Non existent user ID",
 			ExpErr: true,
 			Hist: &authms.History{
-				UserID: 1,
-				IpAddress: "127.0.0.1",
-				AccessType: "LOGIN",
+				UserID:        1,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "LOGIN",
 				SuccessStatus: true,
-				DevID: "test-app-id",
+				DevID:         "test-app-id",
 			},
 		},
 		{
-			Desc: "Empty access type",
+			Desc:   "Empty access type",
 			ExpErr: true,
 			Hist: &authms.History{
-				UserID: usr.ID,
-				IpAddress: "127.0.0.1",
-				AccessType: "",
+				UserID:        usr.ID,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "",
 				SuccessStatus: true,
-				DevID: "test-app-id",
+				DevID:         "test-app-id",
 			},
 		},
 	}
@@ -79,7 +79,7 @@ func TestModel_SaveHistory(t *testing.T) {
 				&hist.UserID, &hist.Date, &hist.DevID,
 				&hist.IpAddress)
 			if err != nil {
-				t.Fatalf("%s - Error fetching history for" +
+				t.Fatalf("%s - Error fetching history for"+
 					" validation: %s", tc.Desc, err)
 				return
 			}
@@ -101,7 +101,7 @@ func TestModel_GetHistory(t *testing.T) {
 		{
 			Desc: "Missing devID, IP Addr",
 			Hist: &authms.History{
-				AccessType: "LOGIN",
+				AccessType:    "LOGIN",
 				SuccessStatus: true,
 			},
 		},
@@ -121,7 +121,7 @@ func TestModel_GetHistory(t *testing.T) {
 			_, err := db.Exec(q, tc.Hist.UserID, tc.Hist.AccessType,
 				tc.Hist.SuccessStatus, tc.Hist.DevID, tc.Hist.IpAddress)
 			if err != nil {
-				t.Errorf("%s - Error setting up" +
+				t.Errorf("%s - Error setting up"+
 					" (inserting history): %s", tc.Desc, err)
 				return
 			}
@@ -148,11 +148,11 @@ func TestModel_GetHistory(t *testing.T) {
 
 func completeHistory(userID int64) *authms.History {
 	return &authms.History{
-		UserID: userID,
-		IpAddress: "127.0.0.1",
-		AccessType: "LOGIN",
+		UserID:        userID,
+		IpAddress:     "127.0.0.1",
+		AccessType:    "LOGIN",
 		SuccessStatus: true,
-		DevID: "test-app-id",
+		DevID:         "test-app-id",
 	}
 }
 

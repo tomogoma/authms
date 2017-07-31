@@ -1,10 +1,10 @@
 package sms_test
 
 import (
-	"testing"
 	"github.com/tomogoma/authms/auth/phone/sms"
-	"net/http/httptest"
 	"net/http"
+	"net/http/httptest"
+	"testing"
 )
 
 type ATConfigMock struct {

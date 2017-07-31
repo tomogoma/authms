@@ -1,13 +1,13 @@
 package sms
 
 import (
+	"encoding/xml"
 	"github.com/tomogoma/go-commons/errors"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
-	"io/ioutil"
-	"encoding/xml"
 	"strings"
-	"io"
 )
 
 const (
@@ -35,7 +35,7 @@ type atResponse struct {
 				} `xml:"status"`
 			} `xml:"Recipient"`
 		} `xml:"Recipients"`
-	}`xml:"SMSMessageData"`
+	} `xml:"SMSMessageData"`
 }
 
 type AfricasTalking struct {

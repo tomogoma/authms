@@ -5,18 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"io/ioutil"
+
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/oauth"
-	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/auth/token"
-	"io/ioutil"
+	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
 const (
 	RunTypeHttp = "http"
 	RunTypeRPC  = "rpc"
 
-	SMSAPITwilio = "twilio"
+	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
 )
 
@@ -39,7 +40,7 @@ func (sc ServiceConfig) Validate() error {
 }
 
 type VerificationConfig struct {
-	MessageFmt      string `json:"messageFormat" yaml:"messageFormat"`
+	MessageFmt      string        `json:"messageFormat" yaml:"messageFormat"`
 	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
 }
 
@@ -85,18 +86,18 @@ func (atc AfricasTalkingConfig) APIKey() string {
 }
 
 type SMSConfig struct {
-	TestNumber     string `json:"testNumber" yaml:"testNumber"`
-	Twilio         TwilioConfig`json:"twilio" yaml:"twilio"`
-	AfricasTalking AfricasTalkingConfig`json:"africasTalking" yaml:"africasTalking"`
-	Verification   VerificationConfig`json:"verification" yaml:"verification"`
-	ActiveAPI      string `json:"activeAPI" yaml:"activeAPI"`
+	TestNumber     string               `json:"testNumber" yaml:"testNumber"`
+	Twilio         TwilioConfig         `json:"twilio" yaml:"twilio"`
+	AfricasTalking AfricasTalkingConfig `json:"africasTalking" yaml:"africasTalking"`
+	Verification   VerificationConfig   `json:"verification" yaml:"verification"`
+	ActiveAPI      string               `json:"activeAPI" yaml:"activeAPI"`
 }
 
 type Config struct {
-	Service        ServiceConfig`json:"serviceConfig,omitempty" yaml:"serviceConfig"`
-	Database       cockroach.DSN`json:"database,omitempty" yaml:"database"`
-	Authentication auth.Config`json:"authentication,omitempty" yaml:"authentication"`
-	Token          token.ConfigStub`json:"token,omitempty" yaml:"token"`
-	OAuth          oauth.Config`json:"OAuth,omitempty" yaml:"OAuth"`
-	SMS            SMSConfig`json:"sms" yaml:"sms"`
+	Service        ServiceConfig    `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
+	Authentication auth.Config      `json:"authentication,omitempty" yaml:"authentication"`
+	Token          token.ConfigStub `json:"token,omitempty" yaml:"token"`
+	OAuth          oauth.Config     `json:"OAuth,omitempty" yaml:"OAuth"`
+	SMS            SMSConfig        `json:"sms" yaml:"sms"`
 }

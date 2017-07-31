@@ -1,9 +1,10 @@
 package dbhelper
 
 import (
-	"github.com/tomogoma/go-commons/errors"
-	"github.com/tomogoma/go-commons/database/cockroach"
 	"database/sql"
+
+	"github.com/tomogoma/go-commons/database/cockroach"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 type DBHelper struct {

@@ -2,11 +2,11 @@ package rpc
 
 import (
 	"errors"
-	"net/http"
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/helper"
 	"golang.org/x/net/context"
+	"net/http"
 )
 
 const (

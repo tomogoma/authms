@@ -1,13 +1,13 @@
 package dbhelper
 
 import (
-	"github.com/cockroachdb/cockroach-go/crdb"
-	"fmt"
-	"github.com/tomogoma/authms/proto/authms"
 	"database/sql"
+	"fmt"
+	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/lib/pq"
-	"log"
+	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
+	"log"
 )
 
 type PasswordGenerator interface {
@@ -148,7 +148,7 @@ func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
 	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has usernae: %s", err)
 	}
-	if (count == 0) {
+	if count == 0 {
 		q = `INSERT INTO userNames (userID, userName, createDate)
 		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
 		rslt, err := m.db.Exec(q, userID, newUserName)
@@ -170,7 +170,7 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	if err := m.db.QueryRow(q, userID, new.AppName).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
-	if (count == 0) {
+	if count == 0 {
 		q = `INSERT INTO appUserIDs (userID, appUserID, appName, validated, createDate)
 	 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP())`
 		rslt, err := m.db.Exec(q, userID, new.AppUserID, new.AppName, new.Verified)
@@ -192,7 +192,7 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
-	if (count == 0) {
+	if count == 0 {
 		q = `INSERT INTO emails (userID, email, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
 		rslt, err := m.db.Exec(q, userID, newEmail.Value, newEmail.Verified)
@@ -214,7 +214,7 @@ func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has phone: %s", err)
 	}
-	if (count == 0) {
+	if count == 0 {
 		q = `INSERT INTO phones (userID, phone, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
 		rslt, err := m.db.Exec(q, userID, newPhone.Value, newPhone.Verified)
@@ -238,7 +238,7 @@ func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) err
 		}
 		return err
 	}
-	if ! m.hasher.CompareHash(oldPass, actPassHB) {
+	if !m.hasher.CompareHash(oldPass, actPassHB) {
 		return ErrorPasswordMismatch
 	}
 	passHB, err := m.hasher.Hash(newPassword)
@@ -268,7 +268,7 @@ func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass stri
 	return usr, nil
 }
 
-func (m *DBHelper) get(where string, whereArgs ... interface{}) (*authms.User, error) {
+func (m *DBHelper) get(where string, whereArgs ...interface{}) (*authms.User, error) {
 	usr := &authms.User{
 		Email:  &authms.Value{},
 		Phone:  &authms.Value{},

@@ -3,9 +3,9 @@ package dbhelper
 import (
 	"fmt"
 
+	"database/sql"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
-	"database/sql"
 )
 
 func (m *DBHelper) SaveHistory(h *authms.History) error {

@@ -1,10 +1,10 @@
 package verification_test
 
 import (
-	"testing"
-	"github.com/tomogoma/authms/auth/phone/verification"
 	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/proto/authms"
+	"testing"
 	"time"
 )
 
@@ -80,18 +80,18 @@ type VerifierTestCase struct {
 
 func validDependencies() VerifierTestCase {
 	return VerifierTestCase{
-		Desc: "Valid args",
+		Desc:   "Valid args",
 		ExpErr: false,
-		SMSer: &SMSerMock{ExpErr: nil},
+		SMSer:  &SMSerMock{ExpErr: nil},
 		Tokener: &TokenerMock{
-			ExpErr: nil,
+			ExpErr:   nil,
 			ExpToken: "some-token",
-			ExpJwt: &jwt.Token{Raw: "some-token"},
+			ExpJwt:   &jwt.Token{Raw: "some-token"},
 		},
 		SecureRandomer: &SecureRandomerMock{
 			ExpErr: nil, ExpString: "1234",
 		},
-		Config: &ConfigMock{ExpMessageFmt:"verification code is %s"},
+		Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
 	}
 }
 
@@ -99,26 +99,26 @@ func TestNew(t *testing.T) {
 	tcs := []VerifierTestCase{
 		validDependencies(),
 		{
-			Desc: "Missing SMSer",
+			Desc:   "Missing SMSer",
 			ExpErr: false,
 			Tokener: &TokenerMock{
-				ExpErr: nil,
+				ExpErr:   nil,
 				ExpToken: "some-token",
-				ExpJwt: &jwt.Token{Raw: "some-token"},
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
 			},
 			SecureRandomer: &SecureRandomerMock{
 				ExpErr: nil, ExpString: "1234",
 			},
-			Config: &ConfigMock{ExpMessageFmt:"verification code is %s"},
+			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
 		},
 		{
-			Desc: "Missing Tokener",
+			Desc:   "Missing Tokener",
 			ExpErr: false,
-			SMSer: &SMSerMock{ExpErr: nil},
+			SMSer:  &SMSerMock{ExpErr: nil},
 			SecureRandomer: &SecureRandomerMock{
 				ExpErr: nil, ExpString: "1234",
 			},
-			Config: &ConfigMock{ExpMessageFmt:"verification code is %s"},
+			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
 		},
 		//{
 		//	Desc: "Missing secure Randomer",
@@ -164,11 +164,11 @@ func TestNew(t *testing.T) {
 }
 
 func TestVerifier_SendSMSCode(t *testing.T) {
-	validDeps := validDependencies();
+	validDeps := validDependencies()
 	validDeps.ExpVerStatus = &authms.SMSVerificationStatus{
-		Token: "some-token",
+		Token:     "some-token",
 		ExpiresAt: time.Now().Add(5 * time.Minute).Format(time.RFC3339),
-		Verified:false,
+		Verified:  false,
 	}
 	tcs := []VerifierTestCase{
 		validDeps,
@@ -209,8 +209,8 @@ func TestVerifier_SendSMSCode(t *testing.T) {
 
 func TestVerifier_VerifySMSCode(t *testing.T) {
 	validDeps := validDependencies()
-	validDeps.ExpVerStatus = &authms.SMSVerificationStatus{Verified:true}
-	validDeps.Tokener.ExpJwt = &jwt.Token{Valid:true}
+	validDeps.ExpVerStatus = &authms.SMSVerificationStatus{Verified: true}
+	validDeps.Tokener.ExpJwt = &jwt.Token{Valid: true}
 	validDeps.Tokener.ExpCode = "123"
 	validDeps.CodeReq = &authms.SMSVerificationCodeRequest{Code: "123"}
 	tcs := []VerifierTestCase{
@@ -234,7 +234,7 @@ func TestVerifier_VerifySMSCode(t *testing.T) {
 			continue
 		}
 		if !tc.Tokener.ValidateClaimsCalled {
-			t.Errorf("%s - Tokener.ValidateClaimsCalled() was not" +
+			t.Errorf("%s - Tokener.ValidateClaimsCalled() was not"+
 				" called", tc.Desc)
 		}
 		if stts.Verified != tc.ExpVerStatus.Verified {

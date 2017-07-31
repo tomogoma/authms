@@ -1,13 +1,13 @@
 package sms
 
 import (
-	"net/http"
-	"github.com/tomogoma/go-commons/errors"
-	"path"
-	"io/ioutil"
-	"net/url"
-	"strings"
 	"encoding/json"
+	"github.com/tomogoma/go-commons/errors"
+	"io/ioutil"
+	"net/http"
+	"net/url"
+	"path"
+	"strings"
 )
 
 const (
@@ -91,7 +91,7 @@ func (s *Twilio) SMS(toPhone, message string) error {
 	body, err := ioutil.ReadAll(resp.Body)
 	if resp.StatusCode >= 400 {
 		type ResponseError struct {
-			Code    int `json:"code"`
+			Code    int    `json:"code"`
 			Message string `json:"message"`
 		}
 		rErr := ResponseError{}

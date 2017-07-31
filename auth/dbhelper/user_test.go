@@ -1,11 +1,11 @@
 package dbhelper_test
 
 import (
+	"database/sql"
+	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/proto/authms"
 	"reflect"
-	"database/sql"
 	"testing"
-	"github.com/tomogoma/authms/auth/dbhelper"
 )
 
 type UpdateTestCase struct {
@@ -22,10 +22,10 @@ func TestModel_SaveUser(t *testing.T) {
 	usr := &authms.User{
 		OAuths: map[string]*authms.OAuth{
 			completeUserAppName: {
-				AppName: completeUserAppName,
+				AppName:   completeUserAppName,
 				AppUserID: "test-user-id",
-				AppToken: "test-app.test-user-id.test-token",
-				Verified: true,
+				AppToken:  "test-app.test-user-id.test-token",
+				Verified:  true,
 			},
 		},
 	}
@@ -43,10 +43,10 @@ func TestModel_SaveUser_duplicate(t *testing.T) {
 	usr := &authms.User{
 		OAuths: map[string]*authms.OAuth{
 			completeUserAppName: {
-				AppName: completeUserAppName,
+				AppName:   completeUserAppName,
 				AppUserID: "test-user-id",
-				AppToken: "test-app.test-user-id.test-token",
-				Verified: true,
+				AppToken:  "test-app.test-user-id.test-token",
+				Verified:  true,
 			},
 		},
 	}
@@ -85,7 +85,7 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 			if expUsr.OAuths == nil {
 				expUsr.OAuths = map[string]*authms.OAuth{
 					appName: {
-						AppName: appName,
+						AppName:  appName,
 						AppToken: appToken,
 						Verified: true,
 					},
@@ -113,34 +113,34 @@ func TestDBHelper_UserExists(t *testing.T) {
 	cmpltUsr := completeUser()
 	tcs := []TestCase{
 		{
-			Desc: "Not exist",
+			Desc:       "Not exist",
 			InsertUser: nil,
-			TestUser: cmpltUsr,
-			ExpExists: false,
+			TestUser:   cmpltUsr,
+			ExpExists:  false,
 		},
 		{
-			Desc: "UserName Exists",
+			Desc:       "UserName Exists",
 			InsertUser: cmpltUsr,
-			TestUser: &authms.User{UserName: cmpltUsr.UserName},
-			ExpExists: true,
+			TestUser:   &authms.User{UserName: cmpltUsr.UserName},
+			ExpExists:  true,
 		},
 		{
-			Desc: "Phone Exists",
+			Desc:       "Phone Exists",
 			InsertUser: cmpltUsr,
-			TestUser: &authms.User{Phone: cmpltUsr.Phone},
-			ExpExists: true,
+			TestUser:   &authms.User{Phone: cmpltUsr.Phone},
+			ExpExists:  true,
 		},
 		{
-			Desc: "Email Exists",
+			Desc:       "Email Exists",
 			InsertUser: cmpltUsr,
-			TestUser: &authms.User{Email: cmpltUsr.Email},
-			ExpExists: true,
+			TestUser:   &authms.User{Email: cmpltUsr.Email},
+			ExpExists:  true,
 		},
 		{
-			Desc: "OAuth Exists",
+			Desc:       "OAuth Exists",
 			InsertUser: cmpltUsr,
-			TestUser: &authms.User{OAuths: cmpltUsr.OAuths},
-			ExpExists: true,
+			TestUser:   &authms.User{OAuths: cmpltUsr.OAuths},
+			ExpExists:  true,
 		},
 	}
 	for _, tc := range tcs {
@@ -158,12 +158,12 @@ func TestDBHelper_UserExists(t *testing.T) {
 				return
 			}
 			if tc.ExpExists && usrID != tc.InsertUser.ID {
-				t.Errorf("%s - expected existing userID %d " +
+				t.Errorf("%s - expected existing userID %d "+
 					"but got %d", tc.Desc, tc.InsertUser.ID,
 					usrID)
 			}
 			if !tc.ExpExists && usrID != -1 {
-				t.Errorf("%s - expected non-existing userID -1" +
+				t.Errorf("%s - expected non-existing userID -1"+
 					" but got %d", tc.Desc, usrID)
 			}
 		}()
@@ -238,7 +238,7 @@ func TestModel_UpdateEmail(t *testing.T) {
 
 func TestModel_UpdateUserName(t *testing.T) {
 	bareBoneUser := &authms.User{
-		Phone: &authms.Value{Value: "+254012345678"},
+		Phone:    &authms.Value{Value: "+254012345678"},
 		Password: "test-password",
 	}
 	cmpltUsr := completeUser()
@@ -287,7 +287,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 			insertUser(expUsr, t)
 			err := m.UpdatePassword(expUsr.ID, tc.OldPass, newPass)
 			if err != tc.expErr {
-				t.Errorf("%s - model.UpdatePassword() expected" +
+				t.Errorf("%s - model.UpdatePassword() expected"+
 					" error %v but got %v", tc.Desc, tc.expErr, err)
 				return
 			}
@@ -298,7 +298,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 			q := `SELECT password FROM users WHERE id=$1`
 			var updatedPassHB []byte
 			if err = db.QueryRow(q, expUsr.ID).Scan(&updatedPassHB); err != nil {
-				t.Fatalf("%s - error retrieving password for" +
+				t.Fatalf("%s - error retrieving password for"+
 					" validation: %v", tc.Desc, err)
 			}
 			if !hasher.CompareHash(newPass, updatedPassHB) {
@@ -362,23 +362,23 @@ func TestModel_GetByUserName(t *testing.T) {
 	assertUsersEqual(actUser, expUsr, t)
 }
 
-func completeUser() (*authms.User) {
+func completeUser() *authms.User {
 	return &authms.User{
 		UserName: "test-username",
 		Email: &authms.Value{
-			Value: "test@email.com",
+			Value:    "test@email.com",
 			Verified: false,
 		},
 		Phone: &authms.Value{
-			Value: "+254712345678",
+			Value:    "+254712345678",
 			Verified: false,
 		},
 		OAuths: map[string]*authms.OAuth{
 			completeUserAppName: {
-				AppName: completeUserAppName,
+				AppName:   completeUserAppName,
 				AppUserID: "test-user-id",
-				AppToken: "test-app.test-user-id.test-token",
-				Verified: false,
+				AppToken:  "test-app.test-user-id.test-token",
+				Verified:  false,
 			},
 		},
 		Password: "test-password",
@@ -398,8 +398,8 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 		LEFT JOIN appUserIDs ON users.id=appUserIDs.userID
 		WHERE users.id=$1`
 	dbUsr := &authms.User{
-		Email: &authms.Value{},
-		Phone: &authms.Value{},
+		Email:  &authms.Value{},
+		Phone:  &authms.Value{},
 		OAuths: make(map[string]*authms.OAuth),
 	}
 	var dbUserName, dbPhone, dbEmail, dbAppName, dbAppUsrID sql.NullString

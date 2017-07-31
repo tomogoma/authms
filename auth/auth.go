@@ -1,13 +1,13 @@
 package auth
 
 import (
+	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/auth/oauth/response"
+	"github.com/tomogoma/authms/claim"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 	"regexp"
 	"strings"
-	"github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/authms/claim"
 	"time"
 )
 
@@ -95,7 +95,7 @@ func New(tg TokenGenerator, lg Logger, db DBHelper,
 		return nil, ErrorNilPhoneVerifier
 	}
 	return &Auth{dbHelper: db, tokenG: tg, oAuthHandler: oa,
-		logger:        lg, phoneVerifier: pv}, nil
+		logger: lg, phoneVerifier: pv}, nil
 }
 
 func (a *Auth) Register(user *authms.User, devID, rIP string) error {
@@ -377,7 +377,7 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 		accSuccessful = false
 	}
 	h := &authms.History{UserID: user.ID, AccessType: accType,
-		SuccessStatus:       accSuccessful, IpAddress: rIP, DevID: devID}
+		SuccessStatus: accSuccessful, IpAddress: rIP, DevID: devID}
 	err = a.dbHelper.SaveHistory(h)
 	if err != nil {
 		a.logger.Error("unable to save auth history entry (' %+v '): %s", h, err)

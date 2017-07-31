@@ -2,26 +2,27 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"os"
+	"runtime"
+	"time"
+
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-micro/server"
 	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/password"
+	"github.com/tomogoma/authms/auth/phone/sms"
+	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/rpc"
-	"runtime"
 	"github.com/tomogoma/go-commons/auth/token"
-	"github.com/tomogoma/authms/auth/dbhelper"
-	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/authms/auth/phone/verification"
-	"github.com/tomogoma/authms/auth/phone/sms"
-	"time"
 	configH "github.com/tomogoma/go-commons/config"
-	"fmt"
-	"os"
 )
 
 const (

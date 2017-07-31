@@ -39,24 +39,8 @@ func DBConn(dsnF DSNFormatter) (*sql.DB, error) {
 }
 
 // InstantiateDB creates the database and tables based on dbName and tableDescs.
-func InstantiateDB(db *sql.DB, dbName string, tableDescs...string) error {
-	return crdb.ExecuteTx(db, func(tx *sql.Tx) error {
-		_, err := tx.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
-		if err != nil {
-			return fmt.Errorf("error creating db if not exist: %v", err)
-		}
-		_, err = tx.Exec("SET DATABASE = " + dbName)
-		if err != nil {
-			return fmt.Errorf("error setting database: %v", err)
-		}
-		for _, createTblStmt := range tableDescs {
-			_, err = tx.Exec(createTblStmt)
-			if err != nil {
-				return fmt.Errorf("error creating table: %v", err)
-			}
-		}
-		return nil
-	})
+func InstantiateDB(db *sql.DB, dbName string, tableDescs ...string) error {
+	return instantiateDB(db, dbName, true, tableDescs...)
 }
 
 // CloseDBOnError closes connection to the given database if err != nil.
@@ -74,4 +58,32 @@ func CloseDBOnError(db *sql.DB, err error) error {
 		return err
 	}
 	return nil
+}
+
+func instantiateDB(db *sql.DB, dbName string, createDB bool, tableDescs ...string) error {
+	retryWithoutCreateDB := false
+	err := crdb.ExecuteTx(db, func(tx *sql.Tx) error {
+		if createDB {
+			_, err := tx.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
+			if err != nil {
+				retryWithoutCreateDB = true
+				return err
+			}
+		}
+		_, err := tx.Exec("SET DATABASE = " + dbName)
+		if err != nil {
+			return fmt.Errorf("error setting database: %v", err)
+		}
+		for _, createTblStmt := range tableDescs {
+			_, err = tx.Exec(createTblStmt)
+			if err != nil {
+				return fmt.Errorf("error creating table: %v", err)
+			}
+		}
+		return nil
+	})
+	if err != nil && retryWithoutCreateDB {
+		return instantiateDB(db, dbName, false, tableDescs...)
+	}
+	return err
 }

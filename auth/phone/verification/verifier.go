@@ -1,11 +1,11 @@
 package verification
 
 import (
-	"github.com/tomogoma/go-commons/errors"
-	"github.com/tomogoma/authms/proto/authms"
-	jwt "github.com/dgrijalva/jwt-go"
-	"regexp"
 	"fmt"
+	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/go-commons/errors"
+	"regexp"
 	"time"
 )
 

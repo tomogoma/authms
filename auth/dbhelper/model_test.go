@@ -1,14 +1,14 @@
 package dbhelper_test
 
 import (
-	"testing"
-	"github.com/tomogoma/authms/auth/dbhelper"
-	"flag"
-	"github.com/tomogoma/authms/auth/password"
-	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/go-commons/database/cockroach"
 	"database/sql"
+	"flag"
+	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/auth/hash"
+	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/go-commons/config"
+	"github.com/tomogoma/go-commons/database/cockroach"
+	"testing"
 )
 
 type Token struct {
@@ -20,8 +20,8 @@ func (c Token) TokenKeyFile() string {
 }
 
 type Config struct {
-	Database cockroach.DSN    `json:"database,omitempty"`
-	Token    Token  `json:"token,omitempty"`
+	Database cockroach.DSN `json:"database,omitempty"`
+	Token    Token         `json:"token,omitempty"`
 }
 
 var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/conf.file.yml")
@@ -38,7 +38,7 @@ func TestNewModel(t *testing.T) {
 	newModel(t)
 }
 
-func newModel(t *testing.T) (*dbhelper.DBHelper) {
+func newModel(t *testing.T) *dbhelper.DBHelper {
 	pg, err := password.NewGenerator(password.AllChars)
 	if err != nil {
 		t.Fatalf("password.NewGenerator(): %s", err)

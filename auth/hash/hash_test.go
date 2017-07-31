@@ -1,8 +1,8 @@
 package hash_test
 
 import (
-	"testing"
 	"github.com/tomogoma/authms/auth/hash"
+	"testing"
 )
 
 func TestCompareHash(t *testing.T) {
