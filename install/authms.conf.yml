@@ -49,7 +49,7 @@ token:
 # The values can be found in the app's dashboard in https://developers.facebook.com/apps
 OAuth:
   # facebookSecretFileLoc is the location of the file containing the facebook
-  # secret.
+  # secret as is on the facebook app's dashboard.
   # The file should contain only the key and no new line characters.
   facebookSecretFileLoc: /etc/authms/keys/facebooksecret.key
   # facebookID is the App ID on the facebook app's dashboard.
