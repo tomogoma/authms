@@ -1,376 +1,259 @@
 package http
 
 import (
+	"context"
 	"encoding/json"
-	"errors"
 	"io/ioutil"
 	"net/http"
-	"time"
-
-	"fmt"
 
 	"github.com/gorilla/mux"
+	"github.com/pborman/uuid"
+	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/dbhelper/history"
-	"github.com/tomogoma/authms/auth/dbhelper/user"
-	"github.com/tomogoma/authms/server/helper"
+	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/go-commons/errors"
 )
+
+type contextKey string
 
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
 
-	loginPath = "/login"
-	regPath   = "/register"
-	tokenPath = "/token"
+	urlVarLoginType = "loginType"
+
+	authTypePhone    = "phones"
+	authTypeOAuth    = "oauths"
+	authTypeEmail    = "emails"
+	authTypeUsername = "usernames"
+	authTypeCode     = "codes"
+
+	logKeyTransID = "transactionID"
+	logKeyURL     = "url"
+	logKeyHost    = "host"
+	logKeyMethod  = "method"
+	logKeyRequest = "request"
+
+	ctxtKeyBody = contextKey("id")
+	ctxKeyLog   = contextKey("log")
 )
 
-type Logger interface {
-	Error(interface{}, ...interface{}) error
-	Warn(interface{}, ...interface{}) error
-	Info(interface{}, ...interface{})
-	Debug(interface{}, ...interface{})
-	Fine(interface{}, ...interface{})
-}
-
-type Request struct {
-	FrSrvcID  string `json:"forServiceID,omitempty"`
-	RefSrvcID string `json:"refererServiceID,omitempty"`
-	DevID     string `json:"devID,omitempty"`
-	User
-}
-
-type History struct {
-	ID            int       `json:"id,omitempty"`
-	UserID        int       `json:"userID,omitempty"`
-	IpAddress     string    `json:"ipAddress,omitempty"`
-	Date          time.Time `json:"date,omitempty"`
-	AccessType    string    `json:"accessType,omitempty"`
-	SuccessStatus bool      `json:"successStatus"`
-}
-
-type AppID struct {
-	AppName  string `json:"appName,omitempty"`
-	UsrID    string `json:"userID,omitempty"`
-	Verified bool   `json:"verified,omitempty"`
-}
-
-func (a *AppID) Name() string {
-	if a == nil {
-		return ""
-	}
-	return a.AppName
-}
-
-func (a *AppID) UserID() string {
-	if a == nil {
-		return ""
-	}
-	return a.UsrID
-}
-
-func (a *AppID) Validated() bool {
-	if a == nil {
-		return false
-	}
-	return a.Verified
-}
-
-type Value struct {
-	Val      string `json:"value,omitempty"`
-	Verified bool   `json:"verified,omitempty"`
-}
-
-func (v *Value) Value() string {
-	if v == nil {
-		return ""
-	}
-	return v.Val
-}
-
-func (v *Value) Validated() bool {
-	if v == nil {
-		return false
-	}
-	return v.Verified
-}
-
-type User struct {
-	ID         int       `json:"id,omitempty"`
-	UName      string    `json:"userName,omitempty"`
-	PhoneNo    *Value    `json:"phone,omitempty"`
-	Mail       *Value    `json:"email,omitempty"`
-	AppID      *AppID    `json:"appID,omitempty"`
-	Pass       string    `json:"password,omitempty"`
-	Token      string    `json:"token,omitempty"`
-	PrevLogins []History `json:"prevLogins,omitempty"`
-}
-
-func (u *User) UserName() string     { return u.UName }
-func (u *User) Email() user.Valuer   { return u.Mail }
-func (u *User) EmailAddress() string { return u.Mail.Value() }
-func (u *User) Phone() user.Valuer   { return u.PhoneNo }
-func (u *User) PhoneNumber() string  { return u.PhoneNo.Value() }
-func (u *User) App() user.App        { return u.AppID }
-
 type Server struct {
-	auth   *auth.Auth
-	lg     Logger
-	tIDCh  chan int
-	quitCh chan error
+	errors.AuthErrCheck
+	errors.ClErrCheck
+	auth *auth.Auth
 }
 
-var ErrorNilAuth = errors.New("Auth cannot be nil")
-var ErrorNilLogger = errors.New("Logger cannot be nil")
-var ErrorEmptyAddress = errors.New("Address cannot be empty")
-var ErrorNilQuitChanel = errors.New("Quit chanel cannot be nil")
-
-func New(auth *auth.Auth, lg Logger, quitCh chan error) (*Server, error) {
-
+func New(auth *auth.Auth) (*Server, error) {
 	if auth == nil {
-		return nil, ErrorNilAuth
+		return nil, errors.New("auth was nil")
 	}
-
-	if lg == nil {
-		return nil, ErrorNilLogger
-	}
-
-	if quitCh == nil {
-		return nil, ErrorNilQuitChanel
-	}
-
-	tIDCh := make(chan int)
-	go helper.TransactionSerializer(tIDCh)
-
-	return &Server{auth: auth, lg: lg, tIDCh: tIDCh, quitCh: quitCh}, nil
+	return &Server{auth: auth}, nil
 }
 
-func (s *Server) Start(address string) {
+func (s *Server) HandleRoute(r *mux.Router) {
+	r.PathPrefix("/register").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleRegistration))
+	r.PathPrefix("/" + authTypeOAuth + "/login").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleLoginOAuth))
+	r.PathPrefix("/" + authTypePhone + "/verify/").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleVerifyPhone))
+	r.PathPrefix("/" + authTypeCode + "/verify").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleVerifyCode))
+	r.PathPrefix("/{" + urlVarLoginType + "}/login").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleLogin))
+	r.PathPrefix("/{" + urlVarLoginType + "}/update").
+		Methods(http.MethodPost).
+		HandlerFunc(s.readReqBody(s.handleUpdate))
+}
 
-	if address == "" {
-		s.quitCh <- ErrorEmptyAddress
-		return
+func prepLogger(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		log := logrus.WithFields(logrus.Fields{
+			logKeyTransID: uuid.New(),
+			logKeyURL:     r.URL,
+			logKeyHost:    r.Host,
+			logKeyMethod:  r.Method,
+		})
+		log.Info("new request")
+		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	}
+}
 
-	r := mux.NewRouter()
-	r.PathPrefix(loginPath).Methods("POST").HandlerFunc(s.handleLogin)
-	r.PathPrefix(regPath).Methods("POST").HandlerFunc(s.handleRegistration)
-	r.PathPrefix(tokenPath).Methods("POST").HandlerFunc(s.handleToken)
+func (s *Server) readReqBody(next http.HandlerFunc) http.HandlerFunc {
+	return prepLogger(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		dataB, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			err = errors.NewClientf("Failed to read request body: %v", err)
+			s.handleError(w, r, nil, err)
+			return
+		}
+		ctx := context.WithValue(r.Context(), ctxtKeyBody, dataB)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
 
-	s.lg.Info("Ready to listen at %s", address)
-	s.quitCh <- http.ListenAndServe(address, r)
+// unmarshalJSONOrRespondError returns true if json is extracted from
+// data into req successfully, otherwise, it writes an error response into
+// w and returns false.
+// The Context in r should contain a logrus Entry with key ctxKeyLog
+// for logging in case of error
+func (s *Server) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, data []byte, req interface{}) bool {
+	err := json.Unmarshal(data, req)
+	if err != nil {
+		err = errors.NewClientf("failed to unmarshal JSON request from body: %v", err)
+		s.handleError(w, r, nil, err)
+		return false
+	}
+	return true
 }
 
 func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
-
-	tID, dataB, ok := s.readReqBody("register", w, r)
-	if !ok {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.RegisterRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
-
-	req := &Request{}
-	s.lg.Fine("%d - unmarshal request...", tID)
-	err := json.Unmarshal(dataB, req)
-	if err != nil {
-		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
-		http.Error(w, "failed to unmarshal json request body", http.StatusBadRequest)
-		return
-	}
-
-	s.lg.Fine("%d - register user...", tID)
-	svdUsr, err := s.auth.RegisterUser(req, req.Pass, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
-	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - registration error: %s", tID, err)
-			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
-			return
-		}
-		s.lg.Warn("%d - registration error: %s", tID, err)
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	s.lg.Fine("%d - package registered user result...", tID)
-	respUsr := packageUser(svdUsr)
-	s.lg.Fine("%d - write json response...", tID)
-	b, err := jsonResponse(w, "user", respUsr, http.StatusCreated)
-	if err != nil {
-		s.lg.Error("%d - json response error: %s", tID, err)
-		return
-	}
-
-	s.lg.Info("%d - [%s] registration complete, wrote %d bytes", tID, r.RemoteAddr, b)
+	err := s.auth.Register(req.User, req.DeviceID, r.RemoteAddr)
+	// todo req may have been mutated and thus not good enough for debugging!
+	s.respondOn(w, r, req, req.User, http.StatusCreated, err)
 }
 
 func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
-
-	tID, dataB, ok := s.readReqBody("login", w, r)
-	if !ok {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.BasicAuthRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
-
-	req := &Request{}
-	s.lg.Fine("%d - unmarshal request...", tID)
-	err := json.Unmarshal(dataB, req)
-	if err != nil {
-		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
-		http.Error(w, "failed to unmarshal json request body", http.StatusBadRequest)
+	vars := mux.Vars(r)
+	var authUsr *authms.User
+	var err error
+	switch vars[urlVarLoginType] {
+	case authTypeUsername:
+		authUsr, err = s.auth.LoginUserName(req.BasicID, req.Password,
+			req.DeviceID, "")
+	case authTypeEmail:
+		authUsr, err = s.auth.LoginEmail(req.BasicID, req.Password,
+			req.DeviceID, "")
+	case authTypePhone:
+		authUsr, err = s.auth.LoginPhone(req.BasicID, req.Password,
+			req.DeviceID, "")
+	default:
+		http.Error(w, "unknown login type", http.StatusBadRequest)
 		return
 	}
-
-	s.lg.Fine("%d - validate login...", tID)
-	var authUsr user.User
-	if req.UName != "" {
-		s.lg.Fine("%d - use username...", tID)
-		authUsr, err = s.auth.LoginUserName(req.UName, req.Pass,
-			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
-	} else if req.AppID != nil {
-		s.lg.Fine("%d - use appID...", tID)
-		authUsr, err = s.auth.LoginOAuth(req.AppID, req.Pass,
-			req.DevID, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
-	}
-	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - login error: %s", tID, err)
-			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
-			return
-		}
-		s.lg.Warn("%d - login error: %s", tID, err)
-		http.Error(w, "invalid userName/password combo or missing devID", http.StatusUnauthorized)
-		return
-	}
-
-	s.lg.Fine("%d - package authenticated user result...", tID)
-	respUsr := packageUser(authUsr)
-	s.lg.Fine("%d - write json response...", tID)
-	b, err := jsonResponse(w, "user", respUsr, http.StatusOK)
-	if err != nil {
-		s.lg.Error("%d - json response error: %s", tID, err)
-		return
-	}
-
-	s.lg.Info("%d - [%s] login complete, wrote %d bytes", tID, r.RemoteAddr, b)
+	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
 }
 
-func (s *Server) handleToken(w http.ResponseWriter, r *http.Request) {
-
-	tID, dataB, ok := s.readReqBody("validate token", w, r)
-	if !ok {
+func (s *Server) handleLoginOAuth(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.OAuthRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
-
-	req := &Request{}
-	s.lg.Fine("%d - unmarshal request...", tID)
-	err := json.Unmarshal(dataB, req)
-	if err != nil {
-		s.lg.Warn("%d - unmarshal json request body fail: %s", tID, err)
-		http.Error(w, "failed to unmarshal json request body", http.StatusBadRequest)
-		return
-	}
-	s.lg.Fine("%d - validate token...", tID)
-	authUsr, err := s.auth.AuthenticateToken(req.Token, r.RemoteAddr, req.FrSrvcID, req.RefSrvcID)
-	if err != nil {
-		s.lg.Fine("%d - check error is authentication or internal...", tID)
-		if !auth.AuthError(err) {
-			s.lg.Error("%d - token authentication error: %s", tID, err)
-			http.Error(w, internalErrorMessage, http.StatusInternalServerError)
-			return
-		}
-		s.lg.Warn("%d - token authentication error: %s", tID, err)
-		http.Error(w, err.Error(), http.StatusUnauthorized)
-		return
-	}
-
-	s.lg.Fine("%d - package authenticated user result...", tID)
-	respUsr := packageUser(authUsr)
-	s.lg.Fine("%d - write json response...", tID)
-	b, err := jsonResponse(w, "user", respUsr, http.StatusOK)
-	if err != nil {
-		s.lg.Error("%d - json response error: %s", tID, err)
-		return
-	}
-
-	s.lg.Info("%d - [%s] token validation complete, wrote %d bytes", tID, r.RemoteAddr, b)
+	authUsr, err := s.auth.LoginOAuth(req.OAuth, req.DeviceID, "")
+	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
 }
 
-func (s *Server) readReqBody(handlerName string, w http.ResponseWriter, r *http.Request) (int, []byte, bool) {
-
-	tID := <-s.tIDCh
-	s.lg.Info("%d - [%s] %s request", tID, r.RemoteAddr, handlerName)
-
-	defer r.Body.Close()
-	s.lg.Fine("%d - read request body...", tID)
-	dataB, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		s.lg.Warn("%d - read request body fail: %s", tID, err)
-		http.Error(w, "failed to read request body", http.StatusRequestTimeout)
-		return tID, dataB, false
+func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.UpdateRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
 	}
-
-	return tID, dataB, true
+	vars := mux.Vars(r)
+	var err error
+	switch vars[urlVarLoginType] {
+	case authTypePhone:
+		err = s.auth.UpdatePhone(req.User, req.Token, req.DeviceID, "")
+	case authTypeOAuth:
+		err = s.auth.UpdateOAuth(req.User, req.AppName, req.Token, req.DeviceID, "")
+	case authTypeUsername:
+		fallthrough
+	case authTypeEmail:
+		http.Error(w, "not implemented", http.StatusNotImplemented)
+		return
+	default:
+		s.handleError(w, r, req, errors.NewClient("Unknown auth type"))
+		return
+	}
+	// todo req may have been mutated and thus not good enough for debugging!
+	s.respondOn(w, r, req, req.User, http.StatusOK, err)
 }
 
-func packageUser(rcv user.User) User {
-
-	prevLogins := make([]History, len(rcv.PreviousLogins()))
-	for i, h := range rcv.PreviousLogins() {
-		prevLogins[i] = History{
-			ID:            h.ID(),
-			UserID:        h.UserID(),
-			IpAddress:     h.IPAddress(),
-			Date:          h.Date(),
-			AccessType:    history.DecodeAccessMethod(h.AccessMethod()),
-			SuccessStatus: h.Successful(),
-		}
+func (s *Server) handleVerifyPhone(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.SMSVerificationRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
 	}
-	var email *Value
-	if e := rcv.Email(); e != nil && fmt.Sprintf("%v", e) != "<nil>" {
-		email = &Value{
-			Val:      e.Value(),
-			Verified: e.Validated(),
-		}
-	}
-
-	var phone *Value
-	if p := rcv.Phone(); p != nil && fmt.Sprintf("%v", p) != "<nil>" {
-		phone = &Value{
-			Val:      p.Value(),
-			Verified: p.Validated(),
-		}
-	}
-
-	var appID *AppID
-	if app := rcv.App(); app != nil && fmt.Sprintf("%v", app) != "<nil>" {
-		app = &AppID{
-			AppName:  app.Name(),
-			UsrID:    app.UserID(),
-			Verified: app.Validated(),
-		}
-	}
-
-	return User{
-		ID:         rcv.ID(),
-		UName:      rcv.UserName(),
-		Token:      rcv.Token(""),
-		AppID:      appID,
-		Mail:       email,
-		PhoneNo:    phone,
-		PrevLogins: prevLogins,
-	}
+	resp, err := s.auth.VerifyPhone(req, "")
+	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 
-func jsonResponse(w http.ResponseWriter, dataKey string, data interface{}, status int) (int, error) {
-
-	respM := map[string]interface{}{"status": status}
-	respM[dataKey] = data
-
-	respB, err := json.Marshal(respM)
-	if err != nil {
-		return 0, err
+func (s *Server) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &authms.SMSVerificationCodeRequest{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
 	}
+	resp, err := s.auth.VerifyPhoneCode(req, "")
+	s.respondOn(w, r, req, resp, http.StatusOK, err)
+}
 
+func (s *Server) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
+	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).WithField(logKeyRequest, reqData)
+	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
+		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
+			log.Warnf("Forbidden: %v", err)
+			http.Error(w, err.Error(), http.StatusForbidden)
+		} else {
+			log.Warnf("Unauthorized: %v", err)
+			http.Error(w, err.Error(), http.StatusUnauthorized)
+		}
+		return
+	}
+	if s.auth.IsClientError(err) || s.IsClientError(err) {
+		log.Warnf("Bad request: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	log.Errorf("Internal error: %v", err)
+	http.Error(w, internalErrorMessage, http.StatusInternalServerError)
+}
+
+func (s *Server) respondOn(w http.ResponseWriter, r *http.Request, reqData interface{}, respData interface{}, code int, err error) int {
+	if err != nil {
+		s.handleError(w, r, reqData, err)
+		return 0
+	}
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	response := struct {
+		Status  int         `json:"status"`
+		Message string      `json:"message"`
+		Data    interface{} `json:"data"`
+	}{
+		Status: code,
+		Data:   respData,
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	return w.Write(respB)
+	respBytes, err := json.Marshal(&response)
+	if err != nil {
+		s.handleError(w, r, reqData, err)
+		return 0
+	}
+	w.WriteHeader(code)
+	i, err := w.Write(respBytes)
+	if err != nil {
+		log := r.Context().Value(ctxKeyLog).(*logrus.Entry)
+		log.Errorf("unable write data to response stream: %v", err)
+		return i
+	}
+	return i
 }

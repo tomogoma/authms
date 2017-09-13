@@ -8,9 +8,10 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
-	"github.com/micro/go-micro/server"
+	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
@@ -20,6 +21,7 @@ import (
 	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/authms/server/http"
 	"github.com/tomogoma/authms/server/rpc"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
@@ -27,6 +29,8 @@ import (
 
 const (
 	serviceName    = "authms"
+	rpcNamePrefix  = ""
+	webnamePrefix  = "go.micro.web."
 	serviceVersion = "0.0.1"
 )
 
@@ -122,15 +126,13 @@ func main() {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
 	}
-	switch conf.Service.RunType {
-	case config.RunTypeRPC:
-		go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
-	case config.RunTypeHttp:
-		go serveHttp(rpcSrv, serverHttpQuitCh)
-	default:
-		lg.Critical("Invalid runt type chosen")
+	go serveRPC(conf.Service.RegisterInterval, rpcSrv, serverRPCQuitCh)
+	httpHandler, err := http.New(a)
+	if err != nil {
+		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
 	}
+	go serveHttp(conf.Service.RegisterInterval, httpHandler, serverHttpQuitCh)
 	select {
 	case err = <-authQuitCh:
 		lg.Critical("auth quit with error: %v", err)
@@ -141,24 +143,29 @@ func main() {
 	}
 }
 
-func serveRPC(c config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
+func serveRPC(regInterval time.Duration, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
-		micro.Name(serviceName),
+		micro.Name(rpcNamePrefix+serviceName),
 		micro.Version(serviceVersion),
-		micro.RegisterInterval(c.RegisterInterval),
+		micro.RegisterInterval(regInterval),
 	)
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
 	err := service.Run()
 	quitCh <- err
 }
 
-func serveHttp(rpcServ *rpc.Server, quitCh chan error) {
-	server.Init(
-		server.Name(serviceName),
-		server.Version(serviceVersion),
-		//server.RegisterInterval(c.RegisterInterval),
+type RouteHandler interface {
+	HandleRoute(r *mux.Router)
+}
+
+func serveHttp(regInterval time.Duration, rh RouteHandler, quitCh chan error) {
+	r := mux.NewRouter()
+	rh.HandleRoute(r)
+	service := web.NewService(
+		web.Handler(r),
+		web.Name(webnamePrefix+serviceName),
+		web.Version(serviceVersion),
+		web.RegisterInterval(regInterval),
 	)
-	server.Handle(server.NewHandler(rpcServ))
-	err := server.Run()
-	quitCh <- err
+	quitCh <- service.Run()
 }

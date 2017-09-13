@@ -9,9 +9,6 @@
 
 # s# serviceConfig contains runtime micro-service configuration.
 serviceConfig:
-  # runType is how the server should listen for requests.
-  # can be one of (http, rpc).
-  runType: rpc
   # registerInterval is the interval for sending alive pulses to the
   # service registry.
   registerInterval: 5s

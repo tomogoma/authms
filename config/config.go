@@ -2,7 +2,6 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"time"
 
 	"io/ioutil"
@@ -21,18 +20,13 @@ const (
 	SMSAPIAfricasTalking = "africasTalking"
 )
 
-var ErrorInvalidRunType = fmt.Errorf("Invalid runtype; expected one of %s, %s", RunTypeRPC, RunTypeHttp)
 var ErrorInvalidRegInterval = errors.New("Register interval was invalid cannot be < 1ms")
 
 type ServiceConfig struct {
-	RunType          string        `json:"runType,omitempty" yaml:"runType"`
 	RegisterInterval time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
 }
 
 func (sc ServiceConfig) Validate() error {
-	if sc.RunType != RunTypeHttp && sc.RunType != RunTypeRPC {
-		return ErrorInvalidRunType
-	}
 	if sc.RegisterInterval <= 1*time.Millisecond {
 		return ErrorInvalidRegInterval
 	}
