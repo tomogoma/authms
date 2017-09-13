@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/dropbox/godropbox/errors"
 	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
@@ -127,7 +128,7 @@ func main() {
 		return
 	}
 	go serveRPC(conf.Service.RegisterInterval, rpcSrv, serverRPCQuitCh)
-	httpHandler, err := http.New(a)
+	httpHandler, err := http.NewHandler(a)
 	if err != nil {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
@@ -155,12 +156,14 @@ func serveRPC(regInterval time.Duration, rpcSrv *rpc.Server, quitCh chan error) 
 }
 
 type RouteHandler interface {
-	HandleRoute(r *mux.Router)
+	HandleRoute(r *mux.Router) error
 }
 
 func serveHttp(regInterval time.Duration, rh RouteHandler, quitCh chan error) {
 	r := mux.NewRouter()
-	rh.HandleRoute(r)
+	if err := rh.HandleRoute(r); err != nil {
+		quitCh <- errors.Newf("unable to handle route: %v", err)
+	}
 	service := web.NewService(
 		web.Handler(r),
 		web.Name(webnamePrefix+serviceName),

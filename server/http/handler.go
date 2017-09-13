@@ -9,12 +9,32 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
-	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 type contextKey string
+
+type Auth interface {
+	IsClientError(error) bool
+	IsForbiddenError(error) bool
+	IsAuthError(error) bool
+	Register(user *authms.User, devID, rIP string) error
+	LoginUserName(uName, pass, devID, rIP string) (*authms.User, error)
+	LoginEmail(email, pass, devID, rIP string) (*authms.User, error)
+	LoginPhone(phone, pass, devID, rIP string) (*authms.User, error)
+	LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, error)
+	UpdatePhone(user *authms.User, token, devID, rIP string) error
+	UpdateOAuth(user *authms.User, appName, token, devID, rIP string) error
+	VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*authms.SMSVerificationStatus, error)
+	VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP string) (*authms.SMSVerificationStatus, error)
+}
+
+type Handler struct {
+	errors.AuthErrCheck
+	errors.ClErrCheck
+	auth Auth
+}
 
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
@@ -37,27 +57,24 @@ const (
 	ctxKeyLog   = contextKey("log")
 )
 
-type Server struct {
-	errors.AuthErrCheck
-	errors.ClErrCheck
-	auth *auth.Auth
-}
-
-func New(auth *auth.Auth) (*Server, error) {
-	if auth == nil {
+func NewHandler(a Auth) (*Handler, error) {
+	if a == nil {
 		return nil, errors.New("auth was nil")
 	}
-	return &Server{auth: auth}, nil
+	return &Handler{auth: a}, nil
 }
 
-func (s *Server) HandleRoute(r *mux.Router) {
+func (s *Handler) HandleRoute(r *mux.Router) error {
+	if r == nil {
+		return errors.New("Router was nil")
+	}
 	r.PathPrefix("/register").
 		Methods(http.MethodPost).
 		HandlerFunc(s.readReqBody(s.handleRegistration))
 	r.PathPrefix("/" + authTypeOAuth + "/login").
 		Methods(http.MethodPost).
 		HandlerFunc(s.readReqBody(s.handleLoginOAuth))
-	r.PathPrefix("/" + authTypePhone + "/verify/").
+	r.PathPrefix("/" + authTypePhone + "/verify").
 		Methods(http.MethodPost).
 		HandlerFunc(s.readReqBody(s.handleVerifyPhone))
 	r.PathPrefix("/" + authTypeCode + "/verify").
@@ -69,6 +86,7 @@ func (s *Server) HandleRoute(r *mux.Router) {
 	r.PathPrefix("/{" + urlVarLoginType + "}/update").
 		Methods(http.MethodPost).
 		HandlerFunc(s.readReqBody(s.handleUpdate))
+	return nil
 }
 
 func prepLogger(next http.HandlerFunc) http.HandlerFunc {
@@ -85,7 +103,7 @@ func prepLogger(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *Server) readReqBody(next http.HandlerFunc) http.HandlerFunc {
+func (s *Handler) readReqBody(next http.HandlerFunc) http.HandlerFunc {
 	return prepLogger(func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		dataB, err := ioutil.ReadAll(r.Body)
@@ -104,7 +122,7 @@ func (s *Server) readReqBody(next http.HandlerFunc) http.HandlerFunc {
 // w and returns false.
 // The Context in r should contain a logrus Entry with key ctxKeyLog
 // for logging in case of error
-func (s *Server) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, data []byte, req interface{}) bool {
+func (s *Handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, data []byte, req interface{}) bool {
 	err := json.Unmarshal(data, req)
 	if err != nil {
 		err = errors.NewClientf("failed to unmarshal JSON request from body: %v", err)
@@ -114,7 +132,7 @@ func (s *Server) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Requ
 	return true
 }
 
-func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.RegisterRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -125,7 +143,7 @@ func (s *Server) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, req.User, http.StatusCreated, err)
 }
 
-func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.BasicAuthRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -151,7 +169,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
 }
 
-func (s *Server) handleLoginOAuth(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleLoginOAuth(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.OAuthRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -161,7 +179,7 @@ func (s *Server) handleLoginOAuth(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
 }
 
-func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.UpdateRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -187,7 +205,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, req.User, http.StatusOK, err)
 }
 
-func (s *Server) handleVerifyPhone(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleVerifyPhone(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.SMSVerificationRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -197,7 +215,7 @@ func (s *Server) handleVerifyPhone(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 
-func (s *Server) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
+func (s *Handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &authms.SMSVerificationCodeRequest{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
@@ -207,7 +225,7 @@ func (s *Server) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 
-func (s *Server) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
+func (s *Handler) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
 	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).WithField(logKeyRequest, reqData)
 	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
 		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
@@ -228,7 +246,7 @@ func (s *Server) handleError(w http.ResponseWriter, r *http.Request, reqData int
 	http.Error(w, internalErrorMessage, http.StatusInternalServerError)
 }
 
-func (s *Server) respondOn(w http.ResponseWriter, r *http.Request, reqData interface{}, respData interface{}, code int, err error) int {
+func (s *Handler) respondOn(w http.ResponseWriter, r *http.Request, reqData interface{}, respData interface{}, code int, err error) int {
 	if err != nil {
 		s.handleError(w, r, reqData, err)
 		return 0
