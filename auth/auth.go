@@ -1,14 +1,15 @@
 package auth
 
 import (
+	"regexp"
+	"strings"
+	"time"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/auth/oauth/response"
 	"github.com/tomogoma/authms/claim"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
-	"regexp"
-	"strings"
-	"time"
 )
 
 type OAuthHandler interface {
@@ -356,7 +357,7 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 
 func (a *Auth) validateOAuth(claimOA *authms.OAuth) error {
 	if claimOA == nil {
-		return nil
+		return errors.NewClient("nil OAuth was found")
 	}
 	oa, err := a.oAuthHandler.ValidateToken(claimOA.AppName, claimOA.AppToken)
 	if err != nil {

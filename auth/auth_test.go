@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"flag"
+	"runtime"
+	"time"
+
 	"github.com/limetext/log4go"
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/auth/oauth/facebook"
@@ -14,8 +17,6 @@ import (
 	"github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
-	"runtime"
-	"time"
 )
 
 type TokenConfigMock struct {
@@ -797,6 +798,10 @@ func TestAuth_LoginOAuth(t *testing.T) {
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
 			OAuth:     &authms.OAuth{}, DevID: "Tes-devID"},
+		{Desc: "Nil OAuth", ExpErr: true,
+			DBHelper:  &DBHelperMock{T: t},
+			OAHandler: &OAuthHandlerMock{ExpValTknClld: false, ExpErr: errors.New("")},
+			OAuth:     nil, DevID: "Tes-devID"},
 	}
 	for _, c := range cases {
 		func() {
