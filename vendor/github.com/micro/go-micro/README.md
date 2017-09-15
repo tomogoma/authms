@@ -6,12 +6,11 @@ The **Micro** philosophy is sane defaults with a pluggable architecture. We prov
 
 Everything in go-micro is **pluggable**. You can find and contribute to plugins at [github.com/micro/go-plugins](https://github.com/micro/go-plugins).
 
-Follow us on Twitter at [@MicroHQ](https://twitter.com/microhq), join the [Slack](https://micro-services.slack.com) community [here](http://slack.micro.mu/) or 
-check out the [Mailing List](https://groups.google.com/forum/#!forum/microhq).
+Follow us on [Twitter](https://twitter.com/microhq) or join the [Slack](http://slack.micro.mu/) community.
 
 ## Features
 
-Go Micro abstracts way the details of distributed systems. Here are the main features.
+Go Micro abstracts away the details of distributed systems. Here are the main features.
 
 - **Service Discovery** - Applications are automatically registered with service discovery so they can find each other.
 - **Load Balancing** - Smart client side load balancing is used to balance requests between instances of a service.
@@ -20,14 +19,15 @@ Go Micro abstracts way the details of distributed systems. Here are the main fea
 - **Message Encoding** - Micro services can encode requests in a number of encoding formats and seamlessly decode based on the Content-Type header.
 - **RPC Client/Server** - The client and server leverage the above features and provide a clean simple interface for building microservices.
 
+Go Micro supports both the Service and Function programming models. Read on to learn more.
+
 ## Docs
 
 For more detailed information on the architecture, installation and use of go-micro checkout the [docs](https://micro.mu/docs).
 
 ## Learn By Example
 
-An example service can be found in [**examples/service**](https://github.com/micro/examples/tree/master/service). The [**examples**](https://github.com/micro/examples) directory contains many more examples for using things such as middleware/wrappers, selector filters, pub/sub and code generation. 
-
+An example service can be found in [**examples/service**](https://github.com/micro/examples/tree/master/service) and function in [**examples/function**](https://github.com/micro/examples/tree/master/function). The [**examples**](https://github.com/micro/examples) directory contains many more examples for using things such as middleware/wrappers, selector filters, pub/sub and code generation. 
 For the complete greeter example look at [**examples/greeter**](https://github.com/micro/examples/tree/master/greeter). Other examples can be found throughout the GitHub repository.
 
 Check out the blog post to learn how to write go-micro services [https://micro.mu/blog/2016/03/28/go-micro.html](https://micro.mu/blog/2016/03/28/go-micro.html) or watch the talk from the [Golang UK Conf 2016](https://www.youtube.com/watch?v=xspaDovwk34).
@@ -156,14 +156,9 @@ func main() {
 	service := micro.NewService(
 		micro.Name("greeter"),
 		micro.Version("latest"),
-		micro.Metadata(map[string]string{
-			"type": "helloworld",
-		}),
 	)
 
-	// Init will parse the command line flags. Any flags set will
-	// override the above settings. Options defined here will
-	// override anything set on the command line.
+	// Init will parse the command line flags.
 	service.Init()
 
 	// Register handler
@@ -227,6 +222,48 @@ func main() {
 go run client.go
 Hello John
 ```
+
+## Writing a Function
+
+Go Micro includes the Function programming model. This is the notion of a one time executing Service which operates much like a service except exiting 
+after completing a request. A function is defined much like a service and called in exactly the same way.
+
+### Defining a Function
+
+```go
+package main
+
+import (
+	proto "github.com/micro/examples/function/proto"
+	"github.com/micro/go-micro"
+	"golang.org/x/net/context"
+)
+
+type Greeter struct{}
+
+func (g *Greeter) Hello(ctx context.Context, req *proto.HelloRequest, rsp *proto.HelloResponse) error {
+	rsp.Greeting = "Hello " + req.Name
+	return nil
+}
+
+func main() {
+	// create a new function
+	fnc := micro.NewFunction(
+		micro.Name("go.micro.fnc.greeter"),
+	)
+
+	// init the command line
+	fnc.Init()
+
+	// register a handler
+	fnc.Handle(new(Greeter))
+
+	// run the function
+	fnc.Run()
+}
+```
+
+It's that simple.
 
 ## How does it work?
 

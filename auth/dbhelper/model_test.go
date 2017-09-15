@@ -3,12 +3,13 @@ package dbhelper_test
 import (
 	"database/sql"
 	"flag"
+	"testing"
+
 	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
-	"testing"
 )
 
 type Token struct {

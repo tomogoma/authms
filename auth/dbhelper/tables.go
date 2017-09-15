@@ -1,7 +1,7 @@
 package dbhelper
 
 const (
-	users = `
+	UsersTBLDesc = `
 CREATE TABLE IF NOT EXISTS users (
   id         SERIAL PRIMARY KEY NOT NULL,
   password   BYTES              NOT NULL,
@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS users (
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP()
 );
 `
-	usernames = `
+	UsernamesTblDesc = `
 CREATE TABLE IF NOT EXISTS userNames (
   userID     SERIAL             NOT NULL REFERENCES users (id),
   id         SERIAL		NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS userNames (
   PRIMARY KEY	(userID, id)
 );
 `
-	emails = `
+	EmailsTblDesc = `
 CREATE TABLE IF NOT EXISTS emails (
   userID     SERIAL             NOT NULL REFERENCES users (id),
   id         SERIAL		NOT NULL,
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS emails (
   PRIMARY KEY	(userID, id)
 );
 `
-	phones = `
+	PhonesTblDesc = `
 CREATE TABLE IF NOT EXISTS phones (
   userID     SERIAL             NOT NULL REFERENCES users (id),
   id         SERIAL		NOT NULL,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS phones (
   PRIMARY KEY	(userID, id)
 );
 `
-	appUserIDs = `
+	AppUserIDsTblDesc = `
 CREATE TABLE IF NOT EXISTS appUserIDs (
   userID     SERIAL             NOT NULL REFERENCES users (id),
   id         SERIAL		NOT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS appUserIDs (
 );
 `
 	// TODO add error column
-	history = `
+	HistoryTblDesc = `
 CREATE TABLE IF NOT EXISTS history (
   userID       SERIAL             NOT NULL REFERENCES users (id),
   id           SERIAL		  NOT NULL,
@@ -70,3 +70,6 @@ CREATE TABLE IF NOT EXISTS history (
 );
 `
 )
+
+var AllTableDescs = []string{UsersTBLDesc, UsernamesTblDesc,
+	EmailsTblDesc, PhonesTblDesc, AppUserIDsTblDesc, HistoryTblDesc}

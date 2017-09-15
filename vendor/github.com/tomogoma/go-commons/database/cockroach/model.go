@@ -3,8 +3,10 @@ package cockroach
 import (
 	"database/sql"
 	"errors"
-
 	"fmt"
+
+	"context"
+	"time"
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	_ "github.com/lib/pq"
@@ -43,6 +45,21 @@ func InstantiateDB(db *sql.DB, dbName string, tableDescs ...string) error {
 	return instantiateDB(db, dbName, true, tableDescs...)
 }
 
+// TryConnect attempts to connect to db using dsn (if not already connected).
+func TryConnect(dsn string, db *sql.DB) (*sql.DB, error) {
+	if db != nil {
+		return db, nil
+	}
+	db, err := sql.Open(driverName, dsn)
+	if err != nil {
+		return nil, err
+	}
+	if err := db.Ping(); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
 // CloseDBOnError closes connection to the given database if err != nil.
 // It then returns the error.
 func CloseDBOnError(db *sql.DB, err error) error {
@@ -62,8 +79,13 @@ func CloseDBOnError(db *sql.DB, err error) error {
 
 func instantiateDB(db *sql.DB, dbName string, createDB bool, tableDescs ...string) error {
 	retryWithoutCreateDB := false
-	err := crdb.ExecuteTx(db, func(tx *sql.Tx) error {
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFunc()
+	err := crdb.ExecuteTx(ctx, db, nil, func(tx *sql.Tx) error {
 		if createDB {
+			// This block is necessary to accommodate non-root user to call
+			// this func as CockroachDB only allows root user to
+			// CREATE DATABASE.
 			_, err := tx.Exec("CREATE DATABASE IF NOT EXISTS " + dbName)
 			if err != nil {
 				retryWithoutCreateDB = true

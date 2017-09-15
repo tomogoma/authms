@@ -1,6 +1,9 @@
 package cockroach
 
-import "fmt"
+import (
+	"fmt"
+	"net/url"
+)
 
 type DSN struct {
 	UName       string `yaml:"userName,omitempty"`
@@ -37,8 +40,9 @@ func (d DSN) FormatDSN() string {
 
 	if d.UName != "" {
 		if d.Password != "" {
+			password := url.QueryEscape(d.Password)
 			return fmt.Sprintf("%s%s:%s@%s/%s%s",
-				dsnPrefix, d.UName, d.Password, host, d.DB, dsnSuffix,
+				dsnPrefix, d.UName, password, host, d.DB, dsnSuffix,
 			)
 		}
 		return fmt.Sprintf("%s%s@%s/%s%s",

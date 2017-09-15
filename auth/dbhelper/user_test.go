@@ -2,10 +2,12 @@ package dbhelper_test
 
 import (
 	"database/sql"
-	"github.com/tomogoma/authms/auth/dbhelper"
-	"github.com/tomogoma/authms/proto/authms"
 	"reflect"
 	"testing"
+
+	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
 type UpdateTestCase struct {
@@ -423,6 +425,10 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 
 func insertUser(u *authms.User, t *testing.T) {
 	db := getDB(t)
+	err := cockroach.InstantiateDB(db, conf.Database.DB, dbhelper.AllTableDescs...)
+	if err != nil {
+		t.Fatalf("Error setting up (instantiate users table: %v", err)
+	}
 	query := `INSERT INTO users (password, createDate)
 			VALUES($1, CURRENT_TIMESTAMP())
 			RETURNING id`

@@ -12,6 +12,9 @@ func (m *DBHelper) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
 	}
+	if err := m.initDBConnIfNotInitted(); err != nil {
+		return err
+	}
 	q := `
 	INSERT INTO history (userID, accessMethod, successful, devID, ipAddress, date)
 		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())
@@ -26,6 +29,9 @@ func (m *DBHelper) SaveHistory(h *authms.History) error {
 }
 
 func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
+	if err := m.initDBConnIfNotInitted(); err != nil {
+		return nil, err
+	}
 	acMFilter := ""
 	for i, acM := range acMs {
 		if i == 0 {
