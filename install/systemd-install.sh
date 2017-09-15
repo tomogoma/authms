@@ -17,6 +17,7 @@ WantedBy=multi-user.target
 ExecStart=${INSTALL_FILE}
 SyslogIdentifier=${CANONICAL_NAME}
 Restart=always
+RestartSec=10
 EOF
 echo "$UNIT_CONTENTS" > ${UNIT_FILE} || exit 1
 }
@@ -29,5 +30,6 @@ mkdir -p "${INSTALL_DIR}" || exit 1
 cp -f ../bin/app "${INSTALL_FILE}" || exit 1
 printUnitFile
 systemctl enable "${UNIT_NAME}"
+systemctl daemon-reload
 
 printDetails
