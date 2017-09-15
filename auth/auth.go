@@ -319,7 +319,7 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 func (a *Auth) checkUserExists(user *authms.User) error {
 	existUsrID, err := a.dbHelper.UserExists(user)
 	if err != nil {
-		return errors.Newf("Error checking if user exists")
+		return errors.Newf("error checking if user exists: %v", err)
 	}
 	if existUsrID >= 1 && user.ID != existUsrID {
 		return errors.NewClient("A user with some of the provided" +
