@@ -109,16 +109,19 @@ used.
 ### Accessing the Authentication Services
 
 `micro` is the recommended gateway for accessing the micro-service.
-    - `micro web` runs on port `8082` by default
-    - `micro api` runs on port `8080` by default
-        These options can be configured:
-            ```
-            micro --help
-            ```
-            or
-            ```
-            micro [option] --help
-            ```
+
+`micro web` runs on port `8082` by default
+
+`micro api` runs on port `8080` by default
+
+These options can be configured:
+```
+micro --help
+```
+or
+```
+micro [option] --help
+```
 
 1. Access using `micro web` is direct:
     ```
