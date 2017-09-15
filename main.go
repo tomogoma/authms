@@ -29,10 +29,13 @@ import (
 )
 
 const (
-	serviceName    = "authms"
-	rpcNamePrefix  = ""
-	webnamePrefix  = "go.micro.web."
-	serviceVersion = "0.0.1"
+	name             = "authms"
+	version          = "v1"
+	canonicalName    = name + version
+	rpcNamePrefix    = ""
+	canonicalRPCName = rpcNamePrefix + canonicalName
+	webnamePrefix    = "go.micro.web."
+	canonicalWebName = webnamePrefix + canonicalName
 )
 
 type defLogWriter struct {
@@ -44,7 +47,11 @@ func (dlw defLogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "location of config file")
+var confFile = flag.String(
+	"conf",
+	"/etc/"+name+"/"+canonicalName+".conf.yml",
+	"location of config file",
+)
 
 func main() {
 	flag.Parse()
@@ -122,18 +129,18 @@ func main() {
 	}
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.New(serviceName, a, lg)
+	rpcSrv, err := rpc.New(canonicalName, a, lg)
 	if err != nil {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
 	}
-	go serveRPC(conf.Service.RegisterInterval, rpcSrv, serverRPCQuitCh)
+	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 	httpHandler, err := http.NewHandler(a)
 	if err != nil {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
 	}
-	go serveHttp(conf.Service.RegisterInterval, httpHandler, serverHttpQuitCh)
+	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
 	select {
 	case err = <-authQuitCh:
 		lg.Critical("auth quit with error: %v", err)
@@ -144,11 +151,11 @@ func main() {
 	}
 }
 
-func serveRPC(regInterval time.Duration, rpcSrv *rpc.Server, quitCh chan error) {
+func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
-		micro.Name(rpcNamePrefix+serviceName),
-		micro.Version(serviceVersion),
-		micro.RegisterInterval(regInterval),
+		micro.Name(canonicalRPCName),
+		micro.Version(conf.LoadBalanceVersion),
+		micro.RegisterInterval(conf.RegisterInterval),
 	)
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
 	err := service.Run()
@@ -159,16 +166,16 @@ type RouteHandler interface {
 	HandleRoute(r *mux.Router) error
 }
 
-func serveHttp(regInterval time.Duration, rh RouteHandler, quitCh chan error) {
+func serveHttp(conf config.ServiceConfig, rh RouteHandler, quitCh chan error) {
 	r := mux.NewRouter()
 	if err := rh.HandleRoute(r); err != nil {
 		quitCh <- errors.Newf("unable to handle route: %v", err)
 	}
 	service := web.NewService(
 		web.Handler(r),
-		web.Name(webnamePrefix+serviceName),
-		web.Version(serviceVersion),
-		web.RegisterInterval(regInterval),
+		web.Name(canonicalWebName),
+		web.Version(conf.LoadBalanceVersion),
+		web.RegisterInterval(conf.RegisterInterval),
 	)
 	quitCh <- service.Run()
 }

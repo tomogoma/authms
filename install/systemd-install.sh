@@ -1,21 +1,33 @@
 #!/usr/bin/env bash
 
-NAME="authms"
-BUILD_NAME="${NAME}-installer-version"
-CONF_DIR="/etc/${NAME}"
-CONF_FILE="${CONF_DIR}/${NAME}.conf.yml"
-INSTALL_DIR="/usr/local/bin"
-UNIT_FILE="/etc/systemd/system/${NAME}.service"
-
+source vars.sh
 ./systemd-uninstall.sh || exit 1
-echo "Begin install"
+
+printUnitFile() {
+read -r -d '' UNIT_CONTENTS  << EOF
+[Unit]
+Description=${DESCRIPTION}
+Wants=network-online.target
+After=network.target network-online.target
+
+[Install]
+WantedBy=multi-user.target
+
+[Service]
+ExecStart=${INSTALL_FILE}
+SyslogIdentifier=${CANONICAL_NAME}
+Restart=always
+EOF
+echo "$UNIT_CONTENTS" > ${UNIT_FILE} || exit 1
+}
+
 mkdir -p "${CONF_DIR}" || exit 1
 if [ ! -f "${CONF_FILE}" ]; then
-    cp "${NAME}.conf.yml" "${CONF_FILE}" || exit 1
+    cp "conf.yml" "${CONF_FILE}" || exit 1
 fi
 mkdir -p "${INSTALL_DIR}" || exit 1
-cp -f "${BUILD_NAME}" "${INSTALL_DIR}/${NAME}" || exit 1
-cp -f "${NAME}.service" "${UNIT_FILE}" || exit 1
-systemctl enable "${NAME}.service"
-echo "Config file is at '${CONF_FILE}'"
-echo "Install complete"
+cp -f ../bin/app "${INSTALL_FILE}" || exit 1
+printUnitFile
+systemctl enable "${UNIT_NAME}"
+
+printDetails

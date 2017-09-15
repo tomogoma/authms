@@ -13,22 +13,18 @@ import (
 )
 
 const (
-	RunTypeHttp = "http"
-	RunTypeRPC  = "rpc"
-
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
 )
 
-var ErrorInvalidRegInterval = errors.New("Register interval was invalid cannot be < 1ms")
-
 type ServiceConfig struct {
-	RegisterInterval time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
+	RegisterInterval   time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
+	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
 }
 
 func (sc ServiceConfig) Validate() error {
 	if sc.RegisterInterval <= 1*time.Millisecond {
-		return ErrorInvalidRegInterval
+		return errors.New("register interval was invalid cannot be < 1ms")
 	}
 	return nil
 }

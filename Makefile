@@ -1,11 +1,11 @@
 .PHONY: install
 
 build:
-	go build -o install/authms-installer-version
+	go build -o bin/app
 
 install:
-	cd "install" && sudo ./systemd-install.sh
+	cd "install" && ./systemd-install.sh
 
 uninstall:
-	cd "install" && sudo ./systemd-uninstall.sh
+	cd "install" && ./systemd-uninstall.sh
 
