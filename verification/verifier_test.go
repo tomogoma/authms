@@ -5,8 +5,8 @@ import (
 	"time"
 
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/go-commons/errors"
 )
 

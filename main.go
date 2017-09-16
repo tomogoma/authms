@@ -17,7 +17,7 @@ import (
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/sms"
-	"github.com/tomogoma/authms/auth/phone/verification"
+	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
