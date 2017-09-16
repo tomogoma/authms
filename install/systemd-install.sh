@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 source vars.sh
-./systemd-uninstall.sh || exit 1
 
 printUnitFile() {
 read -r -d '' UNIT_CONTENTS  << EOF

@@ -1,16 +1,16 @@
-.PHONY: install
+.PHONY: clean build install uninstall
 
 clean:
-	go version;\
-	rm bin/*;\
-	rm install/vars.sh
+	go version
+	rm -f bin/*
+	rm -f install/vars.sh
 
 build: clean
 	go run build.go --goos "$(goos)" --goarch "$(goarch)" --goarm "$(goarm)"
 
 install:
-	cd "install" && ./systemd-install.sh
+	$(MAKE) -C "install" install
 
 uninstall:
-	cd "install" && ./systemd-uninstall.sh
+	$(MAKE) -C "install" uninstall
 
