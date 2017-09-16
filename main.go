@@ -14,16 +14,15 @@ import (
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/oauth"
-	"github.com/tomogoma/authms/sms"
-	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
 	"github.com/tomogoma/authms/server/rpc"
+	"github.com/tomogoma/authms/sms"
 	"github.com/tomogoma/authms/store"
+	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
 )
@@ -67,7 +66,7 @@ func main() {
 		lg.Critical("Error instantiating password generator: %s", err)
 		return
 	}
-	db, err := store.NewRoach(conf.Database, pg, hash.Hasher{})
+	db, err := store.NewRoach(conf.Database, pg)
 	if err != nil {
 		lg.Critical("Error instantiating db helper: %v", err)
 		return

@@ -6,13 +6,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/store"
 	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type Token struct {
@@ -39,7 +39,6 @@ var confFile = flag.String(
 	"/path/to/config/file.conf.yml",
 )
 var conf = &Config{}
-var hasher = hash.Hasher{}
 var completeUserAppName = "test-app"
 
 func init() {
@@ -478,7 +477,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 				t.Fatalf("%s - error retrieving password for"+
 					" validation: %v", tc.Desc, err)
 			}
-			if !hasher.CompareHash(newPass, updatedPassHB) {
+			if err := bcrypt.CompareHashAndPassword(updatedPassHB, []byte(newPass)); err != nil {
 				t.Error("New password in db did not match " +
 					"new password provided")
 			}
@@ -611,7 +610,7 @@ func insertUser(u *authms.User, t *testing.T) {
 	if pass == "" {
 		pass = "some-random-password"
 	}
-	passHB, err := hasher.Hash(pass)
+	passHB, err := bcrypt.GenerateFromPassword([]byte(pass), bcrypt.DefaultCost)
 	if err != nil {
 		t.Fatalf("Error setting up (hashing password): %s", err)
 	}
@@ -752,7 +751,7 @@ func newModel(t *testing.T) *store.Roach {
 	if err != nil {
 		t.Fatalf("password.NewRandom(): %s", err)
 	}
-	m, err := store.NewRoach(conf.Database, pg, hasher)
+	m, err := store.NewRoach(conf.Database, pg)
 	if err != nil {
 		t.Fatalf("user.NewModel(): %s", err)
 	}

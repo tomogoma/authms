@@ -13,19 +13,14 @@ import (
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type PasswordGenerator interface {
 	SecureRandomBytes(length int) ([]byte, error)
 }
 
-type Hasher interface {
-	Hash(pass string) ([]byte, error)
-	CompareHash(pass string, passHB []byte) bool
-}
-
 type Roach struct {
-	hasher    Hasher
 	gen       PasswordGenerator
 	gcRunning bool
 	errors.NotFoundErrCheck
@@ -39,17 +34,14 @@ type Roach struct {
 var ErrorPasswordMismatch = errors.NewAuth("username/password combo mismatch")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
-func NewRoach(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*Roach, error) {
-	if h == nil {
-		return nil, errors.New("HashFunc cannot be nil")
-	}
+func NewRoach(dsnF cockroach.DSNFormatter, pg PasswordGenerator) (*Roach, error) {
 	if pg == nil {
 		return nil, errors.New("HashFunc cannot be nil")
 	}
 	if dsnF == nil {
 		return nil, errors.New("DSNFormatter was nil")
 	}
-	return &Roach{dsnF: dsnF, gen: pg, hasher: h, isDBInitMutex: sync.Mutex{}}, nil
+	return &Roach{dsnF: dsnF, gen: pg, isDBInitMutex: sync.Mutex{}}, nil
 }
 
 func (h *Roach) InitDBConnIfNotInitted() error {
@@ -368,10 +360,10 @@ func (m *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error 
 		}
 		return err
 	}
-	if !m.hasher.CompareHash(oldPass, actPassHB) {
+	if err := bcrypt.CompareHashAndPassword(actPassHB, []byte(oldPass)); err != nil {
 		return ErrorPasswordMismatch
 	}
-	passHB, err := m.hasher.Hash(newPassword)
+	passHB, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -466,7 +458,7 @@ func (m *Roach) validatePassword(id int64, password string) error {
 	if len(dbPassword) == 0 {
 		return ErrorModelCorruptedOnEmptyPassword
 	}
-	if !m.hasher.CompareHash(password, dbPassword) {
+	if err := bcrypt.CompareHashAndPassword(dbPassword, []byte(password)); err != nil {
 		return ErrorPasswordMismatch
 	}
 	return err
@@ -482,7 +474,7 @@ func (m *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
 		}
 		passStr = string(passB)
 	}
-	return m.hasher.Hash(passStr)
+	return bcrypt.GenerateFromPassword([]byte(passStr), bcrypt.DefaultCost)
 }
 
 func (h *Roach) instantiate() error {
