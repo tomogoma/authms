@@ -29,7 +29,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 	if u == nil {
 		return errors.New("user was nil")
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	passHB, err := m.getPasswordHash(u)
@@ -84,7 +84,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 
 func (m *DBHelper) UserExists(u *authms.User) (int64, error) {
 	userID := int64(-1)
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return userID, err
 	}
 	if u.UserName != "" {
@@ -138,7 +138,7 @@ func (m *DBHelper) GetByEmail(email, pass string) (*authms.User, error) {
 
 func (m *DBHelper) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
 	usr := &authms.User{}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return usr, err
 	}
 	query := `SELECT userID FROM appUserIDs WHERE appName = $1 AND appUserID = $2`
@@ -157,7 +157,7 @@ func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
 	if newUserName == "" {
 		return errors.New("the userName provided was invlaid")
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM userNames WHERE userID=$1`
@@ -182,7 +182,7 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	if new == nil {
 		return errors.New("new OAuth was nil")
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM appUserIDs WHERE userID=$1 AND appName=$2`
@@ -207,7 +207,7 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	if !hasValue(newEmail) {
 		return errors.New("the email provided was invlaid")
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM emails WHERE userID=$1`
@@ -232,7 +232,7 @@ func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	if !hasValue(newPhone) {
 		return errors.New("the phone provided was invlaid")
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM phones WHERE userID=$1`
@@ -254,7 +254,7 @@ func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
 }
 
 func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) error {
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT password FROM users WHERE id=$1`
@@ -303,7 +303,7 @@ func (m *DBHelper) get(where string, whereArgs ...interface{}) (*authms.User, er
 		Phone:  &authms.Value{},
 		OAuths: make(map[string]*authms.OAuth),
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return usr, err
 	}
 	query := `
@@ -353,7 +353,7 @@ func (m *DBHelper) get(where string, whereArgs ...interface{}) (*authms.User, er
 }
 
 func (m *DBHelper) validatePassword(id int64, password string) error {
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	userQ := `SELECT password FROM users WHERE id = $1`

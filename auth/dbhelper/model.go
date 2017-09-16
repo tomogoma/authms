@@ -34,7 +34,7 @@ func New(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*DBHelper
 	return &DBHelper{dsnF: dsnF, gen: pg, hasher: h, isDBInitMutex: sync.Mutex{}}, nil
 }
 
-func (h *DBHelper) initDBConnIfNotInitted() error {
+func (h *DBHelper) InitDBConnIfNotInitted() error {
 	var err error
 	h.db, err = cockroach.TryConnect(h.dsnF.FormatDSN(), h.db)
 	if err != nil {

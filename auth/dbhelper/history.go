@@ -12,7 +12,7 @@ func (m *DBHelper) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
 	}
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `
@@ -29,7 +29,7 @@ func (m *DBHelper) SaveHistory(h *authms.History) error {
 }
 
 func (m *DBHelper) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
-	if err := m.initDBConnIfNotInitted(); err != nil {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return nil, err
 	}
 	acMFilter := ""

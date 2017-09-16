@@ -72,6 +72,9 @@ func main() {
 		lg.Critical("Error instantiating db helper: %v", err)
 		return
 	}
+	if err := db.InitDBConnIfNotInitted(); err != nil {
+		lg.Warn("Error initiating connection to db: %v", err)
+	}
 	var s verification.SMSer
 	if conf.SMS.ActiveAPI != "" {
 		switch conf.SMS.ActiveAPI {
