@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/dbhelper"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )

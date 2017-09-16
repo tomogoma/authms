@@ -14,7 +14,7 @@ import (
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/auth/password"

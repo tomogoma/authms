@@ -5,7 +5,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/tomogoma/authms/auth/dbhelper"
+	"github.com/tomogoma/authms/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/config"
