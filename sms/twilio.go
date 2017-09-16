@@ -110,7 +110,8 @@ func (s *Twilio) SMS(toPhone, message string) error {
 func readToken(tokenKeyFile string) (string, error) {
 	fb, err := ioutil.ReadFile(tokenKeyFile)
 	if err != nil {
-		return "", errors.Newf("error opening twilio token file: %v", err)
+		return "", errors.Newf("error opening twilio token file '%s': %v",
+			tokenKeyFile, err)
 	}
 	return string(fb), nil
 }

@@ -4,8 +4,8 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/tomogoma/authms/auth/phone/sms"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/sms"
 	configH "github.com/tomogoma/go-commons/config"
 )
 
@@ -13,7 +13,6 @@ type ConfigMock struct {
 	ID           string `json:"ID" yaml:"ID"`
 	SenderPhone  string `json:"senderPhone" yaml:"senderPhone"`
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
-	TestNumber   string `json:"testNumber" yaml:"testNumber"`
 }
 
 func (c ConfigMock) TwilioID() string {
@@ -26,12 +25,13 @@ func (c ConfigMock) TwilioSenderPhone() string {
 	return c.SenderPhone
 }
 
-func (c ConfigMock) TwilioTestNumber() string {
-	return c.TestNumber
+type SMSMock struct {
+	TestNumber string     `json:"testNumber" yaml:"testNumber"`
+	Twilio     ConfigMock `json:"twilio" yaml:"twilio"`
 }
 
 type AuthMsConfigMock struct {
-	Twilio ConfigMock `json:"twilio" yaml:"twilio"`
+	SMS SMSMock `json:"sms" yaml:"sms"`
 }
 
 var confFile = flag.String(
@@ -45,13 +45,13 @@ func init() {
 	flag.Parse()
 }
 
-func setupTwilio(t *testing.T) ConfigMock {
+func setupTwilio(t *testing.T) SMSMock {
 	conf := AuthMsConfigMock{}
 	err := configH.ReadYamlConfig(*confFile, &conf)
 	if err != nil {
 		t.Fatalf("Error setting up (reading config file): %v", err)
 	}
-	return conf.Twilio
+	return conf.SMS
 }
 
 func TestNewTwilio(t *testing.T) {
@@ -61,7 +61,7 @@ func TestNewTwilio(t *testing.T) {
 		conf   sms.TwConfig
 		expErr bool
 	}{
-		{desc: "valid config", conf: validConf},
+		{desc: "valid config", conf: validConf.Twilio},
 		{desc: "nil config", conf: nil, expErr: true},
 		{desc: "missing token key file", conf: ConfigMock{}, expErr: true},
 	}
@@ -92,11 +92,11 @@ func TestTwilio_SMS(t *testing.T) {
 		message  string
 		expErr   bool
 	}{
-		{desc: "successful", toNumber: conf.TwilioTestNumber(), message: testMessage},
+		{desc: "successful", toNumber: conf.TestNumber, message: testMessage},
 		{desc: "empty number", toNumber: "", message: testMessage, expErr: true},
-		{desc: "empty message", toNumber: conf.TwilioTestNumber(), message: "", expErr: true},
+		{desc: "empty message", toNumber: conf.TestNumber, message: "", expErr: true},
 	}
-	tw, err := sms.NewTwilio(conf)
+	tw, err := sms.NewTwilio(conf.Twilio)
 	if err != nil {
 		t.Fatalf("sms.NewTwilio(): %v", err)
 	}
