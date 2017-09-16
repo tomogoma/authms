@@ -16,6 +16,7 @@ import (
 type contextKey string
 
 type Auth interface {
+	IsNotImplementedError(error) bool
 	IsClientError(error) bool
 	IsForbiddenError(error) bool
 	IsAuthError(error) bool
@@ -31,6 +32,7 @@ type Auth interface {
 }
 
 type Handler struct {
+	errors.NotImplErrCheck
 	errors.AuthErrCheck
 	errors.ClErrCheck
 	auth Auth
@@ -240,6 +242,11 @@ func (s *Handler) handleError(w http.ResponseWriter, r *http.Request, reqData in
 	if s.auth.IsClientError(err) || s.IsClientError(err) {
 		log.Warnf("Bad request: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if s.auth.IsNotImplementedError(err) || s.IsNotImplementedError(err) {
+		log.Warnf("Not implemented entity: %v", err)
+		http.Error(w, err.Error(), http.StatusNotImplemented)
 		return
 	}
 	log.Errorf("Internal error: %v", err)

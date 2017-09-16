@@ -46,6 +46,7 @@ type DBHelper interface {
 }
 
 type PhoneVerifier interface {
+	IsNotImplementedError(error) bool
 	SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error)
 	VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.SMSVerificationStatus, error)
 }
@@ -58,6 +59,7 @@ type Auth struct {
 	phoneVerifier PhoneVerifier
 	errors.ClErrCheck
 	errors.AuthErrCheck
+	errors.NotImplErrCheck
 }
 
 const (
@@ -191,6 +193,9 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	}
 	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
 	if err != nil {
+		if a.phoneVerifier.IsNotImplementedError(err) {
+			return nil, errors.NewNotImplementedf("%v", err)
+		}
 		return nil, err
 	}
 	return vs, nil
@@ -265,7 +270,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 }
 
 func (a *Auth) UpdatePassword(userID int64, oldPass, newPass, devID, rIP string) error {
-	return errors.New("not yet implemented")
+	return errors.NewNotImplemented()
 }
 
 func (a *Auth) LoginUserName(uName, pass, devID, rIP string) (*authms.User, error) {

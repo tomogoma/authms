@@ -1,14 +1,17 @@
 package verification_test
 
 import (
+	"testing"
+	"time"
+
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/proto/authms"
-	"testing"
-	"time"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 type SMSerMock struct {
+	errors.NotImplErrCheck
 	SMSCalled bool
 	ExpErr    error
 }
@@ -69,6 +72,7 @@ func (C *ConfigMock) ValidityPeriod() time.Duration {
 type VerifierTestCase struct {
 	Desc           string
 	ExpErr         bool
+	ExpNotImpl     bool
 	Phone          string
 	CodeReq        *authms.SMSVerificationCodeRequest
 	SMSer          *SMSerMock
@@ -172,6 +176,25 @@ func TestVerifier_SendSMSCode(t *testing.T) {
 	}
 	tcs := []VerifierTestCase{
 		validDeps,
+		{
+			Desc:   "SMSer not implemented",
+			ExpErr: true, ExpNotImpl: true,
+			SMSer: &SMSerMock{ExpErr: errors.NewNotImplemented()},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
+			ExpVerStatus: &authms.SMSVerificationStatus{
+				Token:     "some-token",
+				ExpiresAt: time.Now().Add(5 * time.Minute).Format(time.RFC3339),
+				Verified:  false,
+			},
+		},
 	}
 	for _, tc := range tcs {
 		v, err := verification.New(tc.Config, tc.SMSer, tc.SecureRandomer, tc.Tokener)

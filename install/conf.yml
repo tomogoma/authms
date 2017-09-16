@@ -7,7 +7,7 @@
 # - comments should start with a "#" sign.
 
 
-# s# serviceConfig contains runtime micro-service configuration.
+# serviceConfig contains runtime micro-service configuration.
 serviceConfig:
   # loadBalanceVersion identifies which cluster this instance will belong to
   # when deploying multiple instances of the micro-service.
@@ -59,6 +59,12 @@ OAuth:
 
 # sms - configuration values for sending SMSes via an API.
 sms:
+  # activeAPI is the API to use for sending SMSes.
+  # Only the activeAPI's configuration values are required, the rest can be ignored.
+  # The value can either be empty or one of (twilio, africasTalking)
+  # the sms section is not necessary if this is left empty.
+  activeAPI:
+
   # testNumber is the number to send a test SMS to during micro-service
   # startup and while running tests.
   testNumber:
@@ -71,11 +77,6 @@ sms:
     # smsCodeValidity is how long a verification code should be acceptable before
     # it expires.
     smsCodeValidity: 5m
-
-  # activeAPI is the API to use for sending SMSes.
-  # Only the activeAPI's configuration values are required, the rest can be ignored.
-  # The value can be one of (twilio, africasTalking)
-  activeAPI: twilio
 
   # twilio - configuration values for using twilio as the activeAPI
   # configuration values can be found in https://www.twilio.com/console

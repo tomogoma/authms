@@ -2,11 +2,12 @@ package rpc
 
 import (
 	"errors"
+	"net/http"
+
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/helper"
 	"golang.org/x/net/context"
-	"net/http"
 )
 
 const (
@@ -116,16 +117,24 @@ func (s *Server) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationC
 func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, tID int, err error) error {
 	if err != nil {
 		if s.auth.IsAuthError(err) {
+			s.lg.Warn("%d - Not authorized: %v", tID, err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusUnauthorized
 			return nil
 		}
 		if s.auth.IsClientError(err) {
+			s.lg.Warn("%d - Bad request: %v", tID, err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusBadRequest
 			return nil
 		}
-		s.lg.Error("%d - internal auth error: %s", tID, err)
+		if s.auth.IsNotImplementedError(err) {
+			s.lg.Warn("%d - Requested unimplemented entity: %v", tID, err)
+			resp.Detail = "This feature is not available"
+			resp.Code = http.StatusNotImplemented
+			return nil
+		}
+		s.lg.Error("%d - internal auth error: %v", tID, err)
 		resp.Detail = internalErrorMessage
 		resp.Code = http.StatusInternalServerError
 		return nil

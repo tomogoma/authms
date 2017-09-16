@@ -2,12 +2,13 @@ package sms
 
 import (
 	"encoding/json"
-	"github.com/tomogoma/go-commons/errors"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+
+	"github.com/tomogoma/go-commons/errors"
 )
 
 const (
@@ -46,6 +47,7 @@ var rcvErrors = map[int]string{
 type Twilio struct {
 	token  string
 	config TwConfig
+	errors.NotImplErrCheck
 }
 
 func NewTwilio(c TwConfig) (*Twilio, error) {

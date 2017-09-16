@@ -42,6 +42,7 @@ type AfricasTalking struct {
 	atSendURL string
 	userName  string
 	apiKey    string
+	errors.NotImplErrCheck
 }
 
 func ATWithSendURL(URL string) func(at *AfricasTalking) {

@@ -73,28 +73,31 @@ func main() {
 		return
 	}
 	var s verification.SMSer
-	switch conf.SMS.ActiveAPI {
-	case config.SMSAPIAfricasTalking:
-		s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking)
-	case config.SMSAPITwilio:
-		s, err = sms.NewTwilio(conf.SMS.Twilio)
-	default:
-		lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
-		return
+	if conf.SMS.ActiveAPI != "" {
+		switch conf.SMS.ActiveAPI {
+		case config.SMSAPIAfricasTalking:
+			s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking)
+		case config.SMSAPITwilio:
+			s, err = sms.NewTwilio(conf.SMS.Twilio)
+		default:
+			lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
+			return
+		}
+		var testMessage string
+		if hostName, err := os.Hostname(); err == nil {
+			testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
+		} else {
+			testMessage = "The SMS API is being used on an unknown host"
+		}
+		if err := s.SMS(conf.SMS.TestNumber, testMessage); err != nil {
+			lg.Warn("Error sending test SMS during start up: %v", err)
+		}
+	} else {
+		s = &sms.Stub{}
 	}
 	if err != nil {
 		lg.Critical("Error instantiating %s API client: %v",
 			conf.SMS.ActiveAPI, err)
-		return
-	}
-	var testMessage string
-	if hostName, err := os.Hostname(); err == nil {
-		testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
-	} else {
-		testMessage = "The SMS API is being used on an unknown host"
-	}
-	if err := s.SMS(conf.SMS.TestNumber, testMessage); err != nil {
-		lg.Critical("Error sending test SMS during start up: %v", err)
 		return
 	}
 	ng, err := password.NewGenerator(password.NumberChars)

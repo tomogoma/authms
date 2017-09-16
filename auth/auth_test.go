@@ -51,6 +51,7 @@ func (oa *OAuthHandlerMock) ValidateToken(appName, token string) (response.OAuth
 }
 
 type PhoneVerifierMock struct {
+	errors.NotImplErrCheck
 	ExpErr    error
 	ExpStatus *authms.SMSVerificationStatus
 }
@@ -618,10 +619,11 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 
 func TestAuth_VerifyPhone(t *testing.T) {
 	type VerifyTestCase struct {
-		ExpErr bool
-		Desc   string
-		Req    *authms.SMSVerificationRequest
-		PV     *PhoneVerifierMock
+		ExpErr     bool
+		ExpNotImpl bool
+		Desc       string
+		Req        *authms.SMSVerificationRequest
+		PV         *PhoneVerifierMock
 	}
 	phone := "+254712345678"
 	devID := "test-dev"
@@ -647,6 +649,17 @@ func TestAuth_VerifyPhone(t *testing.T) {
 				},
 			},
 		},
+		{
+			Desc:   "Verifier reports not implemented",
+			ExpErr: true, ExpNotImpl: true,
+			Req: &authms.SMSVerificationRequest{
+				DeviceID: devID,
+				UserID:   userID,
+				Token:    validToken,
+				Phone:    phone,
+			},
+			PV: &PhoneVerifierMock{ExpErr: errors.NewNotImplemented()},
+		},
 	}
 	for _, tc := range tcs {
 		func() {
@@ -657,8 +670,12 @@ func TestAuth_VerifyPhone(t *testing.T) {
 			runtime.Gosched()
 			if tc.ExpErr {
 				if err == nil {
-					t.Errorf("%s - expected error but "+
+					t.Fatalf("%s - expected error but "+
 						"got nil", tc.Desc)
+				}
+				if tc.ExpNotImpl != a.IsNotImplementedError(err) {
+					t.Errorf("%s - expected IsNotImplementedError() %t, got %t",
+						tc.Desc, tc.ExpNotImpl, a.IsNotImplementedError(err))
 				}
 				return
 			} else if err != nil {

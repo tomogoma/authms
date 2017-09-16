@@ -6,10 +6,11 @@ import "fmt"
 // is a client error or an auth error.
 type Error struct {
 	IsAuthErr           bool
-	IsUnauthorizedError bool
-	IsForbiddenError    bool
+	IsUnauthorizedErr   bool
+	IsForbiddenErr      bool
 	IsClErr             bool
 	IsNotFoundErr       bool
+	IsNotImplementedErr bool
 	Message             string
 }
 
@@ -19,24 +20,29 @@ func (e Error) Error() string {
 	return e.Message
 }
 
-// Client return true if this is a client error.
+// Client returns true if this is a client error.
 func (e Error) Client() bool {
 	return e.IsClErr
 }
 
+// NotImplemented returns true if the functionality requested is not implemented.
+func (e Error) NotImplemented() bool {
+	return e.IsNotImplementedErr
+}
+
 // Auth returns true if this is an auth error.
 func (e Error) Auth() bool {
-	return e.IsAuthErr || e.IsUnauthorizedError || e.IsForbiddenError
+	return e.IsAuthErr || e.IsUnauthorizedErr || e.IsForbiddenErr
 }
 
 // Unauthorized returns true if this is an Unauthorized error.
 func (e Error) Unauthorized() bool {
-	return e.IsUnauthorizedError
+	return e.IsUnauthorizedErr
 }
 
 // Forbidden returns true if this is a Forbidden error.
 func (e Error) Forbidden() bool {
-	return e.IsForbiddenError
+	return e.IsForbiddenErr
 }
 
 // NotFound returns true if this is error denotes that a resource
@@ -51,7 +57,7 @@ func New(message string) Error {
 }
 
 // Newf creates a new error with fmt.Printf formatting.
-func Newf(format string, a ... interface{}) Error {
+func Newf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return New(message)
 }
@@ -62,9 +68,21 @@ func NewClient(message string) Error {
 }
 
 // NewClientf creates a new client error with fmt.Printf style formatting.
-func NewClientf(format string, a ... interface{}) Error {
+func NewClientf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return NewClient(message)
+}
+
+// NewNotImplemented creates a new not implemented error.
+func NewNotImplemented() Error {
+	return Error{IsNotImplementedErr: true}
+}
+
+// NewNotImplementedf creates a new not implemented error with fmt.Printf
+// style formatting.
+func NewNotImplementedf(format string, a ...interface{}) Error {
+	message := fmt.Sprintf(format, a...)
+	return Error{Message: message, IsNotImplementedErr: true}
 }
 
 // NewAuth creates a new auth error. It is not specific to the type of auth
@@ -77,31 +95,31 @@ func NewAuth(message string) Error {
 // NewForbidden creates a new forbidden auth error a la 403 (http.StatusForbidden) error.
 // This will also resolve as an Auth error.
 func NewForbidden(message string) Error {
-	return Error{Message: message, IsAuthErr: true, IsForbiddenError: true}
+	return Error{Message: message, IsAuthErr: true, IsForbiddenErr: true}
 }
 
 // NewUnauthorized creates a new unauthorized auth error a la 401 (http.StatusUnauthorized) error.
 // This will also resolve as an Auth error.
 func NewUnauthorized(message string) Error {
-	return Error{Message: message, IsAuthErr: true, IsUnauthorizedError: true}
+	return Error{Message: message, IsAuthErr: true, IsUnauthorizedErr: true}
 }
 
 // NewAuthf creates a new auth error with fmt.Printf style formatting.
-func NewAuthf(format string, a ... interface{}) Error {
+func NewAuthf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return NewAuth(message)
 }
 
 // NewForbiddenf creates a new forbidden auth error with fmt.Printf style formatting.
 // This will also resolve as an Auth error.
-func NewForbiddenf(format string, a ... interface{}) Error {
+func NewForbiddenf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return NewForbidden(message)
 }
 
 // NewUnauthorizedf creates a new unauthorized auth error with fmt.Printf style formatting.
 // This will also resolve as an Auth error.
-func NewUnauthorizedf(format string, a ... interface{}) Error {
+func NewUnauthorizedf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return NewUnauthorized(message)
 }
@@ -112,12 +130,12 @@ func NewNotFound(message string) Error {
 }
 
 // NewNotFoundf creates a new not found error with fmt.Printf style formatting.
-func NewNotFoundf(format string, a ... interface{}) Error {
+func NewNotFoundf(format string, a ...interface{}) Error {
 	message := fmt.Sprintf(format, a...)
 	return NewNotFound(message)
 }
 
-// ClErrCheck is a helper struct that can be extended within a custom struct to
+// ClErrCheck is a helper struct that can be embedded in a custom struct to
 // give the custom struct the extra method IsClientError(err error). e.g:
 //  type Custom struct {
 //      ...
@@ -132,9 +150,24 @@ func (c *ClErrCheck) IsClientError(err error) bool {
 	return ok && errC.Client()
 }
 
-// AuthErrCheck is a helper struct that can be extended within a custom struct to
+// NotImplErrCheck is a helper struct that can be embedded in a custom struct to
+// give the custom struct the extra method IsNotFoundError(err error). e.g:
+//  type Custom struct {
+//      ...
+//      errors.NotImplErrCheck
+//  }
+type NotImplErrCheck struct {
+}
+
+// IsNotImplementedError returns true if the supplied error is a client error, false otherwise.
+func (c *NotImplErrCheck) IsNotImplementedError(err error) bool {
+	errC, ok := err.(Error)
+	return ok && errC.NotImplemented()
+}
+
+// AuthErrCheck is a helper struct that can be embedded in a custom struct to
 // give the custom struct the extra methods IsAuthError(err error),
-// IsForbiddenError(err error) and IsUnauthorizedError(err error) . e.g:
+// IsForbiddenError(err error) and IsUnauthorizedErr(err error) . e.g:
 //  type Custom struct {
 //      ...
 //      errors.AuthErrCheck
@@ -163,7 +196,7 @@ func (c *AuthErrCheck) IsUnauthorizedError(err error) bool {
 	return ok && errC.Unauthorized()
 }
 
-// NotFoundErrCheck is a helper struct that can be extended within a custom struct to
+// NotFoundErrCheck is a helper struct that can be embedded in a custom struct to
 // give the custom struct the extra method IsNotFoundError(err error). e.g:
 //  type Custom struct {
 //      ...

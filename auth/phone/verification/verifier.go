@@ -2,16 +2,18 @@ package verification
 
 import (
 	"fmt"
+	"regexp"
+	"time"
+
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
-	"regexp"
-	"time"
 )
 
 const timeFormat = time.RFC3339
 
 type SMSer interface {
+	IsNotImplementedError(error) bool
 	SMS(toPhone, message string) error
 }
 
@@ -40,6 +42,7 @@ type Verifier struct {
 	tokener   Tokener
 	generator SecureRandomer
 	config    Config
+	errors.NotImplErrCheck
 }
 
 func New(c Config, s SMSer, sr SecureRandomer, t Tokener) (*Verifier, error) {
@@ -82,6 +85,9 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 	}
 	smsBody := fmt.Sprintf(v.config.MessageFormat(), codeB)
 	if err = v.smser.SMS(toPhone, smsBody); err != nil {
+		if v.smser.IsNotImplementedError(err) {
+			return nil, errors.NewNotImplementedf("%v", err)
+		}
 		return nil, err
 	}
 	return &authms.SMSVerificationStatus{

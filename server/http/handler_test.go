@@ -12,6 +12,7 @@ import (
 )
 
 type AuthMock struct {
+	errors.NotImplErrCheck
 	errors.AuthErrCheck
 	errors.ClErrCheck
 	expUser         *authms.User
