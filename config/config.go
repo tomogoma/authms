@@ -15,15 +15,21 @@ import (
 // Compile time constants that should not be configurable
 // during runtime.
 const (
-	Name             = "authms"
-	Version          = "v1"
-	CanonicalName    = Name + Version
-	RPCNamePrefix    = ""
-	CanonicalRPCName = RPCNamePrefix + CanonicalName
-	WebnamePrefix    = "go.micro.web."
-	CanonicalWebName = WebnamePrefix + CanonicalName
+	Name                = "authms"
+	Version             = "v1"
+	Description         = "Authentication Micro-Service"
+	CanonicalName       = Name + Version
+	RPCNamePrefix       = ""
+	CanonicalRPCName    = RPCNamePrefix + CanonicalName
+	WebNamePrefix       = "go.micro.web."
+	CanonicalWebName    = WebNamePrefix + CanonicalName
+	DefaultSysDUnitName = CanonicalName + ".service"
 
-	DefaultConfPath = "/etc/" + Name + "/" + CanonicalName + ".conf.yml"
+	DefaultInstallDir       = "/usr/local/bin"
+	DefaultInstallPath      = DefaultInstallDir + "/" + CanonicalName
+	DefaultSysDUnitFilePath = "/etc/systemd/system/" + DefaultSysDUnitName
+	DefaultConfDir          = "/etc/" + Name
+	DefaultConfPath         = DefaultConfDir + "/" + CanonicalName + ".conf.yml"
 
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"

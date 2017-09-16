@@ -49,10 +49,21 @@ https://github.com/tomogoma/micro-installer
     
 ## Manual build
 
-To run a manual build run the build command from inside the root folder:
-```
-make build
-```
+[Go](https://golang.org) 1.7+ is required for this.
+
+To run a manual build either:
+1. Run the build command from inside the root folder:
+    ```
+    make build
+    ```
+    `make build` can also be supplied with `goos=[GOOS]` `goarch=[GOARCH]`
+    `goarm=[GOARM]` values as per the documentation at https://golang.org/cmd/go
+    
+    or 
+1. Run the build.go file directly
+    ```
+    go run build.go --help // to show all options for building
+    ```
 
 ## Configuration and deployment
 
