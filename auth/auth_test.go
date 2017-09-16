@@ -1,10 +1,9 @@
 package auth_test
 
 import (
-	"testing"
-
 	"flag"
 	"runtime"
+	"testing"
 	"time"
 
 	"github.com/limetext/log4go"
@@ -12,9 +11,10 @@ import (
 	"github.com/tomogoma/authms/auth/oauth/facebook"
 	"github.com/tomogoma/authms/auth/oauth/response"
 	"github.com/tomogoma/authms/claim"
+	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
-	"github.com/tomogoma/go-commons/config"
+	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -161,8 +161,11 @@ type RegisterTestCase struct {
 
 var conf = &ConfigMock{}
 var tokenGen *token.JWTHandler
-var confFile = flag.String("conf", "/etc/authms/authms.conf.yml",
-	"/path/to/config/file.conf.yml")
+var confFile = flag.String(
+	"conf",
+	config.DefaultConfPath,
+	"/path/to/config/file.conf.yml",
+)
 
 func init() {
 	flag.Parse()
@@ -853,7 +856,7 @@ func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVeri
 }
 
 func setUp(t *testing.T) {
-	if err := config.ReadYamlConfig(*confFile, conf); err != nil {
+	if err := configH.ReadYamlConfig(*confFile, conf); err != nil {
 		t.Fatal(err)
 	}
 }

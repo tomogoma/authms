@@ -28,16 +28,6 @@ import (
 	configH "github.com/tomogoma/go-commons/config"
 )
 
-const (
-	name             = "authms"
-	version          = "v1"
-	canonicalName    = name + version
-	rpcNamePrefix    = ""
-	canonicalRPCName = rpcNamePrefix + canonicalName
-	webnamePrefix    = "go.micro.web."
-	canonicalWebName = webnamePrefix + canonicalName
-)
-
 type defLogWriter struct {
 	lg log4go.Logger
 }
@@ -49,7 +39,7 @@ func (dlw defLogWriter) Write(p []byte) (int, error) {
 
 var confFile = flag.String(
 	"conf",
-	"/etc/"+name+"/"+canonicalName+".conf.yml",
+	config.DefaultConfPath,
 	"location of config file",
 )
 
@@ -129,7 +119,7 @@ func main() {
 	}
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.New(canonicalName, a, lg)
+	rpcSrv, err := rpc.New(config.CanonicalName, a, lg)
 	if err != nil {
 		lg.Critical("Error instantiating rpc server module: %s", err)
 		return
@@ -153,7 +143,7 @@ func main() {
 
 func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
 	service := micro.NewService(
-		micro.Name(canonicalRPCName),
+		micro.Name(config.CanonicalRPCName),
 		micro.Version(conf.LoadBalanceVersion),
 		micro.RegisterInterval(conf.RegisterInterval),
 	)
@@ -173,7 +163,7 @@ func serveHttp(conf config.ServiceConfig, rh RouteHandler, quitCh chan error) {
 	}
 	service := web.NewService(
 		web.Handler(r),
-		web.Name(canonicalWebName),
+		web.Name(config.CanonicalWebName),
 		web.Version(conf.LoadBalanceVersion),
 		web.RegisterInterval(conf.RegisterInterval),
 	)

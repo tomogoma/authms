@@ -12,7 +12,19 @@ import (
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
+// Compile time constants that should not be configurable
+// during runtime.
 const (
+	Name             = "authms"
+	Version          = "v1"
+	CanonicalName    = Name + Version
+	RPCNamePrefix    = ""
+	CanonicalRPCName = RPCNamePrefix + CanonicalName
+	WebnamePrefix    = "go.micro.web."
+	CanonicalWebName = WebnamePrefix + CanonicalName
+
+	DefaultConfPath = "/etc/" + Name + "/" + CanonicalName + ".conf.yml"
+
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
 )

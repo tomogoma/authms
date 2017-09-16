@@ -2,9 +2,11 @@ package sms_test
 
 import (
 	"flag"
-	"github.com/tomogoma/authms/auth/phone/sms"
-	"github.com/tomogoma/go-commons/config"
 	"testing"
+
+	"github.com/tomogoma/authms/auth/phone/sms"
+	"github.com/tomogoma/authms/config"
+	configH "github.com/tomogoma/go-commons/config"
 )
 
 type ConfigMock struct {
@@ -32,7 +34,11 @@ type AuthMsConfigMock struct {
 	Twilio ConfigMock `json:"twilio" yaml:"twilio"`
 }
 
-var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/config.conf.yml")
+var confFile = flag.String(
+	"conf",
+	config.DefaultConfPath,
+	"/path/to/config/file.conf.yml",
+)
 var testMessage = "Twilio tests are running, this is a confirmation of success"
 
 func init() {
@@ -41,7 +47,7 @@ func init() {
 
 func setupTwilio(t *testing.T) ConfigMock {
 	conf := AuthMsConfigMock{}
-	err := config.ReadYamlConfig(*confFile, &conf)
+	err := configH.ReadYamlConfig(*confFile, &conf)
 	if err != nil {
 		t.Fatalf("Error setting up (reading config file): %v", err)
 	}

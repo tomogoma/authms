@@ -8,7 +8,8 @@ import (
 	"github.com/tomogoma/authms/auth/dbhelper"
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/password"
-	"github.com/tomogoma/go-commons/config"
+	"github.com/tomogoma/authms/config"
+	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
@@ -25,7 +26,11 @@ type Config struct {
 	Token    Token         `json:"token,omitempty"`
 }
 
-var confFile = flag.String("conf", "/etc/authms/authms.conf.yml", "/path/to/conf.file.yml")
+var confFile = flag.String(
+	"conf",
+	config.DefaultConfPath,
+	"/path/to/config/file.conf.yml",
+)
 var conf = &Config{}
 var hasher = hash.Hasher{}
 
@@ -60,7 +65,7 @@ func getDB(t *testing.T) *sql.DB {
 }
 
 func setUp(t *testing.T) {
-	if err := config.ReadYamlConfig(*confFile, conf); err != nil {
+	if err := configH.ReadYamlConfig(*confFile, conf); err != nil {
 		t.Fatal(err)
 	}
 	conf.Database.DB = conf.Database.DB + "_test"
