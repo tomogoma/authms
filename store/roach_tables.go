@@ -1,4 +1,4 @@
-package dbhelper
+package store
 
 const (
 	UsersTBLDesc = `

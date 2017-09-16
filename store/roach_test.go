@@ -1,22 +1,197 @@
-package dbhelper_test
+package store_test
 
 import (
 	"database/sql"
+	"flag"
 	"reflect"
 	"testing"
 
-	"github.com/tomogoma/authms/dbhelper"
+	"github.com/tomogoma/authms/auth/hash"
+	"github.com/tomogoma/authms/password"
+	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/authms/store"
+	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
+
+type Token struct {
+	TknKeyFile string `yaml:"tokenkeyfile"`
+}
+
+func (c Token) TokenKeyFile() string {
+	return c.TknKeyFile
+}
+
+type Config struct {
+	Database cockroach.DSN `json:"database,omitempty"`
+	Token    Token         `json:"token,omitempty"`
+}
 
 type UpdateTestCase struct {
 	Desc string
 	User *authms.User
 }
 
+var confFile = flag.String(
+	"conf",
+	config.DefaultConfPath,
+	"/path/to/config/file.conf.yml",
+)
+var conf = &Config{}
+var hasher = hash.Hasher{}
 var completeUserAppName = "test-app"
 
+func init() {
+	flag.Parse()
+}
+
+func TestNewModel(t *testing.T) {
+	setUp(t)
+	defer tearDown(t)
+	newModel(t)
+}
+
+func TestModel_SaveHistory(t *testing.T) {
+	setUp(t)
+	defer tearDown(t)
+	m := newModel(t)
+	usr := completeUser()
+	insertUser(usr, t)
+	type SaveHistoryTestCase struct {
+		Desc   string
+		Hist   *authms.History
+		ExpErr bool
+	}
+	tcs := []SaveHistoryTestCase{
+		{
+			Desc:   "Valid history",
+			ExpErr: false,
+			Hist:   completeHistory(usr.ID),
+		},
+		{
+			Desc:   "Invalid user ID",
+			ExpErr: true,
+			Hist: &authms.History{
+				UserID:        -1,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "LOGIN",
+				SuccessStatus: true,
+				DevID:         "test-app-id",
+			},
+		},
+		{
+			Desc:   "Non existent user ID",
+			ExpErr: true,
+			Hist: &authms.History{
+				UserID:        1,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "LOGIN",
+				SuccessStatus: true,
+				DevID:         "test-app-id",
+			},
+		},
+		{
+			Desc:   "Empty access type",
+			ExpErr: true,
+			Hist: &authms.History{
+				UserID:        usr.ID,
+				IpAddress:     "127.0.0.1",
+				AccessType:    "",
+				SuccessStatus: true,
+				DevID:         "test-app-id",
+			},
+		},
+	}
+	for _, tc := range tcs {
+		func() {
+			err := m.SaveHistory(tc.Hist)
+			if tc.ExpErr {
+				if err == nil {
+					t.Errorf("%s - expected an error but got none",
+						tc.Desc)
+				}
+				return
+			} else if err != nil {
+				t.Errorf("%s - model.SaveHistory(): %v",
+					tc.Desc, err)
+				return
+			}
+			q := `SELECT id, accessMethod, successful, userID, date, devID, ipAddress
+				FROM history WHERE id=$1`
+			db := getDB(t)
+			hist := new(authms.History)
+			err = db.QueryRow(q, tc.Hist.ID).Scan(&hist.ID,
+				&hist.AccessType, &hist.SuccessStatus,
+				&hist.UserID, &hist.Date, &hist.DevID,
+				&hist.IpAddress)
+			if err != nil {
+				t.Fatalf("%s - Error fetching history for"+
+					" validation: %s", tc.Desc, err)
+				return
+			}
+			if !compareHistory(tc.Hist, hist) {
+				t.Errorf("%s - expected %+v but got %+v",
+					tc.Desc, tc.Hist, hist)
+			}
+		}()
+	}
+}
+
+func TestModel_GetHistory(t *testing.T) {
+	type TestCase struct {
+		Desc string
+		Hist *authms.History
+	}
+	tcs := []TestCase{
+		{Desc: "All values provided", Hist: completeHistory(1)},
+		{
+			Desc: "Missing devID, IP Addr",
+			Hist: &authms.History{
+				AccessType:    "LOGIN",
+				SuccessStatus: true,
+			},
+		},
+	}
+	for _, tc := range tcs {
+		func() {
+			setUp(t)
+			defer tearDown(t)
+			m := newModel(t)
+			usr := completeUser()
+			insertUser(usr, t)
+			q := `INSERT INTO history (userID, accessMethod,
+			 		successful, devID, ipAddress, date)
+				VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())`
+			db := getDB(t)
+			tc.Hist.UserID = usr.ID
+			_, err := db.Exec(q, tc.Hist.UserID, tc.Hist.AccessType,
+				tc.Hist.SuccessStatus, tc.Hist.DevID, tc.Hist.IpAddress)
+			if err != nil {
+				t.Errorf("%s - Error setting up"+
+					" (inserting history): %s", tc.Desc, err)
+				return
+			}
+			offset := 0
+			count := 1
+			hists, err := m.GetHistory(tc.Hist.UserID, offset,
+				count, tc.Hist.AccessType)
+			if err != nil {
+				t.Errorf("%s - model.GetHistory(): %s", tc.Desc, err)
+				return
+			}
+			if len(hists) != 1 {
+				t.Errorf("%s - Expected 1 history entry but got %d",
+					tc.Desc, len(hists))
+				return
+			}
+			if !compareHistory(tc.Hist, hists[0]) {
+				t.Errorf("%s\nExpected:\t%+v\nGot:\t\t%+v",
+					tc.Desc, tc.Hist, hists[0])
+			}
+		}()
+	}
+}
 func TestModel_SaveUser(t *testing.T) {
 	setUp(t)
 	defer tearDown(t)
@@ -155,7 +330,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 			}
 			usrID, err := m.UserExists(tc.TestUser)
 			if err != nil {
-				t.Errorf("%s - dbhelper.UserExists(): %v",
+				t.Errorf("%s - store.UserExists(): %v",
 					tc.Desc, err)
 				return
 			}
@@ -278,7 +453,7 @@ func TestModel_UpdatePassword(t *testing.T) {
 		{Desc: "Correct old password", OldPass: expUsr.Password,
 			expErr: nil},
 		{Desc: "Incorrect old password", OldPass: "some-invalid",
-			expErr: dbhelper.ErrorPasswordMismatch},
+			expErr: store.ErrorPasswordMismatch},
 	}
 	newPass := "test-updated-password"
 	for _, tc := range tcs {
@@ -425,7 +600,7 @@ func fetchUser(userID int64, t *testing.T) *authms.User {
 
 func insertUser(u *authms.User, t *testing.T) {
 	db := getDB(t)
-	err := cockroach.InstantiateDB(db, conf.Database.DB, dbhelper.AllTableDescs...)
+	err := cockroach.InstantiateDB(db, conf.Database.DB, store.AllTableDescs...)
 	if err != nil {
 		t.Fatalf("Error setting up (instantiate users table: %v", err)
 	}
@@ -536,4 +711,73 @@ func oAuthEqual(act, exp *authms.OAuth) bool {
 	}
 	return act.AppName == exp.AppName && act.AppUserID == exp.AppUserID &&
 		act.Verified == exp.Verified
+}
+
+func completeHistory(userID int64) *authms.History {
+	return &authms.History{
+		UserID:        userID,
+		IpAddress:     "127.0.0.1",
+		AccessType:    "LOGIN",
+		SuccessStatus: true,
+		DevID:         "test-app-id",
+	}
+}
+
+func compareHistory(act, exp *authms.History) bool {
+	if exp == nil {
+		return act != nil
+	} else if act == nil {
+		return false
+	}
+	if act.UserID != exp.UserID {
+		return false
+	}
+	if act.IpAddress != exp.IpAddress {
+		return false
+	}
+	if act.AccessType != exp.AccessType {
+		return false
+	}
+	if act.SuccessStatus != exp.SuccessStatus {
+		return false
+	}
+	if act.DevID != exp.DevID {
+		return false
+	}
+	return true
+}
+
+func newModel(t *testing.T) *store.Roach {
+	pg, err := password.NewGenerator(password.AllChars)
+	if err != nil {
+		t.Fatalf("password.NewGenerator(): %s", err)
+	}
+	m, err := store.NewRoach(conf.Database, pg, hasher)
+	if err != nil {
+		t.Fatalf("user.NewModel(): %s", err)
+	}
+	return m
+}
+
+func getDB(t *testing.T) *sql.DB {
+	db, err := cockroach.DBConn(conf.Database)
+	if err != nil {
+		t.Fatalf("unable to tear down: cockroach.DBConn(): %s", err)
+	}
+	return db
+}
+
+func setUp(t *testing.T) {
+	if err := configH.ReadYamlConfig(*confFile, conf); err != nil {
+		t.Fatal(err)
+	}
+	conf.Database.DB = conf.Database.DB + "_test"
+}
+
+func tearDown(t *testing.T) {
+	db := getDB(t)
+	_, err := db.Exec("DROP DATABASE IF EXISTS " + conf.Database.DBName())
+	if err != nil {
+		t.Fatalf("unable to tear down db: %s", err)
+	}
 }

@@ -1,15 +1,17 @@
-package dbhelper
+package store
 
 import (
 	"context"
 	"database/sql"
 	"fmt"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/lib/pq"
 	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -22,10 +24,109 @@ type Hasher interface {
 	CompareHash(pass string, passHB []byte) bool
 }
 
+type Roach struct {
+	hasher    Hasher
+	gen       PasswordGenerator
+	gcRunning bool
+	errors.NotFoundErrCheck
+	dsnF cockroach.DSNFormatter
+
+	isDBInitMutex sync.Mutex
+	isDBInit      bool
+	db            *sql.DB
+}
+
 var ErrorPasswordMismatch = errors.NewAuth("username/password combo mismatch")
 var ErrorModelCorruptedOnEmptyPassword = errors.New("The model contained an empty password value and is probably corrupt")
 
-func (m *DBHelper) SaveUser(u *authms.User) error {
+func NewRoach(dsnF cockroach.DSNFormatter, pg PasswordGenerator, h Hasher) (*Roach, error) {
+	if h == nil {
+		return nil, errors.New("HashFunc cannot be nil")
+	}
+	if pg == nil {
+		return nil, errors.New("HashFunc cannot be nil")
+	}
+	if dsnF == nil {
+		return nil, errors.New("DSNFormatter was nil")
+	}
+	return &Roach{dsnF: dsnF, gen: pg, hasher: h, isDBInitMutex: sync.Mutex{}}, nil
+}
+
+func (h *Roach) InitDBConnIfNotInitted() error {
+	var err error
+	h.db, err = cockroach.TryConnect(h.dsnF.FormatDSN(), h.db)
+	if err != nil {
+		return errors.Newf("Failed to connect to db: %v", err)
+	}
+	return h.instantiate()
+}
+func (m *Roach) SaveHistory(h *authms.History) error {
+	if err := validateHistory(h); err != nil {
+		return err
+	}
+	if err := m.InitDBConnIfNotInitted(); err != nil {
+		return err
+	}
+	q := `
+	INSERT INTO history (userID, accessMethod, successful, devID, ipAddress, date)
+		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())
+		 RETURNING id
+	`
+	err := m.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
+		h.DevID, h.IpAddress).Scan(&h.ID)
+	if err != nil {
+		return errors.Newf("error inserting history: %v", err)
+	}
+	return nil
+}
+
+func (m *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
+	if err := m.InitDBConnIfNotInitted(); err != nil {
+		return nil, err
+	}
+	acMFilter := ""
+	for i, acM := range acMs {
+		if i == 0 {
+			acMFilter = fmt.Sprintf("AND (accessMethod = '%s'", acM)
+			continue
+		}
+		acMFilter = fmt.Sprintf("%s OR accessMethod = '%s'", acMFilter, acM)
+	}
+	if acMFilter != "" {
+		acMFilter += ")"
+	}
+	q := fmt.Sprintf(`
+		SELECT id, accessMethod, successful, userID, date, devID, ipAddress
+		FROM history
+		WHERE userID = $1 %s
+		ORDER BY date DESC
+		LIMIT $2 OFFSET $3
+	`, acMFilter)
+	r, err := m.db.Query(q, userID, count, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	hists := make([]*authms.History, 0)
+	for r.Next() {
+		var devID, ipAddr sql.NullString
+		d := &authms.History{}
+		err = r.Scan(&d.ID, &d.AccessType, &d.SuccessStatus, &d.UserID,
+			&d.Date, &devID, &ipAddr)
+		d.DevID = devID.String
+		d.IpAddress = ipAddr.String
+		if err != nil {
+			return nil, errors.Newf("error scanning result row: %v",
+				err)
+		}
+		hists = append(hists, d)
+	}
+	if err := r.Err(); err != nil {
+		return nil, errors.Newf("error iterating resultset: %v", err)
+	}
+	return hists, nil
+}
+func (m *Roach) SaveUser(u *authms.User) error {
 	if u == nil {
 		return errors.New("user was nil")
 	}
@@ -82,7 +183,7 @@ func (m *DBHelper) SaveUser(u *authms.User) error {
 	return err
 }
 
-func (m *DBHelper) UserExists(u *authms.User) (int64, error) {
+func (m *Roach) UserExists(u *authms.User) (int64, error) {
 	userID := int64(-1)
 	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return userID, err
@@ -118,25 +219,25 @@ func (m *DBHelper) UserExists(u *authms.User) (int64, error) {
 	return -1, nil
 }
 
-func (m *DBHelper) GetByUserName(uName, pass string) (*authms.User, error) {
+func (m *Roach) GetByUserName(uName, pass string) (*authms.User, error) {
 	where := "usernames.userName = $1"
 	usr, err := m.get(where, uName)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *DBHelper) GetByPhone(phone, pass string) (*authms.User, error) {
+func (m *Roach) GetByPhone(phone, pass string) (*authms.User, error) {
 	where := `phones.phone = $1`
 	usr, err := m.get(where, phone)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *DBHelper) GetByEmail(email, pass string) (*authms.User, error) {
+func (m *Roach) GetByEmail(email, pass string) (*authms.User, error) {
 	where := `emails.email = $1`
 	usr, err := m.get(where, email)
 	return m.validateFetchedUser(usr, err, pass)
 }
 
-func (m *DBHelper) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
+func (m *Roach) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
 	usr := &authms.User{}
 	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return usr, err
@@ -153,7 +254,7 @@ func (m *DBHelper) GetByAppUserID(appName, appUserID string) (*authms.User, erro
 	return m.get(where, usr.ID)
 }
 
-func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
+func (m *Roach) UpdateUserName(userID int64, newUserName string) error {
 	if newUserName == "" {
 		return errors.New("the userName provided was invlaid")
 	}
@@ -178,7 +279,7 @@ func (m *DBHelper) UpdateUserName(userID int64, newUserName string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
+func (m *Roach) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	if new == nil {
 		return errors.New("new OAuth was nil")
 	}
@@ -203,7 +304,7 @@ func (m *DBHelper) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
+func (m *Roach) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	if !hasValue(newEmail) {
 		return errors.New("the email provided was invlaid")
 	}
@@ -228,7 +329,7 @@ func (m *DBHelper) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
+func (m *Roach) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	if !hasValue(newPhone) {
 		return errors.New("the phone provided was invlaid")
 	}
@@ -253,7 +354,7 @@ func (m *DBHelper) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) error {
+func (m *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error {
 	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
@@ -281,12 +382,12 @@ func (m *DBHelper) UpdatePassword(userID int64, oldPass, newPassword string) err
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *DBHelper) IsDuplicateError(err error) bool {
+func (m *Roach) IsDuplicateError(err error) bool {
 	pqErr, ok := err.(*pq.Error)
 	return ok && pqErr.Code == "23505"
 }
 
-func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass string) (
+func (m *Roach) validateFetchedUser(usr *authms.User, getErr error, pass string) (
 	*authms.User, error) {
 	if getErr != nil {
 		return usr, getErr
@@ -297,7 +398,7 @@ func (m *DBHelper) validateFetchedUser(usr *authms.User, getErr error, pass stri
 	return usr, nil
 }
 
-func (m *DBHelper) get(where string, whereArgs ...interface{}) (*authms.User, error) {
+func (m *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error) {
 	usr := &authms.User{
 		Email:  &authms.Value{},
 		Phone:  &authms.Value{},
@@ -352,7 +453,7 @@ func (m *DBHelper) get(where string, whereArgs ...interface{}) (*authms.User, er
 	return usr, nil
 }
 
-func (m *DBHelper) validatePassword(id int64, password string) error {
+func (m *Roach) validatePassword(id int64, password string) error {
 	if err := m.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
@@ -371,7 +472,7 @@ func (m *DBHelper) validatePassword(id int64, password string) error {
 	return err
 }
 
-func (m *DBHelper) getPasswordHash(u *authms.User) ([]byte, error) {
+func (m *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
 	passStr := u.Password
 	if passStr == "" {
 		passB, err := m.gen.SecureRandomString(36)
@@ -382,6 +483,44 @@ func (m *DBHelper) getPasswordHash(u *authms.User) ([]byte, error) {
 		passStr = string(passB)
 	}
 	return m.hasher.Hash(passStr)
+}
+
+func (h *Roach) instantiate() error {
+	h.isDBInitMutex.Lock()
+	defer h.isDBInitMutex.Unlock()
+	if h.isDBInit {
+		return nil
+	}
+	if err := cockroach.InstantiateDB(h.db, h.dsnF.DBName(), AllTableDescs...); err != nil {
+		return errors.Newf("error instantiating db: %v", err)
+	}
+	h.isDBInit = true
+	return nil
+}
+
+func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
+	if err != nil {
+		return err
+	}
+	c, err := rslt.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if c != expAffected {
+		return errors.Newf("expected %d affected rows but got %d",
+			expAffected, c)
+	}
+	return nil
+}
+
+func validateHistory(h *authms.History) error {
+	if h.UserID < 1 {
+		return errors.New("userID was invalid")
+	}
+	if h.AccessType == "" {
+		return errors.New("access type was empty")
+	}
+	return nil
 }
 
 func hasValue(v *authms.Value) bool {
