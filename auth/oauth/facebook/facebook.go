@@ -18,14 +18,14 @@ const (
 )
 
 type FacebookOAuth struct {
-	appID     int
+	appID     int64
 	appSecret string
 }
 
 var ErrorEmptyAppSecret = errors.New("facebook app secret was empty")
 var ErrorEmptyAppID = errors.New("facebook app ID was empty")
 
-func New(appID int, appSecret string) (*FacebookOAuth, error) {
+func New(appID int64, appSecret string) (*FacebookOAuth, error) {
 	if appSecret == "" {
 		return nil, ErrorEmptyAppSecret
 	}

@@ -7,7 +7,6 @@ import (
 	"io/ioutil"
 
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
@@ -101,11 +100,26 @@ type SMSConfig struct {
 	ActiveAPI      string               `json:"activeAPI" yaml:"activeAPI"`
 }
 
+type OAuth struct {
+	FacebookSecretFileLoc string `json:"facebookSecretFileLoc,omitempty" yaml:"facebookSecretFileLoc"`
+	FacebookID            int64  `json:"facebookID,omitempty" yaml:"facebookID"`
+}
+
+func (c OAuth) Validate() error {
+	if c.FacebookSecretFileLoc == "" {
+		return errors.New("facebook secret file location was empty")
+	}
+	if c.FacebookID < 1 {
+		return errors.New("facebook id was invalid")
+	}
+	return nil
+}
+
 type Config struct {
 	Service        ServiceConfig    `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
 	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
 	Authentication auth.Config      `json:"authentication,omitempty" yaml:"authentication"`
 	Token          token.ConfigStub `json:"token,omitempty" yaml:"token"`
-	OAuth          oauth.Config     `json:"OAuth,omitempty" yaml:"OAuth"`
+	OAuth          OAuth            `json:"OAuth,omitempty" yaml:"OAuth"`
 	SMS            SMSConfig        `json:"sms" yaml:"sms"`
 }

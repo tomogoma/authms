@@ -8,13 +8,14 @@ import (
 	"runtime"
 	"time"
 
+	"io/ioutil"
+
 	"github.com/dropbox/godropbox/errors"
 	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/oauth"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
@@ -112,7 +113,12 @@ func main() {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
 		return
 	}
-	oa, err := oauth.New(conf.OAuth)
+	fbSecret, err := readFile(conf.OAuth.FacebookSecretFileLoc)
+	if err != nil {
+		lg.Critical("Error reading facebook secret file: %v", err)
+		return
+	}
+	oa, err := auth.NewOAuth(conf.OAuth.FacebookID, fbSecret)
 	if err != nil {
 		lg.Critical("Error instantiating OAuth module: %s", err)
 		return
@@ -173,4 +179,12 @@ func serveHttp(conf config.ServiceConfig, rh RouteHandler, quitCh chan error) {
 		web.RegisterInterval(conf.RegisterInterval),
 	)
 	quitCh <- service.Run()
+}
+
+func readFile(path string) (string, error) {
+	contentB, err := ioutil.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read '%s': %v", path, err)
+	}
+	return string(contentB), nil
 }
