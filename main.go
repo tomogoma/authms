@@ -14,16 +14,16 @@ import (
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/store"
 	"github.com/tomogoma/authms/auth/hash"
 	"github.com/tomogoma/authms/auth/oauth"
-	"github.com/tomogoma/authms/auth/password"
 	"github.com/tomogoma/authms/auth/phone/sms"
 	"github.com/tomogoma/authms/auth/phone/verification"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
 	"github.com/tomogoma/authms/server/rpc"
+	"github.com/tomogoma/authms/store"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
 )
@@ -62,7 +62,7 @@ func main() {
 		return
 	}
 	authQuitCh := make(chan error)
-	pg, err := password.NewGenerator(password.AllChars)
+	pg, err := generator.NewRandom(generator.AllChars)
 	if err != nil {
 		lg.Critical("Error instantiating password generator: %s", err)
 		return
@@ -103,7 +103,7 @@ func main() {
 			conf.SMS.ActiveAPI, err)
 		return
 	}
-	ng, err := password.NewGenerator(password.NumberChars)
+	ng, err := generator.NewRandom(generator.NumberChars)
 	if err != nil {
 		lg.Critical("Error instantiating number generator: %s", err)
 		return

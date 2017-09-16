@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/tomogoma/authms/auth/hash"
-	"github.com/tomogoma/authms/password"
+	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/store"
@@ -748,9 +748,9 @@ func compareHistory(act, exp *authms.History) bool {
 }
 
 func newModel(t *testing.T) *store.Roach {
-	pg, err := password.NewGenerator(password.AllChars)
+	pg, err := generator.NewRandom(generator.AllChars)
 	if err != nil {
-		t.Fatalf("password.NewGenerator(): %s", err)
+		t.Fatalf("password.NewRandom(): %s", err)
 	}
 	m, err := store.NewRoach(conf.Database, pg, hasher)
 	if err != nil {

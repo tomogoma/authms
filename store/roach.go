@@ -16,7 +16,7 @@ import (
 )
 
 type PasswordGenerator interface {
-	SecureRandomString(length int) ([]byte, error)
+	SecureRandomBytes(length int) ([]byte, error)
 }
 
 type Hasher interface {
@@ -475,7 +475,7 @@ func (m *Roach) validatePassword(id int64, password string) error {
 func (m *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
 	passStr := u.Password
 	if passStr == "" {
-		passB, err := m.gen.SecureRandomString(36)
+		passB, err := m.gen.SecureRandomBytes(36)
 		if err != nil {
 			return nil, errors.Newf("error generating password: %v",
 				err)

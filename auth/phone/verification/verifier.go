@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"time"
 
-	jwt "github.com/dgrijalva/jwt-go"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -29,7 +29,7 @@ type Tokener interface {
 }
 
 type SecureRandomer interface {
-	SecureRandomString(length int) ([]byte, error)
+	SecureRandomBytes(length int) ([]byte, error)
 }
 
 type Config interface {
@@ -65,7 +65,7 @@ func New(c Config, s SMSer, sr SecureRandomer, t Tokener) (*Verifier, error) {
 }
 
 func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error) {
-	codeB, err := v.generator.SecureRandomString(4)
+	codeB, err := v.generator.SecureRandomBytes(4)
 	if err != nil {
 		return nil, errors.Newf("error generating SMS code: %v", err)
 	}

@@ -52,7 +52,7 @@ type SecureRandomerMock struct {
 	SecureRandomStringCalled bool
 }
 
-func (sr *SecureRandomerMock) SecureRandomString(length int) ([]byte, error) {
+func (sr *SecureRandomerMock) SecureRandomBytes(length int) ([]byte, error) {
 	sr.SecureRandomStringCalled = true
 	return []byte(sr.ExpString), sr.ExpErr
 }

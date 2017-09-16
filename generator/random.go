@@ -1,4 +1,4 @@
-package password
+package generator
 
 import (
 	"crypto/rand"
@@ -19,13 +19,13 @@ const (
 var ErrorBadCharSet = errors.New("availableCharBytes length must be greater" +
 	" than 0 and less than or equal to 256")
 
-type Generator struct {
+type Random struct {
 	letterBytes         string
 	bitMask             byte
 	availableCharLength int
 }
 
-func NewGenerator(charSet string) (*Generator, error) {
+func NewRandom(charSet string) (*Random, error) {
 	availableCharLength := len(charSet)
 	if availableCharLength < 2 || availableCharLength > 256 {
 		return nil, ErrorBadCharSet
@@ -38,24 +38,24 @@ func NewGenerator(charSet string) (*Generator, error) {
 		bitLength++
 	}
 	bitMask = 1<<bitLength - 1
-	return &Generator{
+	return &Random{
 		letterBytes:         charSet,
 		bitMask:             bitMask,
 		availableCharLength: availableCharLength,
 	}, nil
 }
 
-// SecureRandomString returns a string of the requested length,
-// made from the byte characters provided (only ASCII allowed).
-// Uses crypto/rand for security. Will panic if len(availableCharBytes) > 256.
-func (g Generator) SecureRandomString(length int) ([]byte, error) {
+// SecureRandomBytes returns a byte array of the requested length,
+// made from the byte characters provided in NewRandom(). It uses crypto/rand
+// for security.
+func (g Random) SecureRandomBytes(length int) ([]byte, error) {
 	bufferSize := length + length/3
 	var err error
 	result := make([]byte, length)
 	for i, j, randomBytes := 0, 0, []byte{}; i < length; j++ {
 		if j%bufferSize == 0 {
 			// Random byte buffer is empty, get a new one
-			randomBytes, err = SecureRandomBytes(bufferSize)
+			randomBytes, err = RandomBytes(bufferSize)
 			if err != nil {
 				return nil, fmt.Errorf("unable to generate secure random bytes: %s", err)
 			}
@@ -69,8 +69,8 @@ func (g Generator) SecureRandomString(length int) ([]byte, error) {
 	return result, nil
 }
 
-// SecureRandomBytes returns the requested number of bytes using crypto/rand
-func SecureRandomBytes(length int) ([]byte, error) {
+// RandomBytes returns the requested number of bytes using crypto/rand
+func RandomBytes(length int) ([]byte, error) {
 	var randomBytes = make([]byte, length)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
