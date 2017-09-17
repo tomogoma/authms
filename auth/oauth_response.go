@@ -1,7 +1,6 @@
-package response
+package auth
 
-type OAuth interface {
-	IsValid() bool
+type OAuthResponse interface {
 	UserID() string
 	AppID() string
 	AppName() string

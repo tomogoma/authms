@@ -2,13 +2,13 @@ package facebook
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 
-	"github.com/tomogoma/authms/auth/oauth/response"
+	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 const (
@@ -18,6 +18,7 @@ const (
 )
 
 type FacebookOAuth struct {
+	errors.AuthErrCheck
 	appID     int64
 	appSecret string
 }
@@ -35,7 +36,7 @@ func New(appID int64, appSecret string) (*FacebookOAuth, error) {
 	return &FacebookOAuth{appID: appID, appSecret: appSecret}, nil
 }
 
-func (f *FacebookOAuth) ValidateToken(token string) (response.OAuth, error) {
+func (f *FacebookOAuth) ValidateToken(token string) (auth.OAuthResponse, error) {
 	URL, err := url.Parse(fmt.Sprintf("%s?%s=%s&%s=%d|%s", fbURL,
 		fbInputTokenKey, token, fbAppTokenKey, f.appID, f.appSecret))
 	if err != nil {
@@ -58,6 +59,9 @@ func (f *FacebookOAuth) ValidateToken(token string) (response.OAuth, error) {
 	err = json.Unmarshal(rb, resp)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling facebook response: %s", err)
+	}
+	if !resp.Valid {
+		return nil, errors.NewAuth("OAuth token invalid")
 	}
 	return resp, nil
 }

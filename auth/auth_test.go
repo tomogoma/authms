@@ -8,10 +8,9 @@ import (
 
 	"github.com/limetext/log4go"
 	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/auth/oauth/facebook"
-	"github.com/tomogoma/authms/auth/oauth/response"
 	"github.com/tomogoma/authms/claim"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
@@ -33,6 +32,7 @@ type ConfigMock struct {
 }
 
 type OAuthHandlerMock struct {
+	errors.AuthErrCheck
 	ExpValTknClld bool
 	ExpValid      bool
 	AppUserID     string
@@ -40,7 +40,7 @@ type OAuthHandlerMock struct {
 	ValTknClld    bool
 }
 
-func (oa *OAuthHandlerMock) ValidateToken(appName, token string) (response.OAuth, error) {
+func (oa *OAuthHandlerMock) ValidateToken(token string) (auth.OAuthResponse, error) {
 	oa.ValTknClld = true
 	return &facebook.Response{
 		ResponseData: facebook.ResponseData{
@@ -178,7 +178,7 @@ func TestNew(t *testing.T) {
 }
 
 func TestAuth_Register(t *testing.T) {
-	appName := "test-app"
+	appName := "facebook"
 	cases := []RegisterTestCase{
 		{
 			Desc:      "Valid args",
@@ -402,7 +402,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 	usrID := int64(123)
 	devID := "test-dev"
 	tkn := genToken(t, usrID, devID)
-	appName := "test-app"
+	appName := "facebook"
 	appUsrID := "test-app-userID"
 	cases := []RegisterTestCase{
 		{
@@ -813,11 +813,11 @@ func TestAuth_LoginOAuth(t *testing.T) {
 			DBHelper: &DBHelperMock{ExpUser: &authms.User{ID: 123}},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true,
 				AppUserID: "test-app-user-id", ExpValid: true},
-			OAuth: &authms.OAuth{AppUserID: "test-app-user-id"}, DevID: "Tes-devID"},
+			OAuth: &authms.OAuth{AppName: "facebook", AppUserID: "test-app-user-id"}, DevID: "Tes-devID"},
 		{Desc: "Invalid OAuth Creds", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
-			OAuth:     &authms.OAuth{}, DevID: "Tes-devID"},
+			OAuth:     &authms.OAuth{AppName: "facebook",}, DevID: "Tes-devID"},
 		{Desc: "Nil OAuth", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: false, ExpErr: errors.New("")},
@@ -865,7 +865,7 @@ func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVeri
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := auth.New(tokenGen, lg, db, oa, pv)
+	a, err := auth.New(tokenGen, lg, db, pv, auth.WithFB(oa))
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}

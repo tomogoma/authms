@@ -17,6 +17,7 @@ import (
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
@@ -113,17 +114,21 @@ func main() {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
 		return
 	}
-	fbSecret, err := readFile(conf.OAuth.FacebookSecretFileLoc)
-	if err != nil {
-		lg.Critical("Error reading facebook secret file: %v", err)
-		return
+	authOpts := make([]auth.Option, 0)
+	if conf.OAuth.Facebook.ID > 0 {
+		fbSecret, err := readFile(conf.OAuth.Facebook.SecretFilePath)
+		if err != nil {
+			lg.Critical("Error reading facebook secret file: %v", err)
+			return
+		}
+		fb, err := facebook.New(conf.OAuth.Facebook.ID, fbSecret)
+		if err != nil {
+			lg.Critical("Error instantiating facebook OAuth: %v", err)
+			return
+		}
+		authOpts = append(authOpts, auth.WithFB(fb))
 	}
-	oa, err := auth.NewOAuth(conf.OAuth.FacebookID, fbSecret)
-	if err != nil {
-		lg.Critical("Error instantiating OAuth module: %s", err)
-		return
-	}
-	a, err := auth.New(tg, lg, db, oa, pv)
+	a, err := auth.New(tg, lg, db, pv, authOpts...)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return

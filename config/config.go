@@ -100,19 +100,13 @@ type SMSConfig struct {
 	ActiveAPI      string               `json:"activeAPI" yaml:"activeAPI"`
 }
 
-type OAuth struct {
-	FacebookSecretFileLoc string `json:"facebookSecretFileLoc,omitempty" yaml:"facebookSecretFileLoc"`
-	FacebookID            int64  `json:"facebookID,omitempty" yaml:"facebookID"`
+type Facebook struct {
+	SecretFilePath string `json:"secretFilePath,omitempty" yaml:"secretFilePath"`
+	ID             int64  `json:"ID,omitempty" yaml:"ID"`
 }
 
-func (c OAuth) Validate() error {
-	if c.FacebookSecretFileLoc == "" {
-		return errors.New("facebook secret file location was empty")
-	}
-	if c.FacebookID < 1 {
-		return errors.New("facebook id was invalid")
-	}
-	return nil
+type OAuth struct {
+	Facebook Facebook `json:"facebook,omitempty" yaml:"facebook"`
 }
 
 type Config struct {

@@ -15,13 +15,6 @@ type Response struct {
 	ResponseData `json:"data,omitempty"`
 }
 
-func (t *Response) IsValid() bool {
-	if t == nil {
-		return false
-	}
-	return t.Valid
-}
-
 func (t *Response) UserID() string {
 	if t == nil {
 		return ""

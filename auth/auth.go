@@ -6,14 +6,14 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/authms/auth/oauth/response"
 	"github.com/tomogoma/authms/claim"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 type OAuthHandler interface {
-	ValidateToken(appName, token string) (response.OAuth, error)
+	IsAuthError(error) bool
+	ValidateToken(appName, token string) (OAuthResponse, error)
 }
 
 type TokenGenerator interface {
@@ -28,6 +28,11 @@ type PasswordGenerator interface {
 type Logger interface {
 	Info(interface{}, ...interface{})
 	Error(interface{}, ...interface{}) error
+}
+
+type OAuthClient interface {
+	IsAuthError(error) bool
+	ValidateToken(string) (OAuthResponse, error)
 }
 
 type DBHelper interface {
@@ -55,12 +60,14 @@ type Auth struct {
 	dbHelper      DBHelper
 	tokenG        TokenGenerator
 	logger        Logger
-	oAuthHandler  OAuthHandler
 	phoneVerifier PhoneVerifier
+	oAuthCls      map[string]OAuthClient
 	errors.ClErrCheck
 	errors.AuthErrCheck
 	errors.NotImplErrCheck
 }
+
+type Option func(*Auth)
 
 const (
 	numPrevLogins        = 5
@@ -71,17 +78,22 @@ const (
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
 	numExp               = `[0-9]+`
 	tokenValidity        = 8 * time.Hour
+	AppFacebook          = "facebook"
 )
+
+func WithFB(fb OAuthClient) Option {
+	return func(a *Auth) {
+		a.oAuthCls[AppFacebook] = fb
+	}
+}
 
 var ErrorNilTokenGenerator = errors.New("token generator was nil")
 var ErrorNilLogger = errors.New("Logger was nil")
 var ErrorNilDBHelper = errors.New("DBHelper was nil")
-var ErrorNilOAuthHandler = errors.New("oauth handler was nil")
 var ErrorNilPhoneVerifier = errors.New("PhoneVerifier was nil")
 var rePhone = regexp.MustCompile(numExp)
 
-func New(tg TokenGenerator, lg Logger, db DBHelper,
-	oa OAuthHandler, pv PhoneVerifier) (*Auth, error) {
+func New(tg TokenGenerator, lg Logger, db DBHelper, pv PhoneVerifier, opts ...Option) (*Auth, error) {
 	if tg == nil {
 		return nil, ErrorNilTokenGenerator
 	}
@@ -91,14 +103,15 @@ func New(tg TokenGenerator, lg Logger, db DBHelper,
 	if db == nil {
 		return nil, ErrorNilDBHelper
 	}
-	if oa == nil {
-		return nil, ErrorNilOAuthHandler
-	}
 	if pv == nil {
 		return nil, ErrorNilPhoneVerifier
 	}
-	return &Auth{dbHelper: db, tokenG: tg, oAuthHandler: oa,
-		logger: lg, phoneVerifier: pv}, nil
+	a := &Auth{dbHelper: db, tokenG: tg, oAuthCls: make(map[string]OAuthClient),
+		logger: lg, phoneVerifier: pv}
+	for _, f := range opts {
+		f(a)
+	}
+	return a, nil
 }
 
 func (a *Auth) Register(user *authms.User, devID, rIP string) error {
@@ -364,12 +377,19 @@ func (a *Auth) validateOAuth(claimOA *authms.OAuth) error {
 	if claimOA == nil {
 		return errors.NewClient("nil OAuth was found")
 	}
-	oa, err := a.oAuthHandler.ValidateToken(claimOA.AppName, claimOA.AppToken)
-	if err != nil {
-		return errors.Newf("error validating OAuth token: %v", err)
+	cl, exists := a.oAuthCls[claimOA.AppName]
+	if !exists {
+		return errors.NewClient("the app provided is not supported")
 	}
-	if !oa.IsValid() || oa.UserID() != claimOA.AppUserID {
-		return errors.NewAuth("OAuth token was not valid")
+	oa, err := cl.ValidateToken(claimOA.AppToken)
+	if err != nil {
+		if cl.IsAuthError(err) {
+			return errors.NewAuthf("%s: %v", claimOA.AppName, err)
+		}
+		return errors.Newf("validate token: %s: %v", claimOA.AppName, err)
+	}
+	if oa.UserID() != claimOA.AppUserID {
+		return errors.NewAuth("OAuth token does not belong to the user claimed")
 	}
 	return nil
 }
