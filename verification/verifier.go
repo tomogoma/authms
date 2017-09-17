@@ -38,14 +38,15 @@ type Config interface {
 }
 
 type Verifier struct {
-	smser     SMSer
-	tokener   Tokener
-	generator SecureRandomer
-	config    Config
+	smser       SMSer
+	tokener     Tokener
+	generator   SecureRandomer
+	smsFmt      string
+	msgValidity time.Duration
 	errors.NotImplErrCheck
 }
 
-func New(c Config, s SMSer, sr SecureRandomer, t Tokener) (*Verifier, error) {
+func New(smsFmt string, msgValidity time.Duration, s SMSer, sr SecureRandomer, t Tokener) (*Verifier, error) {
 	if s == nil {
 		return nil, errors.New("SMSer was nil")
 	}
@@ -55,13 +56,13 @@ func New(c Config, s SMSer, sr SecureRandomer, t Tokener) (*Verifier, error) {
 	if t == nil {
 		return nil, errors.New("Tokener was nil")
 	}
-	if c == nil {
-		return nil, errors.New("Config was nil")
+	if msgValidity < 1*time.Minute {
+		return nil, errors.New("message validity too small")
 	}
-	if err := testConfig(c); err != nil {
+	if err := testConfig(smsFmt); err != nil {
 		return nil, err
 	}
-	return &Verifier{smser: s, tokener: t, generator: sr, config: c}, nil
+	return &Verifier{smser: s, tokener: t, generator: sr, smsFmt: smsFmt, msgValidity: msgValidity}, nil
 }
 
 func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error) {
@@ -70,7 +71,7 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 		return nil, errors.Newf("error generating SMS code: %v", err)
 	}
 	issue := time.Now()
-	expiry := time.Now().Add(v.config.ValidityPeriod())
+	expiry := time.Now().Add(v.msgValidity)
 	claims := &Claims{
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  issue.Unix(),
@@ -83,7 +84,7 @@ func (v *Verifier) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, e
 	if err != nil {
 		return nil, errors.Newf("error generting SMS token: %v", err)
 	}
-	smsBody := fmt.Sprintf(v.config.MessageFormat(), codeB)
+	smsBody := fmt.Sprintf(v.smsFmt, codeB)
 	if err = v.smser.SMS(toPhone, smsBody); err != nil {
 		if v.smser.IsNotImplementedError(err) {
 			return nil, errors.NewNotImplementedf("%v", err)
@@ -116,12 +117,12 @@ func (v *Verifier) VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.
 	}, nil
 }
 
-func testConfig(c Config) error {
+func testConfig(msgFmt string) error {
 	r, err := regexp.Compile("%s")
 	if err != nil {
 		return errors.Newf("error compiling message tester regex: %v", err)
 	}
-	formatters := r.FindAllString(c.MessageFormat(), -1)
+	formatters := r.FindAllString(msgFmt, -1)
 	if len(formatters) != 1 {
 		return errors.Newf("Expected 1 '%%s' formatter but got %d", len(formatters))
 	}

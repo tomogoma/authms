@@ -46,7 +46,7 @@ var confFile = flag.String(
 
 func main() {
 	flag.Parse()
-	conf := config.Config{}
+	conf := config.General{}
 	err := configH.ReadYamlConfig(*confFile, &conf)
 	if err != nil {
 		log.Fatalf("Error Reading config file: %s", err)
@@ -80,9 +80,19 @@ func main() {
 	if conf.SMS.ActiveAPI != "" {
 		switch conf.SMS.ActiveAPI {
 		case config.SMSAPIAfricasTalking:
-			s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking)
+			apiKey, err := readFile(conf.SMS.AfricasTalking.APIKeyFile)
+			if err != nil {
+				lg.Critical("Africa's talking API key: %v", err)
+				return
+			}
+			s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking.UserName, apiKey)
 		case config.SMSAPITwilio:
-			s, err = sms.NewTwilio(conf.SMS.Twilio)
+			tkn, err := readFile(conf.SMS.Twilio.TokenKeyFile)
+			if err != nil {
+				lg.Critical("Twilio token: %v", err)
+				return
+			}
+			s, err = sms.NewTwilio(conf.SMS.Twilio.ID, tkn, conf.SMS.Twilio.SenderPhone)
 		default:
 			lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
 			return
@@ -109,19 +119,20 @@ func main() {
 		lg.Critical("Error instantiating number generator: %s", err)
 		return
 	}
-	pv, err := verification.New(conf.SMS.Verification, s, ng, tg)
+	pv, err := verification.New(conf.SMS.Verification.MessageFmt,
+		conf.SMS.Verification.SMSCodeValidity, s, ng, tg)
 	if err != nil {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
 		return
 	}
 	authOpts := make([]auth.Option, 0)
-	if conf.OAuth.Facebook.ID > 0 {
-		fbSecret, err := readFile(conf.OAuth.Facebook.SecretFilePath)
+	if conf.Authentication.Facebook.ID > 0 {
+		fbSecret, err := readFile(conf.Authentication.Facebook.SecretFilePath)
 		if err != nil {
 			lg.Critical("Error reading facebook secret file: %v", err)
 			return
 		}
-		fb, err := facebook.New(conf.OAuth.Facebook.ID, fbSecret)
+		fb, err := facebook.New(conf.Authentication.Facebook.ID, fbSecret)
 		if err != nil {
 			lg.Critical("Error instantiating facebook OAuth: %v", err)
 			return
@@ -189,7 +200,7 @@ func serveHttp(conf config.ServiceConfig, rh RouteHandler, quitCh chan error) {
 func readFile(path string) (string, error) {
 	contentB, err := ioutil.ReadFile(path)
 	if err != nil {
-		return "", fmt.Errorf("read '%s': %v", path, err)
+		return "", fmt.Errorf("read: %v", err)
 	}
 	return string(contentB), nil
 }

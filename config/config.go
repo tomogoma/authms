@@ -1,12 +1,8 @@
 package config
 
 import (
-	"errors"
 	"time"
 
-	"io/ioutil"
-
-	"github.com/tomogoma/authms/auth"
 	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
@@ -39,24 +35,9 @@ type ServiceConfig struct {
 	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
 }
 
-func (sc ServiceConfig) Validate() error {
-	if sc.RegisterInterval <= 1*time.Millisecond {
-		return errors.New("register interval was invalid cannot be < 1ms")
-	}
-	return nil
-}
-
 type VerificationConfig struct {
 	MessageFmt      string        `json:"messageFormat" yaml:"messageFormat"`
 	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
-}
-
-func (c VerificationConfig) MessageFormat() string {
-	return c.MessageFmt
-}
-
-func (c VerificationConfig) ValidityPeriod() time.Duration {
-	return c.SMSCodeValidity
 }
 
 type TwilioConfig struct {
@@ -65,31 +46,9 @@ type TwilioConfig struct {
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
 }
 
-func (c TwilioConfig) TwilioID() string {
-	return c.ID
-}
-func (c TwilioConfig) TwilioTokenKeyFile() string {
-	return c.TokenKeyFile
-}
-func (c TwilioConfig) TwilioSenderPhone() string {
-	return c.SenderPhone
-}
-
 type AfricasTalkingConfig struct {
 	UserName   string `json:"username" yaml:"username"`
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
-}
-
-func (atc AfricasTalkingConfig) Username() string {
-	return atc.UserName
-}
-
-func (atc AfricasTalkingConfig) APIKey() string {
-	keyB, err := ioutil.ReadFile(atc.APIKeyFile)
-	if err != nil {
-		return ""
-	}
-	return string(keyB)
 }
 
 type SMSConfig struct {
@@ -105,15 +64,16 @@ type Facebook struct {
 	ID             int64  `json:"ID,omitempty" yaml:"ID"`
 }
 
-type OAuth struct {
-	Facebook Facebook `json:"facebook,omitempty" yaml:"facebook"`
+type Auth struct {
+	Facebook           Facebook      `json:"facebook,omitempty" yaml:"facebook"`
+	BlackListFailCount int           `json:"blackListFailCount" yaml:"blackListFailCount"`
+	BlacklistWindow    time.Duration `json:"blacklistWindow" yaml:"blacklistWindow"`
 }
 
-type Config struct {
+type General struct {
 	Service        ServiceConfig    `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
 	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
-	Authentication auth.Config      `json:"authentication,omitempty" yaml:"authentication"`
+	Authentication Auth             `json:"authentication,omitempty" yaml:"authentication"`
 	Token          token.ConfigStub `json:"token,omitempty" yaml:"token"`
-	OAuth          OAuth            `json:"OAuth,omitempty" yaml:"OAuth"`
 	SMS            SMSConfig        `json:"sms" yaml:"sms"`
 }

@@ -20,12 +20,6 @@ const (
 	formKeyBody  = "Body"
 )
 
-type TwConfig interface {
-	TwilioID() string
-	TwilioTokenKeyFile() string
-	TwilioSenderPhone() string
-}
-
 const (
 	phoneBlockedRcv   = 30004
 	unknownPhone      = 30005
@@ -45,20 +39,26 @@ var rcvErrors = map[int]string{
 }
 
 type Twilio struct {
-	token  string
-	config TwConfig
+	token       string
+	id          string
+	senderPhone string
 	errors.NotImplErrCheck
 }
 
-func NewTwilio(c TwConfig) (*Twilio, error) {
-	if c == nil {
-		return nil, errors.New("Config was nil")
+func NewTwilio(id, token, senderPhone string) (*Twilio, error) {
+	if id == "" {
+		return nil, errors.New("id was empty")
 	}
-	token, err := readToken(c.TwilioTokenKeyFile())
-	if err != nil {
-		return nil, err
+	if token == "" {
+		return nil, errors.New("token was empty")
 	}
-	return &Twilio{config: c, token: token}, nil
+	if senderPhone == "" {
+		return nil, errors.New("senderPhone was empty")
+	}
+	if id == "" {
+		return nil, errors.New("id was nil")
+	}
+	return &Twilio{id: id, senderPhone: senderPhone, token: token}, nil
 }
 
 func (s *Twilio) SMS(toPhone, message string) error {
@@ -74,17 +74,17 @@ func (s *Twilio) SMS(toPhone, message string) error {
 		return errors.Newf("problem with the twilio URL (%v)"+
 			" contact support", err)
 	}
-	URL.Path = path.Join(URL.Path, s.config.TwilioID(), messagesPath)
+	URL.Path = path.Join(URL.Path, s.id, messagesPath)
 	form := url.Values{}
 	form.Add(formKeyTo, toPhone)
-	form.Add(formKeyFrom, s.config.TwilioSenderPhone())
+	form.Add(formKeyFrom, s.senderPhone)
 	form.Add(formKeyBody, message)
 	req, err := http.NewRequest(httpMethod, URL.String(), strings.NewReader(form.Encode()))
 	if err != nil {
 		return errors.Newf("unable to create message request: %v", err)
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.SetBasicAuth(s.config.TwilioID(), s.token)
+	req.SetBasicAuth(s.id, s.token)
 	resp, err := client.Do(req)
 	if err != nil {
 		return errors.Newf("unable to perform request: %v", err)
@@ -105,13 +105,4 @@ func (s *Twilio) SMS(toPhone, message string) error {
 		return errors.Newf("%s: %s", resp.Status, body)
 	}
 	return nil
-}
-
-func readToken(tokenKeyFile string) (string, error) {
-	fb, err := ioutil.ReadFile(tokenKeyFile)
-	if err != nil {
-		return "", errors.Newf("error opening twilio token file '%s': %v",
-			tokenKeyFile, err)
-	}
-	return string(fb), nil
 }

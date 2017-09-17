@@ -2,12 +2,13 @@ package sms
 
 import (
 	"encoding/xml"
-	"github.com/tomogoma/go-commons/errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/tomogoma/go-commons/errors"
 )
 
 const (
@@ -51,16 +52,19 @@ func ATWithSendURL(URL string) func(at *AfricasTalking) {
 	}
 }
 
-func NewAfricasTalking(c ATConfig, opts ...ATOption) (*AfricasTalking, error) {
-	if c == nil {
-		return nil, errors.New("ATConfig was nil")
+func NewAfricasTalking(usrName, APIKey string, opts ...ATOption) (*AfricasTalking, error) {
+	if APIKey == "" {
+		return nil, errors.New("API key was empty")
 	}
-	at := &AfricasTalking{atSendURL: atSendURL, userName: c.Username(), apiKey: c.APIKey()}
+	if usrName == "" {
+		return nil, errors.New("API UserName was empty")
+	}
+	at := &AfricasTalking{atSendURL: atSendURL, userName: usrName, apiKey: APIKey}
 	for _, opt := range opts {
 		opt(at)
 	}
-	if err := at.validate(); err != nil {
-		return nil, err
+	if at.atSendURL == "" {
+		return nil, errors.New("Send URL was empty")
 	}
 	return at, nil
 }
@@ -119,17 +123,4 @@ func readRespBody(resp io.Reader) (atResponse, error) {
 		return atResponse{}, errors.Newf("error unmarshalling response body: %v", err)
 	}
 	return respStruct, nil
-}
-
-func (at *AfricasTalking) validate() error {
-	if at.atSendURL == "" {
-		return errors.New("Send URL was empty")
-	}
-	if at.apiKey == "" {
-		return errors.New("API key was empty")
-	}
-	if at.userName == "" {
-		return errors.New("API UserName was empty")
-	}
-	return nil
 }
