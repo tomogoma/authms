@@ -28,6 +28,8 @@ const (
 
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
+
+	TimeFormat = time.RFC3339
 )
 
 type ServiceConfig struct {

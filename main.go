@@ -66,14 +66,10 @@ func main() {
 	tg, err := token.NewJWTHandler(conf.Token)
 	logFatalOnError(err, "Instantiate token handler (generator)")
 
-	pv, err := verification.New(conf.SMS.Verification.MessageFmt,
-		conf.SMS.Verification.SMSCodeValidity, s, ng, tg)
-	logFatalOnError(err, "Instantiate Verifier")
-
 	oAuthOpts, err := oAuthOptions(conf.Authentication)
 	logWarnOnError(err, "Set up OAuth options")
 
-	a, err := model.New(tg, db, pv, oAuthOpts...)
+	a, err := model.New(tg, db, oAuthOpts...)
 	logFatalOnError(err, "Instantiate Auth Model")
 
 	serverRPCQuitCh := make(chan error)

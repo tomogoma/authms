@@ -1,15 +1,19 @@
 package model
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 	"github.com/sirupsen/logrus"
+	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/generator"
+	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
-	"github.com/tomogoma/authms/logging"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type OAuthHandler interface {
@@ -22,13 +26,13 @@ type TokenGenerator interface {
 	Validate(token string, claims jwt.Claims) (*jwt.Token, error)
 }
 
-type PasswordGenerator interface {
-	SecureRandomString(length int) ([]byte, error)
-}
-
 type OAuthClient interface {
 	IsAuthError(error) bool
 	ValidateToken(string) (OAuthResponse, error)
+}
+
+type SecureRandomByteser interface {
+	SecureRandomBytes(length int) ([]byte, error)
 }
 
 type DBHelper interface {
@@ -42,21 +46,35 @@ type DBHelper interface {
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	UpdatePhone(userID int64, newPhone *authms.Value) error
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
+	UpsertLoginVerification(code LoginVerification) error
+	GetLoginVerifications(verificationType string, userID, offset, count int64) ([]LoginVerification, error)
 	IsNotFoundError(err error) bool
 	IsDuplicateError(err error) bool
 }
 
-type PhoneVerifier interface {
+type SMSer interface {
 	IsNotImplementedError(error) bool
-	SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error)
-	VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.SMSVerificationStatus, error)
+	SMS(toPhone, message string) error
+}
+
+type LoginVerification struct {
+	Type         string
+	SubjectValue string
+	UserID       int64
+	Issue        time.Time
+	Expiry       time.Time
+	CodeHash     []byte
+	IsUsed       bool
 }
 
 type Auth struct {
-	dbHelper      DBHelper
-	tokenG        TokenGenerator
-	phoneVerifier PhoneVerifier
-	oAuthCls      map[string]OAuthClient
+	dbHelper         DBHelper
+	tokenG           TokenGenerator
+	smser            SMSer
+	randomSMSCodeser SecureRandomByteser
+	oAuthCls         map[string]OAuthClient
+	smsFmt           string
+	smsValidity      time.Duration
 	errors.ClErrCheck
 	errors.AuthErrCheck
 	errors.NotImplErrCheck
@@ -74,6 +92,8 @@ const (
 	numExp               = `[0-9]+`
 	tokenValidity        = 8 * time.Hour
 	AppFacebook          = "facebook"
+
+	verTypePhone = "phone"
 )
 
 var rePhone = regexp.MustCompile(numExp)
@@ -84,20 +104,65 @@ func WithFB(fb OAuthClient) Option {
 	}
 }
 
-func New(tg TokenGenerator, db DBHelper, pv PhoneVerifier, opts ...Option) (*Auth, error) {
-	if tg == nil {
-		return nil, errors.New("token generator was nil")
+func WithSMSFormat(fmt string) Option {
+	return func(a *Auth) {
+		a.smsFmt = fmt
 	}
-	if db == nil {
-		return nil, errors.New("DBHelper was nil")
+}
+
+func WithSMSValidity(d time.Duration) Option {
+	return func(a *Auth) {
+		a.smsValidity = d
 	}
-	if pv == nil {
-		return nil, errors.New("PhoneVerifier was nil")
+}
+
+func WithSMSCodeGeneratory(g SecureRandomByteser) Option {
+	return func(a *Auth) {
+		a.randomSMSCodeser = g
 	}
-	a := &Auth{dbHelper: db, tokenG: tg, oAuthCls: make(map[string]OAuthClient),
-		phoneVerifier: pv}
+}
+
+func New(tg TokenGenerator, db DBHelper, sms SMSer, opts ...Option) (*Auth, error) {
+	randSMSCodeser, err := generator.NewRandom(generator.NumberChars)
+	if err != nil {
+		return nil, errors.Newf("instantiate random number code generator: %v", err)
+	}
+	SMSFmt := "Your verification code is %s"
+	SMSValidity := 5 * time.Minute
+	a := &Auth{
+		dbHelper:         db,
+		tokenG:           tg,
+		smser:            sms,
+		randomSMSCodeser: randSMSCodeser,
+		oAuthCls:         make(map[string]OAuthClient),
+		smsFmt:           SMSFmt,
+		smsValidity:      SMSValidity,
+	}
 	for _, f := range opts {
 		f(a)
+	}
+	if a.tokenG == nil {
+		return nil, errors.New("token generator was nil")
+	}
+	if a.dbHelper == nil {
+		return nil, errors.New("DBHelper was nil")
+	}
+	if a.smser == nil {
+		return nil, errors.New("SMSer was nil")
+	}
+	if a.randomSMSCodeser == nil {
+		return nil, errors.New("Random SMS code generator was nil")
+	}
+	if err = testMessageFormat(a.smsFmt); err != nil {
+		return nil, err
+	}
+	if a.smsValidity < 1*time.Minute {
+		return nil, errors.New("invalid sms validity duration: must be > 1m")
+	}
+	for name, OAuthCl := range a.oAuthCls {
+		if OAuthCl == nil {
+			return nil, errors.Newf("nil OAuth client (%s)", name)
+		}
 	}
 	return a, nil
 }
@@ -145,13 +210,12 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	clm := Claim{}
-	_, err := a.tokenG.Validate(token, &clm)
+	var err error
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if err != nil || clm.UsrID != user.ID {
-		return errors.NewAuthf("invalid token: %v", err)
+	if _, err = a.validateToken(user.ID, token); err != nil {
+		return err
 	}
 	if !hasValue(user.Phone) {
 		return errors.NewClient("phone was invalid")
@@ -175,79 +239,126 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	clm := Claim{}
-	_, err := a.tokenG.Validate(req.Token, &clm)
+	var err error
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessVerification, rIP, err)
 	}()
-	if err != nil || clm.UsrID != req.UserID {
-		return nil, errors.NewAuthf("invalid token: %v", err)
-	}
-	req.Phone = formatPhone(req.Phone)
-	testExistsUsr := &authms.User{
-		ID:    req.UserID,
-		Phone: &authms.Value{Value: req.Phone},
-	}
-	if err := a.checkUserExists(testExistsUsr); err != nil {
+	if _, err = a.validateToken(req.UserID, req.Token); err != nil {
 		return nil, err
 	}
-	vs, err := a.phoneVerifier.SendSMSCode(req.Phone)
+	req.Phone = formatPhone(req.Phone)
+	err = a.checkUserExists(&authms.User{
+		ID:    req.UserID,
+		Phone: &authms.Value{Value: req.Phone},
+	})
 	if err != nil {
-		if a.phoneVerifier.IsNotImplementedError(err) {
+		return nil, err
+	}
+	SMSCode, err := a.randomSMSCodeser.SecureRandomBytes(4)
+	if err != nil {
+		return nil, errors.Newf("generate SMS code: %v", err)
+	}
+	SMSCodeHash, err := bcrypt.GenerateFromPassword(SMSCode, bcrypt.DefaultCost)
+	if err != nil {
+		return nil, errors.Newf("hash SMS code: %v", err)
+	}
+	issue := time.Now()
+	expiry := issue.Add(a.smsValidity)
+	err = a.dbHelper.UpsertLoginVerification(LoginVerification{
+		Type:         verTypePhone,
+		SubjectValue: req.Phone,
+		Issue:        issue,
+		Expiry:       expiry,
+		UserID:       req.UserID,
+		CodeHash:     SMSCodeHash,
+		IsUsed:       false,
+	})
+	if err != nil {
+		return nil, errors.Newf("persist SMS code: %v", err)
+	}
+	smsBody := fmt.Sprintf(a.smsFmt, SMSCode)
+	if err = a.smser.SMS(req.Phone, smsBody); err != nil {
+		if a.smser.IsNotImplementedError(err) {
 			return nil, errors.NewNotImplementedf("%v", err)
 		}
 		return nil, err
 	}
-	return vs, nil
+	return &authms.SMSVerificationStatus{
+		Token:     req.Token,
+		Phone:     req.Phone,
+		ExpiresAt: expiry.Format(config.TimeFormat),
+		Verified:  false,
+	}, nil
 }
 
 func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP string) (*authms.SMSVerificationStatus, error) {
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	clm := Claim{}
-	_, err := a.tokenG.Validate(req.Token, &clm)
+	var err error
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessCodeValidation, rIP, err)
 	}()
-	if err != nil || clm.UsrID != req.UserID {
-		return nil, errors.NewAuthf("invalid token: %v", err)
-	}
-	vs, err := a.phoneVerifier.VerifySMSCode(req)
-	if err != nil {
-		return nil, errors.NewClientf("%v", err)
-	}
-	phone := &authms.Value{
-		Verified: vs.Verified,
-		Value:    formatPhone(vs.Phone),
-	}
-	testExistsUsr := &authms.User{
-		ID:    req.UserID,
-		Phone: phone,
-	}
-	if err := a.checkUserExists(testExistsUsr); err != nil {
+	if _, err = a.validateToken(req.UserID, req.Token); err != nil {
 		return nil, err
 	}
-	err = a.dbHelper.UpdatePhone(req.UserID, phone)
-	if err != nil {
-		return nil, errors.Newf("error persisting phone update: %v", err)
+	offset := int64(0)
+	count := int64(100)
+	var verification LoginVerification
+resumeFunc:
+	for {
+		codes, err := a.dbHelper.GetLoginVerifications(verTypePhone, req.UserID, offset, count)
+		if a.dbHelper.IsNotFoundError(err) {
+			return nil, errors.NewAuth("Invalid SMS code")
+		}
+		if err != nil {
+			return nil, errors.Newf("get SMS codes: %v", err)
+		}
+		offset = offset + count
+		for _, verification = range codes {
+			err = bcrypt.CompareHashAndPassword(verification.CodeHash, []byte(req.Code))
+			if err != nil {
+				continue
+			}
+			break resumeFunc
+		}
 	}
-	return vs, nil
+	if verification.IsUsed {
+		return nil, errors.NewAuth("code already used")
+	}
+	if time.Now().After(verification.Expiry) {
+		return nil, errors.NewAuth("%code is expired")
+	}
+	err = a.dbHelper.UpdatePhone(
+		req.UserID, &authms.Value{
+			Verified: true,
+			Value:    verification.SubjectValue,
+		})
+	if err != nil {
+		return nil, errors.Newf("persist phone update: %v", err)
+	}
+	verification.IsUsed = true
+	if err = a.dbHelper.UpsertLoginVerification(verification); err != nil {
+		return nil, errors.Newf("upsert login verification: %v", err)
+	}
+	return &authms.SMSVerificationStatus{
+		Phone:    verification.SubjectValue,
+		Verified: true,
+	}, nil
 }
 
 func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string) error {
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	clm := Claim{}
-	_, err := a.tokenG.Validate(token, &clm)
+	var err error
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if err != nil || clm.UsrID != user.ID {
-		return errors.NewAuthf("invalid token: %v", err)
+	if _, err = a.validateToken(user.ID, token); err != nil {
+		return err
 	}
 	if user.OAuths == nil || user.OAuths[appName] == nil {
 		return errors.NewClient("OAuth was not provided")
@@ -334,6 +445,19 @@ func (a *Auth) checkUserExists(user *authms.User) error {
 	return nil
 }
 
+func (a *Auth) validateToken(userID int64, token string) (Claim, error) {
+	clm := Claim{}
+	_, err := a.tokenG.Validate(token, &clm)
+	if err != nil {
+		return clm, errors.NewAuthf("invalid token: %v", err)
+	}
+	if clm.UsrID != userID {
+		return clm, errors.NewAuthf("token-user (userid) mismatch:"+
+			" userID is %d token belongs to %d", userID, clm.UsrID)
+	}
+	return clm, nil
+}
+
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
 	if a.dbHelper.IsNotFoundError(loginErr) {
 		loginErr = errors.NewAuth("invalid credentials")
@@ -399,6 +523,18 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 			logging.FieldHistory: h,
 		}).Error(err)
 	}
+}
+
+func testMessageFormat(msgFmt string) error {
+	r, err := regexp.Compile("%s")
+	if err != nil {
+		return errors.Newf("error compiling message tester regex: %v", err)
+	}
+	formatters := r.FindAllString(msgFmt, -1)
+	if len(formatters) != 1 {
+		return errors.Newf("Expected 1 '%%s' formatter but got %d", len(formatters))
+	}
+	return nil
 }
 
 func formatPhone(phone string) string {

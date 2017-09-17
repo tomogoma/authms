@@ -32,11 +32,6 @@ type SecureRandomer interface {
 	SecureRandomBytes(length int) ([]byte, error)
 }
 
-type Config interface {
-	MessageFormat() string
-	ValidityPeriod() time.Duration
-}
-
 type Verifier struct {
 	smser       SMSer
 	tokener     Tokener

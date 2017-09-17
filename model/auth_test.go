@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"reflect"
+
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/model"
@@ -14,6 +16,7 @@ import (
 	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type TokenConfigMock struct {
@@ -48,17 +51,13 @@ func (oa *OAuthHandlerMock) ValidateToken(token string) (model.OAuthResponse, er
 	}, oa.ExpErr
 }
 
-type PhoneVerifierMock struct {
+type SMSerMock struct {
 	errors.NotImplErrCheck
-	ExpErr    error
-	ExpStatus *authms.SMSVerificationStatus
+	ExpErr error
 }
 
-func (pv *PhoneVerifierMock) SendSMSCode(toPhone string) (*authms.SMSVerificationStatus, error) {
-	return pv.ExpStatus, pv.ExpErr
-}
-func (pv *PhoneVerifierMock) VerifySMSCode(r *authms.SMSVerificationCodeRequest) (*authms.SMSVerificationStatus, error) {
-	return pv.ExpStatus, pv.ExpErr
+func (s *SMSerMock) SMS(toPhone, message string) error {
+	return s.ExpErr
 }
 
 type DBHelperMock struct {
@@ -76,6 +75,7 @@ type DBHelperMock struct {
 	T                          *testing.T
 	IgnoreDefaultVerifiedCheck bool
 	ExpIsDuplicate             bool
+	ExpLoginVers               []model.LoginVerification
 }
 
 func (d *DBHelperMock) SaveUser(u *authms.User) error {
@@ -109,6 +109,13 @@ func (d *DBHelperMock) GetByAppUserID(appName, appUserID string) (*authms.User, 
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
 }
+func (d *DBHelperMock) UpsertLoginVerification(code model.LoginVerification) error {
+	return d.ExpErr
+}
+func (d *DBHelperMock) GetLoginVerifications(verificationType string, userID, offset, count int64) ([]model.LoginVerification, error) {
+	return d.ExpLoginVers, d.ExpErr
+}
+
 func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error) {
 	return d.ExpHist, d.ExpErr
 }
@@ -172,7 +179,7 @@ func init() {
 
 func TestNew(t *testing.T) {
 	setUp(t)
-	newAuth(t, &DBHelperMock{T: t}, &OAuthHandlerMock{}, &PhoneVerifierMock{})
+	newAuth(t, &DBHelperMock{T: t}, &OAuthHandlerMock{}, &SMSerMock{})
 }
 
 func TestAuth_Register(t *testing.T) {
@@ -252,7 +259,7 @@ func TestAuth_Register(t *testing.T) {
 	for _, c := range cases {
 		func() {
 			setUp(t)
-			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
+			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.Register(c.User, c.DevID, "")
 			if c.User != nil && c.User.Password != "" {
 				t.Errorf("%s - expected password to be cleared"+
@@ -373,7 +380,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 	for _, c := range cases {
 		func() {
 			setUp(t)
-			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
+			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.UpdatePhone(c.User, c.Token, c.DevID, "")
 			runtime.Gosched()
 			if c.ExpErr {
@@ -589,7 +596,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 	for _, c := range cases {
 		func() {
 			setUp(t)
-			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
+			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.UpdateOAuth(c.User, appName, c.Token, c.DevID, "")
 			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
@@ -621,7 +628,9 @@ func TestAuth_VerifyPhone(t *testing.T) {
 		ExpNotImpl bool
 		Desc       string
 		Req        *authms.SMSVerificationRequest
-		PV         *PhoneVerifierMock
+		SMS        *SMSerMock
+		ExpStatus  *authms.SMSVerificationStatus
+		DB         *DBHelperMock
 	}
 	phone := "+254712345678"
 	devID := "test-dev"
@@ -637,15 +646,15 @@ func TestAuth_VerifyPhone(t *testing.T) {
 				Token:    validToken,
 				Phone:    phone,
 			},
-			PV: &PhoneVerifierMock{
+			SMS: &SMSerMock{
 				ExpErr: nil,
-				ExpStatus: &authms.SMSVerificationStatus{
-					Token:     "some-sms-token",
-					Phone:     phone,
-					ExpiresAt: "2017-02-20T22:07:00+03:00",
-					Verified:  false,
-				},
 			},
+			ExpStatus: &authms.SMSVerificationStatus{
+				Phone:    phone,
+				Token:    validToken,
+				Verified: false,
+			},
+			DB: &DBHelperMock{T: t},
 		},
 		{
 			Desc:   "Verifier reports not implemented",
@@ -656,16 +665,19 @@ func TestAuth_VerifyPhone(t *testing.T) {
 				Token:    validToken,
 				Phone:    phone,
 			},
-			PV: &PhoneVerifierMock{ExpErr: errors.NewNotImplemented()},
+			SMS: &SMSerMock{ExpErr: errors.NewNotImplemented()},
+			DB:  &DBHelperMock{T: t},
 		},
 	}
 	for _, tc := range tcs {
-		func() {
+		t.Run(tc.Desc, func(t *testing.T) {
 			setUp(t)
-			db := &DBHelperMock{T: t}
-			a := newAuth(t, db, &OAuthHandlerMock{}, tc.PV)
+			a := newAuth(t, tc.DB, &OAuthHandlerMock{}, tc.SMS)
 			r, err := a.VerifyPhone(tc.Req, "")
 			runtime.Gosched()
+			if !tc.DB.SaveHistoryCalled {
+				t.Errorf("%s - save history was not called", tc.Desc)
+			}
 			if tc.ExpErr {
 				if err == nil {
 					t.Fatalf("%s - expected error but "+
@@ -676,34 +688,42 @@ func TestAuth_VerifyPhone(t *testing.T) {
 						tc.Desc, tc.ExpNotImpl, a.IsNotImplementedError(err))
 				}
 				return
-			} else if err != nil {
-				t.Errorf("%s - auth.VerifyPhone(): %v", tc.Desc, err)
+			}
+			if err != nil {
+				t.Fatalf("%s - auth.VerifyPhone(): %v", tc.Desc, err)
 				return
 			}
-			if !db.SaveHistoryCalled {
-				t.Errorf("%s - save history was not called", tc.Desc)
+			if r.ExpiresAt == "" {
+				t.Errorf("Expires at was empty")
 			}
-			if r != tc.PV.ExpStatus {
-				t.Errorf("%s\ngot status %+v\nexpected %+v",
-					tc.Desc, r, tc.PV.ExpStatus)
+			r.ExpiresAt = ""
+			if !reflect.DeepEqual(r, tc.ExpStatus) {
+				t.Errorf("Status mismatch\ngot:\t%+v\nexpect:\t%+v",
+					r, tc.ExpStatus)
 				return
 			}
-		}()
+		})
 	}
 }
 
 func TestAuth_VerifyPhoneCode(t *testing.T) {
 	type VerifyTestCase struct {
-		ExpErr bool
-		Desc   string
-		Req    *authms.SMSVerificationCodeRequest
-		PV     *PhoneVerifierMock
-		DB     *DBHelperMock
+		ExpErr    bool
+		Desc      string
+		Req       *authms.SMSVerificationCodeRequest
+		SMS       *SMSerMock
+		DB        *DBHelperMock
+		ExpStatus *authms.SMSVerificationStatus
 	}
 	phone := "+254712345678"
 	devID := "test-dev"
 	userID := int64(1234)
 	validToken := genToken(t, userID, devID)
+	code := "1876"
+	codeHash, err := bcrypt.GenerateFromPassword([]byte(code), bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Error setting up: hash SMS Code")
+	}
 	tcs := []VerifyTestCase{
 		{
 			Desc:   "Successful validation",
@@ -711,47 +731,65 @@ func TestAuth_VerifyPhoneCode(t *testing.T) {
 			Req: &authms.SMSVerificationCodeRequest{
 				DeviceID: devID,
 				UserID:   userID,
-				SmsToken: "some-sms-token",
+				Code:     code,
 				Token:    validToken,
 			},
-			PV: &PhoneVerifierMock{
+			SMS: &SMSerMock{
 				ExpErr: nil,
-				ExpStatus: &authms.SMSVerificationStatus{
-					Phone:    phone,
-					Verified: true,
+			},
+			ExpStatus: &authms.SMSVerificationStatus{
+				Verified: true,
+				Phone:    phone,
+			},
+			DB: &DBHelperMock{
+				T: t,
+				IgnoreDefaultVerifiedCheck: true,
+				ExpLoginVers: []model.LoginVerification{
+					{
+						SubjectValue: phone,
+						IsUsed:       false,
+						Expiry:       time.Now().Add(1 * time.Minute),
+						CodeHash:     []byte{},
+					},
+					{
+						SubjectValue: phone,
+						IsUsed:       false,
+						Expiry:       time.Now().Add(1 * time.Minute),
+						CodeHash:     codeHash,
+					},
 				},
 			},
 		},
 	}
 	for _, tc := range tcs {
-		func() {
+		t.Run(tc.Desc, func(t *testing.T) {
 			setUp(t)
-			db := &DBHelperMock{T: t, IgnoreDefaultVerifiedCheck: true}
-			a := newAuth(t, db, &OAuthHandlerMock{}, tc.PV)
+			a := newAuth(t, tc.DB, &OAuthHandlerMock{}, tc.SMS)
 			r, err := a.VerifyPhoneCode(tc.Req, "")
 			runtime.Gosched()
+			if !tc.DB.SaveHistoryCalled {
+				t.Errorf("%s - save history was not called", tc.Desc)
+			}
 			if tc.ExpErr {
 				if err == nil {
 					t.Errorf("%s - expected error but "+
 						"got nil", tc.Desc)
 				}
 				return
-			} else if err != nil {
+			}
+			if err != nil {
 				t.Errorf("%s - auth.VerifyPhone(): %v", tc.Desc, err)
 				return
 			}
-			if !db.SaveHistoryCalled {
-				t.Errorf("%s - save history was not called", tc.Desc)
-			}
-			if !db.UpdatePhoneCalled {
+			if !tc.DB.UpdatePhoneCalled {
 				t.Errorf("%s - update phone was not called", tc.Desc)
 			}
-			if r != tc.PV.ExpStatus {
-				t.Errorf("%s\ngot status %+v\nexpected %+v",
-					tc.Desc, r, tc.PV.ExpStatus)
+			if !reflect.DeepEqual(r, tc.ExpStatus) {
+				t.Errorf("Status mismtach\nGot:\t%+v\nExpect:\t%+v",
+					r, tc.ExpStatus)
 				return
 			}
-		}()
+		})
 	}
 }
 
@@ -773,7 +811,7 @@ func TestAuth_UpdatePassword(t *testing.T) {
 	for _, c := range cases {
 		func() {
 			setUp(t)
-			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
+			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.UpdatePassword(c.User.ID, "some-old-pass",
 				c.User.Password, c.DevID, "")
 			runtime.Gosched()
@@ -823,7 +861,7 @@ func TestAuth_LoginOAuth(t *testing.T) {
 	}
 	for _, c := range cases {
 		func() {
-			a := newAuth(t, c.DBHelper, c.OAHandler, &PhoneVerifierMock{})
+			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			usr, err := a.LoginOAuth(c.OAuth, c.DevID, "")
 			runtime.Gosched()
 			if c.OAHandler.ExpValTknClld && !c.OAHandler.ValTknClld {
@@ -856,13 +894,13 @@ func TestAuth_LoginOAuth(t *testing.T) {
 	}
 }
 
-func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVerifierMock) *model.Auth {
+func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, smser *SMSerMock) *model.Auth {
 	var err error
 	tokenGen, err = token.NewJWTHandler(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
-	a, err := model.New(tokenGen, db, pv, model.WithFB(oa))
+	a, err := model.New(tokenGen, db, smser, model.WithFB(oa))
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}
