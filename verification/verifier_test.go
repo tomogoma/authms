@@ -4,6 +4,8 @@ import (
 	"testing"
 	"time"
 
+	"fmt"
+
 	jwt "github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/verification"
@@ -57,18 +59,6 @@ func (sr *SecureRandomerMock) SecureRandomBytes(length int) ([]byte, error) {
 	return []byte(sr.ExpString), sr.ExpErr
 }
 
-type ConfigMock struct {
-	ExpMessageFmt string
-}
-
-func (c *ConfigMock) MessageFormat() string {
-	return c.ExpMessageFmt
-}
-
-func (C *ConfigMock) ValidityPeriod() time.Duration {
-	return 6 * time.Minute
-}
-
 type VerifierTestCase struct {
 	Desc           string
 	ExpErr         bool
@@ -78,7 +68,8 @@ type VerifierTestCase struct {
 	SMSer          *SMSerMock
 	Tokener        *TokenerMock
 	SecureRandomer *SecureRandomerMock
-	Config         *ConfigMock
+	SMSFormat      string
+	CodeValidity   time.Duration
 	ExpVerStatus   *authms.SMSVerificationStatus
 }
 
@@ -95,16 +86,29 @@ func validDependencies() VerifierTestCase {
 		SecureRandomer: &SecureRandomerMock{
 			ExpErr: nil, ExpString: "1234",
 		},
-		Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
+		CodeValidity: 5 * time.Minute,
+		SMSFormat:    "verification code is %s",
 	}
 }
 
 func TestNew(t *testing.T) {
-	tcs := []VerifierTestCase{
-		validDependencies(),
+	tcs := []struct {
+		Desc           string
+		ExpErr         bool
+		ExpNotImpl     bool
+		Phone          string
+		CodeReq        *authms.SMSVerificationCodeRequest
+		SMSer          verification.SMSer
+		Tokener        verification.Tokener
+		SecureRandomer verification.SecureRandomer
+		SMSFormat      string
+		CodeValidity   time.Duration
+		ExpVerStatus   *authms.SMSVerificationStatus
+	}{
 		{
-			Desc:   "Missing SMSer",
+			Desc:   "Valid args",
 			ExpErr: false,
+			SMSer:  &SMSerMock{ExpErr: nil},
 			Tokener: &TokenerMock{
 				ExpErr:   nil,
 				ExpToken: "some-token",
@@ -113,47 +117,113 @@ func TestNew(t *testing.T) {
 			SecureRandomer: &SecureRandomerMock{
 				ExpErr: nil, ExpString: "1234",
 			},
-			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "verification code is %s",
 		},
 		{
-			Desc:   "Missing Tokener",
-			ExpErr: false,
-			SMSer:  &SMSerMock{ExpErr: nil},
+			Desc:   "Missing SMSer",
+			ExpErr: true,
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SMSer: nil,
 			SecureRandomer: &SecureRandomerMock{
 				ExpErr: nil, ExpString: "1234",
 			},
-			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "verification code is %s",
 		},
-		//{
-		//	Desc: "Missing secure Randomer",
-		//	ExpErr: true,
-		//	SMSer: &SMSerMock{ExpErr: nil},
-		//	Tokener: &TokenerMock{
-		//		ExpErr: nil,
-		//		ExpToken: "some-token",
-		//		ExpJwt: &jwt.Token{Raw: "some-token"},
-		//	},
-		//	SecureRandomer: nil,
-		//	Config: &ConfigMock{ExpMessageFmt:"verification code is %s"},
-		//}, {
-		//	Desc: "Missing Config",
-		//	ExpErr: true,
-		//	SMSer: &SMSerMock{ExpErr: nil},
-		//	Tokener: &TokenerMock{
-		//		ExpErr: nil,
-		//		ExpToken: "some-token",
-		//		ExpJwt: &jwt.Token{Raw: "some-token"},
-		//	},
-		//	SecureRandomer: &SecureRandomerMock{
-		//		ExpErr: nil, ExpString: "1234",
-		//	},
-		//	Config: nil,
-		//},
+		{
+			Desc:    "Missing Tokener",
+			ExpErr:  true,
+			Tokener: nil,
+			SMSer:   &SMSerMock{ExpErr: nil},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "verification code is %s",
+		},
+		{
+			Desc:   "Missing secure Randomer",
+			ExpErr: true,
+			SMSer:  &SMSerMock{ExpErr: nil},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: nil,
+			CodeValidity:   5 * time.Minute,
+			SMSFormat:      "verification code is %s",
+		},
+		{
+			Desc:   "Bad SMS format code",
+			ExpErr: true,
+			SMSer:  &SMSerMock{ExpErr: nil},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "verification code is",
+		},
+		{
+			Desc:   "Empty SMS format code",
+			ExpErr: true,
+			SMSer:  &SMSerMock{ExpErr: nil},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "",
+		},
+		{
+			Desc:   "Bad code validity",
+			ExpErr: true,
+			SMSer:  &SMSerMock{ExpErr: nil},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			CodeValidity: 59 * time.Second,
+			SMSFormat:    "verification code is %s",
+		},
+		{
+			Desc:   "missing code validity",
+			ExpErr: true,
+			SMSer:  &SMSerMock{ExpErr: nil},
+			Tokener: &TokenerMock{
+				ExpErr:   nil,
+				ExpToken: "some-token",
+				ExpJwt:   &jwt.Token{Raw: "some-token"},
+			},
+			SecureRandomer: &SecureRandomerMock{
+				ExpErr: nil, ExpString: "1234",
+			},
+			SMSFormat: "verification code is %s",
+		},
 	}
 	for _, tc := range tcs {
-		v, err := verification.New(tc.Config, tc.SMSer, tc.SecureRandomer, tc.Tokener)
+		v, err := verification.New(tc.SMSFormat, tc.CodeValidity, tc.SMSer, tc.SecureRandomer, tc.Tokener)
 		if tc.ExpErr {
 			if err == nil {
+				fmt.Println(tc.CodeValidity)
 				t.Errorf("%s - expected an error but got nil", tc.Desc)
 			}
 			continue
@@ -188,7 +258,8 @@ func TestVerifier_SendSMSCode(t *testing.T) {
 			SecureRandomer: &SecureRandomerMock{
 				ExpErr: nil, ExpString: "1234",
 			},
-			Config: &ConfigMock{ExpMessageFmt: "verification code is %s"},
+			CodeValidity: 5 * time.Minute,
+			SMSFormat:    "verification code is %s",
 			ExpVerStatus: &authms.SMSVerificationStatus{
 				Token:     "some-token",
 				ExpiresAt: time.Now().Add(5 * time.Minute).Format(time.RFC3339),
@@ -197,7 +268,7 @@ func TestVerifier_SendSMSCode(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		v, err := verification.New(tc.Config, tc.SMSer, tc.SecureRandomer, tc.Tokener)
+		v, err := verification.New(tc.SMSFormat, tc.CodeValidity, tc.SMSer, tc.SecureRandomer, tc.Tokener)
 		if err != nil {
 			t.Errorf("%s - verification.New(): %s", tc.Desc, err)
 			continue
@@ -240,7 +311,7 @@ func TestVerifier_VerifySMSCode(t *testing.T) {
 		validDeps,
 	}
 	for _, tc := range tcs {
-		v, err := verification.New(tc.Config, tc.SMSer, tc.SecureRandomer, tc.Tokener)
+		v, err := verification.New(tc.SMSFormat, tc.CodeValidity, tc.SMSer, tc.SecureRandomer, tc.Tokener)
 		if err != nil {
 			t.Errorf("%s - verification.New(): %s", tc.Desc, err)
 			continue
