@@ -4,137 +4,126 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/micro/go-micro/server"
+	"github.com/pborman/uuid"
+	"github.com/sirupsen/logrus"
+	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/server/helper"
 	"golang.org/x/net/context"
 )
 
+type Server struct {
+	auth *model.Auth
+	name string
+}
+
+type ctxKey string
+
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
+
+	ctxKeyLog = "log"
 )
 
-type Logger interface {
-	Error(interface{}, ...interface{}) error
-	Warn(interface{}, ...interface{}) error
-	Info(interface{}, ...interface{})
-	Debug(interface{}, ...interface{})
-	Fine(interface{}, ...interface{})
-}
-
-type Server struct {
-	auth  *model.Auth
-	lg    Logger
-	tIDCh chan int
-	name  string
-}
-
-var ErrorNilAuth = errors.New("Auth cannot be nil")
-var ErrorNilLogger = errors.New("Logger cannot be nil")
-var ErrorEmptyName = errors.New("Name cannot be empty")
-
-func New(name string, auth *model.Auth, lg Logger) (*Server, error) {
+func New(name string, auth *model.Auth) (*Server, error) {
 	if auth == nil {
-		return nil, ErrorNilAuth
-	}
-	if lg == nil {
-		return nil, ErrorNilLogger
+		return nil, errors.New("nil auth")
 	}
 	if name == "" {
-		return nil, ErrorEmptyName
+		return nil, errors.New("empty name")
 	}
-	tIDCh := make(chan int)
-	go helper.TransactionSerializer(tIDCh)
-	return &Server{name: name, auth: auth, lg: lg, tIDCh: tIDCh}, nil
+	return &Server{name: name, auth: auth}, nil
+}
+
+func LogWrapper(next server.HandlerFunc) server.HandlerFunc {
+	return func(ctx context.Context, req server.Request, rsp interface{}) error {
+		log := logrus.WithField(logging.FieldTransID, uuid.New())
+		log.WithFields(logrus.Fields{
+			logging.FieldTransID:        uuid.New(),
+			logging.FieldService:        req.Service(),
+			logging.FieldMethod:         req.Method(),
+			logging.FieldRequestHandler: "RPC",
+		}).Info("new request")
+		ctx = context.WithValue(ctx, ctxKeyLog, log)
+		return next(ctx, req, rsp)
+	}
+}
+
+func (s *Server) Wrapper(next server.HandlerFunc) server.HandlerFunc {
+	return LogWrapper(next)
 }
 
 func (s *Server) Register(c context.Context, req *authms.RegisterRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - register user", tID)
 	err := s.auth.Register(req.User, req.DeviceID, "")
-	return s.respondOn(req.User, resp, http.StatusCreated, tID, err)
+	return s.respondOnUser(c, req.User, resp, http.StatusCreated, err)
 }
 
 func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user by username...", tID)
 	authUsr, err := s.auth.LoginUserName(req.BasicID, req.Password,
 		req.DeviceID, "")
-	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
 func (s *Server) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user by email...", tID)
 	authUsr, err := s.auth.LoginEmail(req.BasicID, req.Password,
 		req.DeviceID, "")
-	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
 func (s *Server) LoginPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user by phone...", tID)
 	authUsr, err := s.auth.LoginPhone(req.BasicID, req.Password,
 		req.DeviceID, "")
-	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
 func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - login user by OAuth... %+v", tID, c)
 	authUsr, err := s.auth.LoginOAuth(req.OAuth, req.DeviceID, "")
-	return s.respondOn(authUsr, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
 func (s *Server) UpdatePhone(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - update phone...", tID)
 	err := s.auth.UpdatePhone(req.User, req.Token, req.DeviceID, "")
-	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, req.User, resp, http.StatusOK, err)
 }
 
 func (s *Server) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - update OAuth...", tID)
 	err := s.auth.UpdateOAuth(req.User, req.AppName, req.Token, req.DeviceID, "")
-	return s.respondOn(req.User, resp, http.StatusOK, tID, err)
+	return s.respondOnUser(c, req.User, resp, http.StatusOK, err)
 }
 
 func (s *Server) VerifyPhone(c context.Context, req *authms.SMSVerificationRequest, resp *authms.SMSVerificationResponse) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - verify phone...", tID)
 	r, err := s.auth.VerifyPhone(req, "")
-	return s.respondOnSMS(r, resp, tID, err)
+	return s.respondOnSMS(c, r, resp, err)
 }
 
 func (s *Server) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationCodeRequest, resp *authms.SMSVerificationResponse) error {
-	tID := <-s.tIDCh
-	s.lg.Fine("%d - verify phone...", tID)
 	r, err := s.auth.VerifyPhoneCode(req, "")
-	return s.respondOnSMS(r, resp, tID, err)
+	return s.respondOnSMS(c, r, resp, err)
 }
 
-func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, tID int, err error) error {
+func (s *Server) respondOnSMS(ctx context.Context, r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, err error) error {
 	if err != nil {
+		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
 		if s.auth.IsAuthError(err) {
-			s.lg.Warn("%d - Not authorized: %v", tID, err)
+			log.Warnf("Unauthorized: %v", err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusUnauthorized
 			return nil
 		}
 		if s.auth.IsClientError(err) {
-			s.lg.Warn("%d - Bad request: %v", tID, err)
+			log.Warnf("Bad request: %v", err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusBadRequest
 			return nil
 		}
 		if s.auth.IsNotImplementedError(err) {
-			s.lg.Warn("%d - Requested unimplemented entity: %v", tID, err)
+			log.Warnf("Not implemented: %v", err)
 			resp.Detail = "This feature is not available"
 			resp.Code = http.StatusNotImplemented
 			return nil
 		}
-		s.lg.Error("%d - internal auth error: %v", tID, err)
+		log.Errorf("Internal error: %v", err)
 		resp.Detail = internalErrorMessage
 		resp.Code = http.StatusInternalServerError
 		return nil
@@ -145,19 +134,28 @@ func (s *Server) respondOnSMS(r *authms.SMSVerificationStatus, resp *authms.SMSV
 	return nil
 }
 
-func (s *Server) respondOn(authUsr *authms.User, resp *authms.Response, code int32, tID int, err error) error {
+func (s *Server) respondOnUser(ctx context.Context, authUsr *authms.User, resp *authms.Response, code int32, err error) error {
 	if err != nil {
+		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
 		if s.auth.IsAuthError(err) {
+			log.Warnf("Unauthorized: %v", err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusUnauthorized
 			return nil
 		}
 		if s.auth.IsClientError(err) {
+			log.Warnf("Bad request: %v", err)
 			resp.Detail = err.Error()
 			resp.Code = http.StatusBadRequest
 			return nil
 		}
-		s.lg.Error("%d - internal auth error: %s", tID, err)
+		if s.auth.IsNotImplementedError(err) {
+			log.Warnf("Not implemented: %v", err)
+			resp.Detail = "This feature is not available"
+			resp.Code = http.StatusNotImplemented
+			return nil
+		}
+		log.Errorf("Internal error: %v", err)
 		resp.Detail = internalErrorMessage
 		resp.Code = http.StatusInternalServerError
 		return nil

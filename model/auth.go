@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
+	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/authms/logging"
 )
 
 type OAuthHandler interface {
@@ -22,11 +24,6 @@ type TokenGenerator interface {
 
 type PasswordGenerator interface {
 	SecureRandomString(length int) ([]byte, error)
-}
-
-type Logger interface {
-	Info(interface{}, ...interface{})
-	Error(interface{}, ...interface{}) error
 }
 
 type OAuthClient interface {
@@ -58,7 +55,6 @@ type PhoneVerifier interface {
 type Auth struct {
 	dbHelper      DBHelper
 	tokenG        TokenGenerator
-	logger        Logger
 	phoneVerifier PhoneVerifier
 	oAuthCls      map[string]OAuthClient
 	errors.ClErrCheck
@@ -80,33 +76,26 @@ const (
 	AppFacebook          = "facebook"
 )
 
+var rePhone = regexp.MustCompile(numExp)
+
 func WithFB(fb OAuthClient) Option {
 	return func(a *Auth) {
 		a.oAuthCls[AppFacebook] = fb
 	}
 }
 
-var ErrorNilTokenGenerator = errors.New("token generator was nil")
-var ErrorNilLogger = errors.New("Logger was nil")
-var ErrorNilDBHelper = errors.New("DBHelper was nil")
-var ErrorNilPhoneVerifier = errors.New("PhoneVerifier was nil")
-var rePhone = regexp.MustCompile(numExp)
-
-func New(tg TokenGenerator, lg Logger, db DBHelper, pv PhoneVerifier, opts ...Option) (*Auth, error) {
+func New(tg TokenGenerator, db DBHelper, pv PhoneVerifier, opts ...Option) (*Auth, error) {
 	if tg == nil {
-		return nil, ErrorNilTokenGenerator
-	}
-	if lg == nil {
-		return nil, ErrorNilLogger
+		return nil, errors.New("token generator was nil")
 	}
 	if db == nil {
-		return nil, ErrorNilDBHelper
+		return nil, errors.New("DBHelper was nil")
 	}
 	if pv == nil {
-		return nil, ErrorNilPhoneVerifier
+		return nil, errors.New("PhoneVerifier was nil")
 	}
 	a := &Auth{dbHelper: db, tokenG: tg, oAuthCls: make(map[string]OAuthClient),
-		logger: lg, phoneVerifier: pv}
+		phoneVerifier: pv}
 	for _, f := range opts {
 		f(a)
 	}
@@ -405,7 +394,10 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 		SuccessStatus: accSuccessful, IpAddress: rIP, DevID: devID}
 	err = a.dbHelper.SaveHistory(h)
 	if err != nil {
-		a.logger.Error("unable to save auth history entry (' %+v '): %s", h, err)
+		logrus.WithFields(logrus.Fields{
+			logging.FieldAction:  "save history entry",
+			logging.FieldHistory: h,
+		}).Error(err)
 	}
 }
 

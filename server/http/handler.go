@@ -9,6 +9,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
+	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -49,12 +50,6 @@ const (
 	authTypeUsername = "usernames"
 	authTypeCode     = "codes"
 
-	logKeyTransID = "transactionID"
-	logKeyURL     = "url"
-	logKeyHost    = "host"
-	logKeyMethod  = "method"
-	logKeyRequest = "request"
-
 	ctxtKeyBody = contextKey("id")
 	ctxKeyLog   = contextKey("log")
 )
@@ -93,13 +88,13 @@ func (s *Handler) HandleRoute(r *mux.Router) error {
 
 func prepLogger(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := logrus.WithFields(logrus.Fields{
-			logKeyTransID: uuid.New(),
-			logKeyURL:     r.URL,
-			logKeyHost:    r.Host,
-			logKeyMethod:  r.Method,
-		})
-		log.Info("new request")
+		log := logrus.WithField(logging.FieldTransID, uuid.New())
+		log.WithFields(logrus.Fields{
+			logging.FieldURL:            r.URL,
+			logging.FieldHost:           r.Host,
+			logging.FieldMethod:         r.Method,
+			logging.FieldRequestHandler: "HTTP",
+		}).Info("new request")
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -228,7 +223,7 @@ func (s *Handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Handler) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
-	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).WithField(logKeyRequest, reqData)
+	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).WithField(logging.FieldRequest, reqData)
 	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
 		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
 			log.Warnf("Forbidden: %v", err)

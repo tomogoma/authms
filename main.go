@@ -3,10 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
-	"runtime"
-	"time"
 
 	"io/ioutil"
 
@@ -15,9 +12,11 @@ import (
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
+	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/generator"
+	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
@@ -40,89 +39,70 @@ func (dlw defLogWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-var confFile = flag.String(
-	"conf",
-	config.DefaultConfPath,
-	"location of config file",
-)
-
 func main() {
+
+	confFile := flag.String("conf", config.DefaultConfPath, "location of config file")
 	flag.Parse()
+
 	conf := config.General{}
 	err := configH.ReadYamlConfig(*confFile, &conf)
-	if err != nil {
-		log.Fatalf("Error Reading config file: %s", err)
-	}
-	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	log.SetOutput(defLogWriter{lg: lg})
-	defer func() {
-		runtime.Gosched()
-		time.Sleep(100 * time.Millisecond)
-	}()
-	tg, err := token.NewJWTHandler(conf.Token)
-	if err != nil {
-		lg.Critical("Error instantiating token generator: %s", err)
-		return
-	}
-	authQuitCh := make(chan error)
+	logFatalOnError(err, "Read config file")
+
 	pg, err := generator.NewRandom(generator.AllChars)
-	if err != nil {
-		lg.Critical("Error instantiating password generator: %s", err)
-		return
-	}
+	logFatalOnError(err, "Initiate password generator")
+
 	db, err := store.NewRoach(conf.Database, pg)
-	if err != nil {
-		lg.Critical("Error instantiating db helper: %v", err)
-		return
-	}
-	if err := db.InitDBConnIfNotInitted(); err != nil {
-		lg.Warn("Error initiating connection to db: %v", err)
-	}
+	logFatalOnError(err, "Instantiate DB helper")
+
+	err = db.InitDBConnIfNotInitted()
+	logWarnOnError(err, "Initiate DB connection")
+
 	s, err := smsAPIOrStub(conf.SMS)
-	if err != nil {
-		lg.Warn("Error instantiating SMS API: %v", conf.SMS.ActiveAPI, err)
-	}
+	logWarnOnError(err, "Instantiate SMS API")
+
 	ng, err := generator.NewRandom(generator.NumberChars)
-	if err != nil {
-		lg.Critical("Error instantiating number generator: %s", err)
-		return
-	}
+	logFatalOnError(err, "Instantiate random number generator")
+
+	tg, err := token.NewJWTHandler(conf.Token)
+	logFatalOnError(err, "Instantiate token handler (generator)")
+
 	pv, err := verification.New(conf.SMS.Verification.MessageFmt,
 		conf.SMS.Verification.SMSCodeValidity, s, ng, tg)
-	if err != nil {
-		lg.Critical("Error instantiating SMS code verifier: %v", err)
-		return
-	}
-	if err != nil {
-		lg.Critical("Error instantiating auth module: %s", err)
-		return
-	}
+	logFatalOnError(err, "Instantiate Verifier")
+
 	oAuthOpts, err := oAuthOptions(conf.Authentication)
-	if err != nil {
-		lg.Warn("Authentication options: %v", conf.SMS.ActiveAPI, err)
-	}
-	a, err := model.New(tg, lg, db, pv, oAuthOpts...)
+	logWarnOnError(err, "Set up OAuth options")
+
+	a, err := model.New(tg, db, pv, oAuthOpts...)
+	logFatalOnError(err, "Instantiate Auth Model")
+
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.New(config.CanonicalName, a, lg)
-	if err != nil {
-		lg.Critical("Error instantiating rpc server module: %s", err)
-		return
-	}
+	rpcSrv, err := rpc.New(config.CanonicalName, a)
+	logFatalOnError(err, "Instantate RPC handler")
 	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
+
 	httpHandler, err := http.NewHandler(a)
-	if err != nil {
-		lg.Critical("Error instantiating rpc server module: %s", err)
-		return
-	}
+	logFatalOnError(err, "Instantiate HTTP handler")
 	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
+
 	select {
-	case err = <-authQuitCh:
-		lg.Critical("auth quit with error: %v", err)
 	case err = <-serverHttpQuitCh:
-		lg.Critical("http server quit with error: %v", err)
+		logFatalOnError(err, "Serve HTTP")
 	case err = <-serverRPCQuitCh:
-		lg.Critical("rpc server quit with error: %v", err)
+		logFatalOnError(err, "Serve RPC")
+	}
+}
+
+func logWarnOnError(err error, action string) {
+	if err != nil {
+		logrus.WithField(logging.FieldAction, action).Warn(err)
+	}
+}
+
+func logFatalOnError(err error, action string) {
+	if err != nil {
+		logrus.WithField(logging.FieldAction, action).Fatal(err)
 	}
 }
 
@@ -187,6 +167,7 @@ func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) 
 		micro.Name(config.CanonicalRPCName),
 		micro.Version(conf.LoadBalanceVersion),
 		micro.RegisterInterval(conf.RegisterInterval),
+		micro.WrapHandler(rpcSrv.Wrapper),
 	)
 	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
 	err := service.Run()

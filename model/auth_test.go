@@ -6,10 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/limetext/log4go"
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
@@ -863,8 +862,7 @@ func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVeri
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
-	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := model.New(tokenGen, lg, db, pv, model.WithFB(oa))
+	a, err := model.New(tokenGen, db, pv, model.WithFB(oa))
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}
