@@ -374,6 +374,7 @@ func (r *Roach) GetLoginVerifications(vType string, userID, offset, count int64)
 		FROM authVerifications
 		WHERE type=$1 AND userID=$2
 		LIMIT $3 OFFSET $4
+		ORDER BY isused ASC, expirydate DESC
 	`
 	rows, err := r.db.Query(q, vType, userID, count, offset)
 	if err != nil {
