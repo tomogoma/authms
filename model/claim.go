@@ -1,20 +1,20 @@
-package claim
+package model
 
 import (
 	"github.com/dgrijalva/jwt-go"
 	"time"
 )
 
-type Auth struct {
+type Claim struct {
 	UsrID int64
 	DevID string
 	jwt.StandardClaims
 }
 
-func NewAuth(UsrID int64, DevID string, validity time.Duration) Auth {
+func NewClaim(UsrID int64, DevID string, validity time.Duration) Claim {
 	now := time.Now()
 	expiry := now.Add(validity)
-	return Auth{
+	return Claim{
 		UsrID: UsrID,
 		DevID: DevID,
 		StandardClaims: jwt.StandardClaims{

@@ -1,4 +1,4 @@
-package auth
+package model
 
 type OAuthResponse interface {
 	UserID() string

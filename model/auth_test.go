@@ -1,4 +1,4 @@
-package auth_test
+package model_test
 
 import (
 	"flag"
@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/limetext/log4go"
-	"github.com/tomogoma/authms/auth"
-	"github.com/tomogoma/authms/claim"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/proto/authms"
@@ -40,7 +39,7 @@ type OAuthHandlerMock struct {
 	ValTknClld    bool
 }
 
-func (oa *OAuthHandlerMock) ValidateToken(token string) (auth.OAuthResponse, error) {
+func (oa *OAuthHandlerMock) ValidateToken(token string) (model.OAuthResponse, error) {
 	oa.ValTknClld = true
 	return &facebook.Response{
 		ResponseData: facebook.ResponseData{
@@ -285,7 +284,7 @@ func TestAuth_Register(t *testing.T) {
 }
 
 func genToken(t *testing.T, usrID int64, devID string) string {
-	clm := claim.NewAuth(usrID, devID, 1*time.Hour)
+	clm := model.NewClaim(usrID, devID, 1*time.Hour)
 	tkn, err := tokenGen.Generate(clm)
 	if err != nil {
 		t.Fatalf("Error setting up: token.Generate(): %v", err)
@@ -817,7 +816,7 @@ func TestAuth_LoginOAuth(t *testing.T) {
 		{Desc: "Invalid OAuth Creds", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
-			OAuth:     &authms.OAuth{AppName: "facebook",}, DevID: "Tes-devID"},
+			OAuth:     &authms.OAuth{AppName: "facebook"}, DevID: "Tes-devID"},
 		{Desc: "Nil OAuth", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: false, ExpErr: errors.New("")},
@@ -858,14 +857,14 @@ func TestAuth_LoginOAuth(t *testing.T) {
 	}
 }
 
-func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVerifierMock) *auth.Auth {
+func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, pv *PhoneVerifierMock) *model.Auth {
 	var err error
 	tokenGen, err = token.NewJWTHandler(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
 	lg := log4go.NewDefaultLogger(log4go.FINEST)
-	a, err := auth.New(tokenGen, lg, db, pv, auth.WithFB(oa))
+	a, err := model.New(tokenGen, lg, db, pv, model.WithFB(oa))
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}

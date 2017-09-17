@@ -1,4 +1,4 @@
-package auth
+package model
 
 import (
 	"regexp"
@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/authms/claim"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -157,7 +156,7 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	clm := claim.Auth{}
+	clm := Claim{}
 	_, err := a.tokenG.Validate(token, &clm)
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
@@ -187,7 +186,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	clm := claim.Auth{}
+	clm := Claim{}
 	_, err := a.tokenG.Validate(req.Token, &clm)
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
@@ -218,7 +217,7 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 	if req == nil {
 		return nil, errors.NewClient("SMSVerificationRequest was empty")
 	}
-	clm := claim.Auth{}
+	clm := Claim{}
 	_, err := a.tokenG.Validate(req.Token, &clm)
 	defer func() {
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
@@ -253,7 +252,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	if user == nil {
 		return errors.NewClient("user was empty")
 	}
-	clm := claim.Auth{}
+	clm := Claim{}
 	_, err := a.tokenG.Validate(token, &clm)
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
@@ -356,7 +355,7 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	if loginErr != nil {
 		return loginErr
 	}
-	clm := claim.NewAuth(usr.ID, devID, tokenValidity)
+	clm := NewClaim(usr.ID, devID, tokenValidity)
 	tkn, loginErr := a.tokenG.Generate(clm)
 	if loginErr != nil {
 		loginErr = errors.Newf("error generating token: %v", loginErr)

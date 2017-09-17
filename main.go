@@ -15,7 +15,7 @@ import (
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
-	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/generator"
@@ -99,7 +99,7 @@ func main() {
 	if err != nil {
 		lg.Warn("Authentication options: %v", conf.SMS.ActiveAPI, err)
 	}
-	a, err := auth.New(tg, lg, db, pv, oAuthOpts...)
+	a, err := model.New(tg, lg, db, pv, oAuthOpts...)
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
 	rpcSrv, err := rpc.New(config.CanonicalName, a, lg)
@@ -124,8 +124,8 @@ func main() {
 	}
 }
 
-func oAuthOptions(conf config.Auth) ([]auth.Option, error) {
-	authOpts := make([]auth.Option, 0)
+func oAuthOptions(conf config.Auth) ([]model.Option, error) {
+	authOpts := make([]model.Option, 0)
 	if conf.Facebook.ID > 0 {
 		fbSecret, err := readFile(conf.Facebook.SecretFilePath)
 		if err != nil {
@@ -135,7 +135,7 @@ func oAuthOptions(conf config.Auth) ([]auth.Option, error) {
 		if err != nil {
 			return authOpts, errors.Newf("facebook client: %v", err)
 		}
-		authOpts = append(authOpts, auth.WithFB(fb))
+		authOpts = append(authOpts, model.WithFB(fb))
 	}
 	return authOpts, nil
 }

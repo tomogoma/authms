@@ -4,7 +4,7 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/helper"
 	"golang.org/x/net/context"
@@ -23,7 +23,7 @@ type Logger interface {
 }
 
 type Server struct {
-	auth  *auth.Auth
+	auth  *model.Auth
 	lg    Logger
 	tIDCh chan int
 	name  string
@@ -33,7 +33,7 @@ var ErrorNilAuth = errors.New("Auth cannot be nil")
 var ErrorNilLogger = errors.New("Logger cannot be nil")
 var ErrorEmptyName = errors.New("Name cannot be empty")
 
-func New(name string, auth *auth.Auth, lg Logger) (*Server, error) {
+func New(name string, auth *model.Auth, lg Logger) (*Server, error) {
 	if auth == nil {
 		return nil, ErrorNilAuth
 	}

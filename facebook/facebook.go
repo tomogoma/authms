@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/tomogoma/authms/auth"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -36,7 +36,7 @@ func New(appID int64, appSecret string) (*FacebookOAuth, error) {
 	return &FacebookOAuth{appID: appID, appSecret: appSecret}, nil
 }
 
-func (f *FacebookOAuth) ValidateToken(token string) (auth.OAuthResponse, error) {
+func (f *FacebookOAuth) ValidateToken(token string) (model.OAuthResponse, error) {
 	URL, err := url.Parse(fmt.Sprintf("%s?%s=%s&%s=%d|%s", fbURL,
 		fbInputTokenKey, token, fbAppTokenKey, f.appID, f.appSecret))
 	if err != nil {
