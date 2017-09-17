@@ -1,11 +1,11 @@
-package sms_test
+package africas_talking_test
 
 import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/tomogoma/authms/sms"
+	"github.com/tomogoma/authms/sms/africas_talking"
 )
 
 type ATConfigMock struct {
@@ -22,51 +22,49 @@ func (a *ATConfigMock) APIKey() string {
 
 func TestNewAfricasTalking(t *testing.T) {
 	testCases := []struct {
-		desc   string
-		conf   sms.ATConfig
-		opts   []sms.ATOption
-		expErr bool
+		desc     string
+		username string
+		apiKey   string
+		opts     []africas_talking.Option
+		expErr   bool
 	}{
 		{
-			desc:   "successful normal use case",
-			conf:   &ATConfigMock{ExpUserName: "some-name", ExpAPIKey: "some-api-key"},
-			opts:   make([]sms.ATOption, 0),
-			expErr: false,
+			desc:     "successful normal use case",
+			username: "some-name",
+			apiKey:   "some-api-key",
+			opts:     make([]africas_talking.Option, 0),
+			expErr:   false,
 		},
 		{
-			desc:   "successful with URL",
-			conf:   &ATConfigMock{ExpUserName: "some-name", ExpAPIKey: "some-api-key"},
-			opts:   []sms.ATOption{sms.ATWithSendURL("http://some.valid.url")},
-			expErr: false,
-		},
-		{
-			desc:   "nil config",
-			conf:   nil,
-			opts:   make([]sms.ATOption, 0),
-			expErr: true,
+			desc:     "successful with URL",
+			username: "some-name",
+			apiKey:   "some-api-key",
+			opts:     []africas_talking.Option{africas_talking.SendURL("http://some.valid.url")},
+			expErr:   false,
 		},
 		{
 			desc:   "missing username",
-			conf:   &ATConfigMock{ExpAPIKey: "some-api-key"},
-			opts:   make([]sms.ATOption, 0),
+			apiKey: "some-api-key",
+			opts:   make([]africas_talking.Option, 0),
 			expErr: true,
 		},
 		{
-			desc:   "missing API key",
-			conf:   &ATConfigMock{ExpUserName: "some-name"},
-			opts:   make([]sms.ATOption, 0),
-			expErr: true,
+			desc:     "missing API key",
+			username: "some-name",
+			opts:     make([]africas_talking.Option, 0),
+			expErr:   true,
 		},
 		{
-			desc:   "empty URL ATOption",
-			conf:   &ATConfigMock{ExpUserName: "some-name", ExpAPIKey: "some-api-key"},
-			opts:   []sms.ATOption{sms.ATWithSendURL("")},
-			expErr: true,
+			desc:     "empty URL Option",
+			username: "some-name",
+			apiKey:   "some-api-key",
+			opts:     []africas_talking.Option{africas_talking.SendURL("")},
+			expErr:   true,
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			at, err := sms.NewAfricasTalking(tc.conf, tc.opts...)
+			at, err := africas_talking.NewSMSCl(tc.username, tc.apiKey, tc.opts...)
 			if tc.expErr {
 				if err == nil {
 					t.Fatalf("Expected an error but got nil")
@@ -74,10 +72,10 @@ func TestNewAfricasTalking(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("sms.NewAfricasTalking(): %v", err)
+				t.Fatalf("africas_talking.NewSMSCl(): %v", err)
 			}
 			if at == nil {
-				t.Fatalf("Received a nil AfricasTalking struct!")
+				t.Fatalf("Received a nil SMSCl struct!")
 			}
 		})
 	}
@@ -181,7 +179,8 @@ func TestAfricasTalking_SMS(t *testing.T) {
 			expErr: true,
 		},
 	}
-	conf := &ATConfigMock{ExpUserName: "username", ExpAPIKey: "api-key"}
+	username := "username"
+	APIKey := "api-key"
 	toPhone := "+254712345678"
 	smsContent := "This is a test SMS\nWith a new Line"
 	for _, tc := range testCases {
@@ -197,18 +196,18 @@ func TestAfricasTalking_SMS(t *testing.T) {
 				w.Write([]byte(tc.expBody))
 			}))
 			defer ts.Close()
-			at, err := sms.NewAfricasTalking(conf, sms.ATWithSendURL(ts.URL))
+			at, err := africas_talking.NewSMSCl(username, APIKey, africas_talking.SendURL(ts.URL))
 			if err != nil {
-				t.Fatalf("sms.NewAfricasTalking(): %v", err)
+				t.Fatalf("africas_talking.NewSMSCl(): %v", err)
 			}
 			err = at.SMS(toPhone, smsContent)
-			if recUserName != conf.ExpUserName {
+			if recUserName != username {
 				t.Errorf("Submitted Username mismatch. Expect '%s', got '%s'",
-					conf.ExpUserName, recUserName)
+					username, recUserName)
 			}
-			if recAPIKey != conf.ExpAPIKey {
+			if recAPIKey != APIKey {
 				t.Errorf("Submitted API key mismatch. Expect '%s', got '%s'",
-					conf.ExpAPIKey, recAPIKey)
+					APIKey, recAPIKey)
 			}
 			if recToPhone != toPhone {
 				t.Errorf("Submitted to-phone mismatch. Expect '%s', got '%s'",
@@ -225,7 +224,7 @@ func TestAfricasTalking_SMS(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("sms.AfricasTalking#SMS(): %v", err)
+				t.Fatalf("africas_talking.SMSCl#SMS(): %v", err)
 			}
 		})
 	}
@@ -238,12 +237,11 @@ func TestAfricasTalking_SMS_invalidParams(t *testing.T) {
 		smsContent string
 	}{
 		{desc: "empty toPhone", toPhone: "", smsContent: "Some SMS content"},
-		{desc: "empty smsContent", toPhone: "0712345678", smsContent: ""},
+		{desc: "empty sms Content", toPhone: "0712345678", smsContent: ""},
 	}
-	conf := &ATConfigMock{ExpUserName: "username", ExpAPIKey: "api-key"}
-	at, err := sms.NewAfricasTalking(conf)
+	at, err := africas_talking.NewSMSCl("username", "api-key")
 	if err != nil {
-		t.Fatalf("sms.NewAfricasTalking(): %v", err)
+		t.Fatalf("africas_talking.NewSMSCl(): %v", err)
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {

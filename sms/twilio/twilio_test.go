@@ -1,11 +1,12 @@
-package sms_test
+package twilio_test
 
 import (
 	"flag"
+	"io/ioutil"
 	"testing"
 
 	"github.com/tomogoma/authms/config"
-	"github.com/tomogoma/authms/sms"
+	"github.com/tomogoma/authms/sms/twilio"
 	configH "github.com/tomogoma/go-commons/config"
 )
 
@@ -13,6 +14,7 @@ type ConfigMock struct {
 	ID           string `json:"ID" yaml:"ID"`
 	SenderPhone  string `json:"senderPhone" yaml:"senderPhone"`
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
+	readToken    string
 }
 
 func (c ConfigMock) TwilioID() string {
@@ -51,23 +53,51 @@ func setupTwilio(t *testing.T) SMSMock {
 	if err != nil {
 		t.Fatalf("Error setting up (reading config file): %v", err)
 	}
+	tokenB, err := ioutil.ReadFile(conf.SMS.Twilio.TokenKeyFile)
+	if err != nil {
+		t.Fatalf("Error setting up (reading token file): %v", err)
+	}
+	conf.SMS.Twilio.readToken = string(tokenB)
 	return conf.SMS
 }
 
 func TestNewTwilio(t *testing.T) {
 	validConf := setupTwilio(t)
 	testCases := []struct {
-		desc   string
-		conf   sms.TwConfig
-		expErr bool
+		desc        string
+		id          string
+		token       string
+		senderPhone string
+		expErr      bool
 	}{
-		{desc: "valid config", conf: validConf.Twilio},
-		{desc: "nil config", conf: nil, expErr: true},
-		{desc: "missing token key file", conf: ConfigMock{}, expErr: true},
+		{
+			desc:        "valid config",
+			id:          validConf.Twilio.ID,
+			token:       validConf.Twilio.readToken,
+			senderPhone: validConf.Twilio.SenderPhone,
+		},
+		{
+			desc:        "missing id",
+			expErr:      true,
+			token:       validConf.Twilio.readToken,
+			senderPhone: validConf.Twilio.SenderPhone,
+		},
+		{
+			desc:        "missing token",
+			id:          validConf.Twilio.ID,
+			expErr:      true,
+			senderPhone: validConf.Twilio.SenderPhone,
+		},
+		{
+			desc:   "missing sender phone",
+			id:     validConf.Twilio.ID,
+			token:  validConf.Twilio.readToken,
+			expErr: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			tw, err := sms.NewTwilio(tc.conf)
+			tw, err := twilio.NewSMSCl(tc.id, tc.token, tc.senderPhone)
 			if tc.expErr {
 				if err == nil {
 					t.Fatalf("Expected an error but got nil")
@@ -75,10 +105,10 @@ func TestNewTwilio(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("sms.NewTwilio(): %v", err)
+				t.Fatalf("twilio.NewSMSCl(): %v", err)
 			}
 			if tw == nil {
-				t.Fatalf("got nil Twilio API")
+				t.Fatalf("got nil SMSCl API")
 			}
 		})
 	}
@@ -96,9 +126,9 @@ func TestTwilio_SMS(t *testing.T) {
 		{desc: "empty number", toNumber: "", message: testMessage, expErr: true},
 		{desc: "empty message", toNumber: conf.TestNumber, message: "", expErr: true},
 	}
-	tw, err := sms.NewTwilio(conf.Twilio)
+	tw, err := twilio.NewSMSCl(conf.Twilio.ID, conf.Twilio.readToken, conf.Twilio.SenderPhone)
 	if err != nil {
-		t.Fatalf("sms.NewTwilio(): %v", err)
+		t.Fatalf("twilio.NewSMSCl(): %v", err)
 	}
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {

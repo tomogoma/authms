@@ -1,4 +1,4 @@
-package sms
+package africas_talking
 
 import (
 	"encoding/xml"
@@ -20,12 +20,12 @@ const (
 	paramMessage  = "message"
 )
 
-type ATConfig interface {
+type Config interface {
 	Username() string
 	APIKey() string
 }
 
-type ATOption func(at *AfricasTalking)
+type Option func(at *SMSCl)
 
 type atResponse struct {
 	SMSMessageData struct {
@@ -39,27 +39,27 @@ type atResponse struct {
 	} `xml:"SMSMessageData"`
 }
 
-type AfricasTalking struct {
+type SMSCl struct {
 	atSendURL string
 	userName  string
 	apiKey    string
 	errors.NotImplErrCheck
 }
 
-func ATWithSendURL(URL string) func(at *AfricasTalking) {
-	return func(at *AfricasTalking) {
+func SendURL(URL string) func(at *SMSCl) {
+	return func(at *SMSCl) {
 		at.atSendURL = URL
 	}
 }
 
-func NewAfricasTalking(usrName, APIKey string, opts ...ATOption) (*AfricasTalking, error) {
+func NewSMSCl(usrName, APIKey string, opts ...Option) (*SMSCl, error) {
 	if APIKey == "" {
 		return nil, errors.New("API key was empty")
 	}
 	if usrName == "" {
 		return nil, errors.New("API UserName was empty")
 	}
-	at := &AfricasTalking{atSendURL: atSendURL, userName: usrName, apiKey: APIKey}
+	at := &SMSCl{atSendURL: atSendURL, userName: usrName, apiKey: APIKey}
 	for _, opt := range opts {
 		opt(at)
 	}
@@ -69,7 +69,7 @@ func NewAfricasTalking(usrName, APIKey string, opts ...ATOption) (*AfricasTalkin
 	return at, nil
 }
 
-func (at *AfricasTalking) SMS(toPhone, message string) error {
+func (at *SMSCl) SMS(toPhone, message string) error {
 	resp, err := at.sendRequest(toPhone, message)
 	if err != nil {
 		return errors.Newf("error sending request: %v", err)
@@ -93,7 +93,7 @@ func (at *AfricasTalking) SMS(toPhone, message string) error {
 	return nil
 }
 
-func (at *AfricasTalking) sendRequest(toPhone, message string) (*http.Response, error) {
+func (at *SMSCl) sendRequest(toPhone, message string) (*http.Response, error) {
 	if toPhone == "" {
 		return nil, errors.Newf("toPhone was empty")
 	}

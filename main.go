@@ -15,14 +15,16 @@ import (
 	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/generator"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
 	"github.com/tomogoma/authms/server/rpc"
 	"github.com/tomogoma/authms/sms"
+	"github.com/tomogoma/authms/sms/africas_talking"
+	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/store"
 	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/go-commons/auth/token"
@@ -151,7 +153,7 @@ func smsAPIOrStub(conf config.SMSConfig) (verification.SMSer, error) {
 		if err != nil {
 			return &sms.Stub{}, fmt.Errorf("africa's talking API key: %v", err)
 		}
-		s, err = sms.NewAfricasTalking(conf.AfricasTalking.UserName, apiKey)
+		s, err = africas_talking.NewSMSCl(conf.AfricasTalking.UserName, apiKey)
 		if err != nil {
 			return &sms.Stub{}, fmt.Errorf("africasTalking: %v", err)
 		}
@@ -160,7 +162,7 @@ func smsAPIOrStub(conf config.SMSConfig) (verification.SMSer, error) {
 		if err != nil {
 			return &sms.Stub{}, fmt.Errorf("twilio token: %v", err)
 		}
-		s, err = sms.NewTwilio(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
+		s, err = twilio.NewSMSCl(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
 		if err != nil {
 			return &sms.Stub{}, fmt.Errorf("twilio: %v", err)
 		}

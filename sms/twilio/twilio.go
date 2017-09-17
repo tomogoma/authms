@@ -1,4 +1,4 @@
-package sms
+package twilio
 
 import (
 	"encoding/json"
@@ -38,14 +38,14 @@ var rcvErrors = map[int]string{
 	phoneNoSMS:        "the phone provided cannot receive SMS",
 }
 
-type Twilio struct {
+type SMSCl struct {
 	token       string
 	id          string
 	senderPhone string
 	errors.NotImplErrCheck
 }
 
-func NewTwilio(id, token, senderPhone string) (*Twilio, error) {
+func NewSMSCl(id, token, senderPhone string) (*SMSCl, error) {
 	if id == "" {
 		return nil, errors.New("id was empty")
 	}
@@ -58,10 +58,10 @@ func NewTwilio(id, token, senderPhone string) (*Twilio, error) {
 	if id == "" {
 		return nil, errors.New("id was nil")
 	}
-	return &Twilio{id: id, senderPhone: senderPhone, token: token}, nil
+	return &SMSCl{id: id, senderPhone: senderPhone, token: token}, nil
 }
 
-func (s *Twilio) SMS(toPhone, message string) error {
+func (s *SMSCl) SMS(toPhone, message string) error {
 	if toPhone == "" {
 		return errors.New("toPhone was empty")
 	}
