@@ -78,7 +78,7 @@ func main() {
 
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.New(config.CanonicalName, a)
+	rpcSrv, err := rpc.NewHandler(config.CanonicalName, a)
 	logFatalOnError(err, "Instantate RPC handler")
 	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
@@ -162,7 +162,7 @@ func smsAPIOrStub(conf config.SMSConfig) (verification.SMSer, error) {
 	return s, nil
 }
 
-func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
+func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(config.CanonicalRPCName),
 		micro.Version(conf.LoadBalanceVersion),

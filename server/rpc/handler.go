@@ -13,7 +13,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-type Server struct {
+type Handler struct {
 	auth *model.Auth
 	name string
 }
@@ -26,14 +26,14 @@ const (
 	ctxKeyLog = "log"
 )
 
-func New(name string, auth *model.Auth) (*Server, error) {
+func NewHandler(name string, auth *model.Auth) (*Handler, error) {
 	if auth == nil {
 		return nil, errors.New("nil auth")
 	}
 	if name == "" {
 		return nil, errors.New("empty name")
 	}
-	return &Server{name: name, auth: auth}, nil
+	return &Handler{name: name, auth: auth}, nil
 }
 
 func LogWrapper(next server.HandlerFunc) server.HandlerFunc {
@@ -50,59 +50,59 @@ func LogWrapper(next server.HandlerFunc) server.HandlerFunc {
 	}
 }
 
-func (s *Server) Wrapper(next server.HandlerFunc) server.HandlerFunc {
+func (s *Handler) Wrapper(next server.HandlerFunc) server.HandlerFunc {
 	return LogWrapper(next)
 }
 
-func (s *Server) Register(c context.Context, req *authms.RegisterRequest, resp *authms.Response) error {
+func (s *Handler) Register(c context.Context, req *authms.RegisterRequest, resp *authms.Response) error {
 	err := s.auth.Register(req.User, req.DeviceID, "")
 	return s.respondOnUser(c, req.User, resp, http.StatusCreated, err)
 }
 
-func (s *Server) LoginUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+func (s *Handler) LoginUserName(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
 	authUsr, err := s.auth.LoginUserName(req.BasicID, req.Password,
 		req.DeviceID, "")
 	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
-func (s *Server) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+func (s *Handler) LoginEmail(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
 	authUsr, err := s.auth.LoginEmail(req.BasicID, req.Password,
 		req.DeviceID, "")
 	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
-func (s *Server) LoginPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
+func (s *Handler) LoginPhone(c context.Context, req *authms.BasicAuthRequest, resp *authms.Response) error {
 	authUsr, err := s.auth.LoginPhone(req.BasicID, req.Password,
 		req.DeviceID, "")
 	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
-func (s *Server) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
+func (s *Handler) LoginOAuth(c context.Context, req *authms.OAuthRequest, resp *authms.Response) error {
 	authUsr, err := s.auth.LoginOAuth(req.OAuth, req.DeviceID, "")
 	return s.respondOnUser(c, authUsr, resp, http.StatusOK, err)
 }
 
-func (s *Server) UpdatePhone(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
+func (s *Handler) UpdatePhone(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
 	err := s.auth.UpdatePhone(req.User, req.Token, req.DeviceID, "")
 	return s.respondOnUser(c, req.User, resp, http.StatusOK, err)
 }
 
-func (s *Server) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
+func (s *Handler) UpdateOauth(c context.Context, req *authms.UpdateRequest, resp *authms.Response) error {
 	err := s.auth.UpdateOAuth(req.User, req.AppName, req.Token, req.DeviceID, "")
 	return s.respondOnUser(c, req.User, resp, http.StatusOK, err)
 }
 
-func (s *Server) VerifyPhone(c context.Context, req *authms.SMSVerificationRequest, resp *authms.SMSVerificationResponse) error {
+func (s *Handler) VerifyPhone(c context.Context, req *authms.SMSVerificationRequest, resp *authms.SMSVerificationResponse) error {
 	r, err := s.auth.VerifyPhone(req, "")
 	return s.respondOnSMS(c, r, resp, err)
 }
 
-func (s *Server) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationCodeRequest, resp *authms.SMSVerificationResponse) error {
+func (s *Handler) VerifyPhoneCode(c context.Context, req *authms.SMSVerificationCodeRequest, resp *authms.SMSVerificationResponse) error {
 	r, err := s.auth.VerifyPhoneCode(req, "")
 	return s.respondOnSMS(c, r, resp, err)
 }
 
-func (s *Server) respondOnSMS(ctx context.Context, r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, err error) error {
+func (s *Handler) respondOnSMS(ctx context.Context, r *authms.SMSVerificationStatus, resp *authms.SMSVerificationResponse, err error) error {
 	if err != nil {
 		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
 		if s.auth.IsAuthError(err) {
@@ -134,7 +134,7 @@ func (s *Server) respondOnSMS(ctx context.Context, r *authms.SMSVerificationStat
 	return nil
 }
 
-func (s *Server) respondOnUser(ctx context.Context, authUsr *authms.User, resp *authms.Response, code int32, err error) error {
+func (s *Handler) respondOnUser(ctx context.Context, authUsr *authms.User, resp *authms.Response, code int32, err error) error {
 	if err != nil {
 		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
 		if s.auth.IsAuthError(err) {
