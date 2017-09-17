@@ -7,6 +7,8 @@ import (
 
 	"io/ioutil"
 
+	"time"
+
 	"github.com/dropbox/godropbox/errors"
 	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
@@ -21,11 +23,9 @@ import (
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/server/http"
 	"github.com/tomogoma/authms/server/rpc"
-	"github.com/tomogoma/authms/sms"
 	"github.com/tomogoma/authms/sms/africas_talking"
 	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/store"
-	"github.com/tomogoma/authms/verification"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
 )
@@ -57,19 +57,26 @@ func main() {
 	err = db.InitDBConnIfNotInitted()
 	logWarnOnError(err, "Initiate DB connection")
 
-	s, err := smsAPIOrStub(conf.SMS)
-	logWarnOnError(err, "Instantiate SMS API")
-
-	ng, err := generator.NewRandom(generator.NumberChars)
-	logFatalOnError(err, "Instantiate random number generator")
-
 	tg, err := token.NewJWTHandler(conf.Token)
 	logFatalOnError(err, "Instantiate token handler (generator)")
 
-	oAuthOpts, err := oAuthOptions(conf.Authentication)
+	authOpts, err := oAuthOptions(conf.Authentication)
 	logWarnOnError(err, "Set up OAuth options")
 
-	a, err := model.New(tg, db, oAuthOpts...)
+	if conf.SMS.MessageFmt != "" {
+		authOpts = append(authOpts, model.WithSMSFormat(conf.SMS.MessageFmt))
+	}
+	if conf.SMS.SMSCodeValidity > 1*time.Minute {
+		authOpts = append(authOpts, model.WithSMSValidity(conf.SMS.SMSCodeValidity))
+	}
+
+	s, err := smsAPI(conf.SMS)
+	logWarnOnError(err, "Instantiate SMS API")
+	if s != nil {
+		authOpts = append(authOpts, model.WithSMSer(s))
+	}
+
+	a, err := model.New(tg, db, authOpts...)
 	logFatalOnError(err, "Instantiate Auth Model")
 
 	serverRPCQuitCh := make(chan error)
@@ -118,32 +125,32 @@ func oAuthOptions(conf config.Auth) ([]model.Option, error) {
 	return authOpts, nil
 }
 
-func smsAPIOrStub(conf config.SMSConfig) (verification.SMSer, error) {
+func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
 	if conf.ActiveAPI == "" {
-		return &sms.Stub{}, nil
+		return nil, nil
 	}
-	var s verification.SMSer
+	var s model.SMSer
 	switch conf.ActiveAPI {
 	case config.SMSAPIAfricasTalking:
 		apiKey, err := readFile(conf.AfricasTalking.APIKeyFile)
 		if err != nil {
-			return &sms.Stub{}, fmt.Errorf("africa's talking API key: %v", err)
+			return nil, fmt.Errorf("africa's talking API key: %v", err)
 		}
 		s, err = africas_talking.NewSMSCl(conf.AfricasTalking.UserName, apiKey)
 		if err != nil {
-			return &sms.Stub{}, fmt.Errorf("africasTalking: %v", err)
+			return nil, fmt.Errorf("africasTalking: %v", err)
 		}
 	case config.SMSAPITwilio:
 		tkn, err := readFile(conf.Twilio.TokenKeyFile)
 		if err != nil {
-			return &sms.Stub{}, fmt.Errorf("twilio token: %v", err)
+			return nil, fmt.Errorf("twilio token: %v", err)
 		}
 		s, err = twilio.NewSMSCl(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
 		if err != nil {
-			return &sms.Stub{}, fmt.Errorf("twilio: %v", err)
+			return nil, fmt.Errorf("twilio: %v", err)
 		}
 	default:
-		return &sms.Stub{}, fmt.Errorf("invalid API selected can be %s or %s",
+		return nil, fmt.Errorf("invalid API selected can be %s or %s",
 			config.SMSAPIAfricasTalking, config.SMSAPITwilio)
 	}
 	var testMessage string

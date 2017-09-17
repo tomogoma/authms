@@ -69,7 +69,21 @@ CREATE TABLE IF NOT EXISTS history (
   INDEX         history_UserDate_indx (userID, DATE )
 );
 `
+	AuthVerificationsTblDesc = `
+CREATE TABLE IF NOT EXISTS authVerifications (
+	id				CHAR		PRIMARY KEY NOT NULL,
+	type			CHAR		NOT NULL,
+	subjectValue	CHAR		NOT NULL,
+	userID			INTEGER		NOT NULL REFERENCES users(id),
+	codeHash		BYTES		NOT NULL,
+	isUsed			BOOL		NOT NULL,
+	issueDate		TIMESTAMPTZ	NOT NULL,
+	expiryDate		TIMESTAMPTZ	NOT NULL,
+	INDEX authVerifications_type_indx(type, userID)
+);
+`
 )
 
 var AllTableDescs = []string{UsersTBLDesc, UsernamesTblDesc,
-	EmailsTblDesc, PhonesTblDesc, AppUserIDsTblDesc, HistoryTblDesc}
+	EmailsTblDesc, PhonesTblDesc, AppUserIDsTblDesc, HistoryTblDesc,
+	AuthVerificationsTblDesc}

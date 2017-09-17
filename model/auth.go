@@ -46,18 +46,18 @@ type DBHelper interface {
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
 	UpdatePhone(userID int64, newPhone *authms.Value) error
 	UpdateAppUserID(userID int64, new *authms.OAuth) error
-	UpsertLoginVerification(code LoginVerification) error
+	UpsertLoginVerification(code LoginVerification) (LoginVerification, error)
 	GetLoginVerifications(verificationType string, userID, offset, count int64) ([]LoginVerification, error)
 	IsNotFoundError(err error) bool
 	IsDuplicateError(err error) bool
 }
 
 type SMSer interface {
-	IsNotImplementedError(error) bool
 	SMS(toPhone, message string) error
 }
 
 type LoginVerification struct {
+	ID           string
 	Type         string
 	SubjectValue string
 	UserID       int64
@@ -116,13 +116,20 @@ func WithSMSValidity(d time.Duration) Option {
 	}
 }
 
-func WithSMSCodeGeneratory(g SecureRandomByteser) Option {
+func WithSMSer(sms SMSer) Option {
+	return func(a *Auth) {
+		a.smser = sms
+	}
+}
+
+//noinspection GoUnusedExportedFunction
+func WithSMSCodeGenerator(g SecureRandomByteser) Option {
 	return func(a *Auth) {
 		a.randomSMSCodeser = g
 	}
 }
 
-func New(tg TokenGenerator, db DBHelper, sms SMSer, opts ...Option) (*Auth, error) {
+func New(tg TokenGenerator, db DBHelper, opts ...Option) (*Auth, error) {
 	randSMSCodeser, err := generator.NewRandom(generator.NumberChars)
 	if err != nil {
 		return nil, errors.Newf("instantiate random number code generator: %v", err)
@@ -132,7 +139,6 @@ func New(tg TokenGenerator, db DBHelper, sms SMSer, opts ...Option) (*Auth, erro
 	a := &Auth{
 		dbHelper:         db,
 		tokenG:           tg,
-		smser:            sms,
 		randomSMSCodeser: randSMSCodeser,
 		oAuthCls:         make(map[string]OAuthClient),
 		smsFmt:           SMSFmt,
@@ -146,9 +152,6 @@ func New(tg TokenGenerator, db DBHelper, sms SMSer, opts ...Option) (*Auth, erro
 	}
 	if a.dbHelper == nil {
 		return nil, errors.New("DBHelper was nil")
-	}
-	if a.smser == nil {
-		return nil, errors.New("SMSer was nil")
 	}
 	if a.randomSMSCodeser == nil {
 		return nil, errors.New("Random SMS code generator was nil")
@@ -244,6 +247,9 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessVerification, rIP, err)
 	}()
+	if a.smser == nil {
+		return nil, errors.NewNotImplementedf("SMS capability not available")
+	}
 	if _, err = a.validateToken(req.UserID, req.Token); err != nil {
 		return nil, err
 	}
@@ -265,7 +271,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	}
 	issue := time.Now()
 	expiry := issue.Add(a.smsValidity)
-	err = a.dbHelper.UpsertLoginVerification(LoginVerification{
+	_, err = a.dbHelper.UpsertLoginVerification(LoginVerification{
 		Type:         verTypePhone,
 		SubjectValue: req.Phone,
 		Issue:        issue,
@@ -279,9 +285,6 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	}
 	smsBody := fmt.Sprintf(a.smsFmt, SMSCode)
 	if err = a.smser.SMS(req.Phone, smsBody); err != nil {
-		if a.smser.IsNotImplementedError(err) {
-			return nil, errors.NewNotImplementedf("%v", err)
-		}
 		return nil, err
 	}
 	return &authms.SMSVerificationStatus{
@@ -329,7 +332,7 @@ resumeFunc:
 		return nil, errors.NewAuth("code already used")
 	}
 	if time.Now().After(verification.Expiry) {
-		return nil, errors.NewAuth("%code is expired")
+		return nil, errors.NewAuth("code is expired")
 	}
 	err = a.dbHelper.UpdatePhone(
 		req.UserID, &authms.Value{
@@ -340,7 +343,7 @@ resumeFunc:
 		return nil, errors.Newf("persist phone update: %v", err)
 	}
 	verification.IsUsed = true
-	if err = a.dbHelper.UpsertLoginVerification(verification); err != nil {
+	if _, err = a.dbHelper.UpsertLoginVerification(verification); err != nil {
 		return nil, errors.Newf("upsert login verification: %v", err)
 	}
 	return &authms.SMSVerificationStatus{

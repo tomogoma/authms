@@ -69,14 +69,12 @@ sms:
   # startup and while running tests.
   testNumber:
 
-  # verification - configuration values for SMS based verification of phone numbers.
-  verification:
-    # messageFormat is the content of the verification SMS with a %s denoting
-    # the position which will contain the verification code being sent to the user.
-    messageFormat: Your verification code is %s
-    # smsCodeValidity is how long a verification code should be acceptable before
-    # it expires.
-    smsCodeValidity: 5m
+  # messageFormat is the content of the verification SMS with a %s denoting
+  # the position which will contain the verification code being sent to the user.
+  messageFormat: Your verification code is %s
+  # smsCodeValidity is how long a verification code should be acceptable before
+  # it expires.
+  smsCodeValidity: 5m
 
   # twilio - configuration values for using twilio as the activeAPI
   # configuration values can be found in https://www.twilio.com/console

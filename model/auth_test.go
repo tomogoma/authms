@@ -75,6 +75,7 @@ type DBHelperMock struct {
 	T                          *testing.T
 	IgnoreDefaultVerifiedCheck bool
 	ExpIsDuplicate             bool
+	ExpLoginVer                model.LoginVerification
 	ExpLoginVers               []model.LoginVerification
 }
 
@@ -109,8 +110,8 @@ func (d *DBHelperMock) GetByAppUserID(appName, appUserID string) (*authms.User, 
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
 }
-func (d *DBHelperMock) UpsertLoginVerification(code model.LoginVerification) error {
-	return d.ExpErr
+func (d *DBHelperMock) UpsertLoginVerification(code model.LoginVerification) (model.LoginVerification, error) {
+	return d.ExpLoginVer, d.ExpErr
 }
 func (d *DBHelperMock) GetLoginVerifications(verificationType string, userID, offset, count int64) ([]model.LoginVerification, error) {
 	return d.ExpLoginVers, d.ExpErr
@@ -628,7 +629,7 @@ func TestAuth_VerifyPhone(t *testing.T) {
 		ExpNotImpl bool
 		Desc       string
 		Req        *authms.SMSVerificationRequest
-		SMS        *SMSerMock
+		SMS        model.SMSer
 		ExpStatus  *authms.SMSVerificationStatus
 		DB         *DBHelperMock
 	}
@@ -657,7 +658,7 @@ func TestAuth_VerifyPhone(t *testing.T) {
 			DB: &DBHelperMock{T: t},
 		},
 		{
-			Desc:   "Verifier reports not implemented",
+			Desc:   "Nil SMSer",
 			ExpErr: true, ExpNotImpl: true,
 			Req: &authms.SMSVerificationRequest{
 				DeviceID: devID,
@@ -665,7 +666,7 @@ func TestAuth_VerifyPhone(t *testing.T) {
 				Token:    validToken,
 				Phone:    phone,
 			},
-			SMS: &SMSerMock{ExpErr: errors.NewNotImplemented()},
+			SMS: nil,
 			DB:  &DBHelperMock{T: t},
 		},
 	}
@@ -894,13 +895,13 @@ func TestAuth_LoginOAuth(t *testing.T) {
 	}
 }
 
-func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, smser *SMSerMock) *model.Auth {
+func newAuth(t *testing.T, db *DBHelperMock, oa *OAuthHandlerMock, smser model.SMSer) *model.Auth {
 	var err error
 	tokenGen, err = token.NewJWTHandler(conf.Token)
 	if err != nil {
 		t.Fatalf("token.NewGenerator(): %v", err)
 	}
-	a, err := model.New(tokenGen, db, smser, model.WithFB(oa))
+	a, err := model.New(tokenGen, db, model.WithSMSer(smser), model.WithFB(oa))
 	if err != nil {
 		t.Fatalf("auth.New(): %v", err)
 	}

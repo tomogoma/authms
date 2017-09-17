@@ -37,11 +37,6 @@ type ServiceConfig struct {
 	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
 }
 
-type VerificationConfig struct {
-	MessageFmt      string        `json:"messageFormat" yaml:"messageFormat"`
-	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
-}
-
 type TwilioConfig struct {
 	ID           string `json:"ID" yaml:"ID"`
 	SenderPhone  string `json:"senderPhone" yaml:"senderPhone"`
@@ -57,8 +52,9 @@ type SMSConfig struct {
 	TestNumber     string               `json:"testNumber" yaml:"testNumber"`
 	Twilio         TwilioConfig         `json:"twilio" yaml:"twilio"`
 	AfricasTalking AfricasTalkingConfig `json:"africasTalking" yaml:"africasTalking"`
-	Verification   VerificationConfig   `json:"verification" yaml:"verification"`
 	ActiveAPI      string               `json:"activeAPI" yaml:"activeAPI"`
+	MessageFmt      string        `json:"messageFormat" yaml:"messageFormat"`
+	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
 }
 
 type Facebook struct {

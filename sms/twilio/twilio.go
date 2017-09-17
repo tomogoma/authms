@@ -42,7 +42,6 @@ type SMSCl struct {
 	token       string
 	id          string
 	senderPhone string
-	errors.NotImplErrCheck
 }
 
 func NewSMSCl(id, token, senderPhone string) (*SMSCl, error) {

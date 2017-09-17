@@ -43,7 +43,6 @@ type SMSCl struct {
 	atSendURL string
 	userName  string
 	apiKey    string
-	errors.NotImplErrCheck
 }
 
 func SendURL(URL string) func(at *SMSCl) {

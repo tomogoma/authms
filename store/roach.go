@@ -10,6 +10,8 @@ import (
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/lib/pq"
+	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
@@ -346,6 +348,57 @@ func (r *Roach) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
+func (r *Roach) UpsertLoginVerification(lv model.LoginVerification) (model.LoginVerification, error) {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
+		return lv, err
+	}
+	if lv.ID == "" {
+		lv.ID = genID()
+	}
+	q := `
+	UPSERT INTO authVerifications (id, type, subjectValue, userID,
+			codeHash, isUsed, issueDate, expiryDate)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`
+	rslt, err := r.db.Exec(q, lv.ID, lv.Type, lv.SubjectValue, lv.UserID, lv.CodeHash,
+		lv.IsUsed, lv.Issue, lv.Expiry)
+	return lv, checkRowsAffected(rslt, err, 1)
+}
+
+func (r *Roach) GetLoginVerifications(vType string, userID, offset, count int64) ([]model.LoginVerification, error) {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
+		return nil, err
+	}
+	q := `
+	SELECT id, type, subjectValue, userID, codeHash, isUsed, issueDate, expiryDate
+		FROM authVerifications
+		WHERE type=$1 AND userID=$2
+		LIMIT $3 OFFSET $4
+	`
+	rows, err := r.db.Query(q, vType, userID, count, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	lvs := make([]model.LoginVerification, 0)
+	for rows.Next() {
+		lv := model.LoginVerification{}
+		err = rows.Scan(&lv.ID, &lv.Type, &lv.SubjectValue, &lv.UserID, &lv.CodeHash,
+			&lv.IsUsed, &lv.Issue, &lv.Expiry)
+		if err != nil {
+			return nil, errors.Newf("scan row: %v", err)
+		}
+		lvs = append(lvs, lv)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, errors.Newf("iterate resultset: %v", err)
+	}
+	if len(lvs) == 0 {
+		return nil, errors.NewNotFound("no verification found")
+	}
+	return lvs, nil
+}
+
 func (r *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
@@ -517,4 +570,8 @@ func validateHistory(h *authms.History) error {
 
 func hasValue(v *authms.Value) bool {
 	return v != nil && v.Value != ""
+}
+
+func genID() string {
+	return uuid.New()
 }
