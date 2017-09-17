@@ -44,19 +44,19 @@ func NewRoach(dsnF cockroach.DSNFormatter, pg PasswordGenerator) (*Roach, error)
 	return &Roach{dsnF: dsnF, gen: pg, isDBInitMutex: sync.Mutex{}}, nil
 }
 
-func (h *Roach) InitDBConnIfNotInitted() error {
+func (r *Roach) InitDBConnIfNotInitted() error {
 	var err error
-	h.db, err = cockroach.TryConnect(h.dsnF.FormatDSN(), h.db)
+	r.db, err = cockroach.TryConnect(r.dsnF.FormatDSN(), r.db)
 	if err != nil {
 		return errors.Newf("Failed to connect to db: %v", err)
 	}
-	return h.instantiate()
+	return r.instantiate()
 }
-func (m *Roach) SaveHistory(h *authms.History) error {
+func (r *Roach) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `
@@ -64,7 +64,7 @@ func (m *Roach) SaveHistory(h *authms.History) error {
 		VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP())
 		 RETURNING id
 	`
-	err := m.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
+	err := r.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
 		h.DevID, h.IpAddress).Scan(&h.ID)
 	if err != nil {
 		return errors.Newf("error inserting history: %v", err)
@@ -72,8 +72,8 @@ func (m *Roach) SaveHistory(h *authms.History) error {
 	return nil
 }
 
-func (m *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+func (r *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return nil, err
 	}
 	acMFilter := ""
@@ -94,16 +94,16 @@ func (m *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*
 		ORDER BY date DESC
 		LIMIT $2 OFFSET $3
 	`, acMFilter)
-	r, err := m.db.Query(q, userID, count, offset)
+	rows, err := r.db.Query(q, userID, count, offset)
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
+	defer rows.Close()
 	hists := make([]*authms.History, 0)
-	for r.Next() {
+	for rows.Next() {
 		var devID, ipAddr sql.NullString
 		d := &authms.History{}
-		err = r.Scan(&d.ID, &d.AccessType, &d.SuccessStatus, &d.UserID,
+		err = rows.Scan(&d.ID, &d.AccessType, &d.SuccessStatus, &d.UserID,
 			&d.Date, &devID, &ipAddr)
 		d.DevID = devID.String
 		d.IpAddress = ipAddr.String
@@ -113,25 +113,25 @@ func (m *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*
 		}
 		hists = append(hists, d)
 	}
-	if err := r.Err(); err != nil {
+	if err := rows.Err(); err != nil {
 		return nil, errors.Newf("error iterating resultset: %v", err)
 	}
 	return hists, nil
 }
-func (m *Roach) SaveUser(u *authms.User) error {
+func (r *Roach) SaveUser(u *authms.User) error {
 	if u == nil {
 		return errors.New("user was nil")
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
-	passHB, err := m.getPasswordHash(u)
+	passHB, err := r.getPasswordHash(u)
 	if err != nil {
 		return err
 	}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFunc()
-	err = crdb.ExecuteTx(ctx, m.db, nil, func(tx *sql.Tx) error {
+	err = crdb.ExecuteTx(ctx, r.db, nil, func(tx *sql.Tx) error {
 		userqStr := `INSERT INTO users (password, createDate)
 	 		VALUES ($1, CURRENT_TIMESTAMP()) RETURNING id`
 		err := tx.QueryRow(userqStr, passHB).Scan(&u.ID)
@@ -175,35 +175,35 @@ func (m *Roach) SaveUser(u *authms.User) error {
 	return err
 }
 
-func (m *Roach) UserExists(u *authms.User) (int64, error) {
+func (r *Roach) UserExists(u *authms.User) (int64, error) {
 	userID := int64(-1)
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return userID, err
 	}
 	if u.UserName != "" {
 		q := `SELECT userID FROM userNames WHERE userName=$1`
-		err := m.db.QueryRow(q, u.UserName).Scan(&userID)
+		err := r.db.QueryRow(q, u.UserName).Scan(&userID)
 		if err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	if hasValue(u.Email) {
 		q := `SELECT userID FROM emails WHERE email=$1`
-		err := m.db.QueryRow(q, u.Email.Value).Scan(&userID)
+		err := r.db.QueryRow(q, u.Email.Value).Scan(&userID)
 		if err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	if hasValue(u.Phone) {
 		q := `SELECT userID FROM phones WHERE phone=$1`
-		err := m.db.QueryRow(q, u.Phone.Value).Scan(&userID)
+		err := r.db.QueryRow(q, u.Phone.Value).Scan(&userID)
 		if err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	for _, oAuth := range u.OAuths {
 		q := `SELECT userID FROM appUserIDs WHERE appName=$1 AND appUserID=$2`
-		err := m.db.QueryRow(q, oAuth.AppName, oAuth.AppUserID).Scan(&userID)
+		err := r.db.QueryRow(q, oAuth.AppName, oAuth.AppUserID).Scan(&userID)
 		if err != sql.ErrNoRows {
 			return userID, err
 		}
@@ -211,31 +211,31 @@ func (m *Roach) UserExists(u *authms.User) (int64, error) {
 	return -1, nil
 }
 
-func (m *Roach) GetByUserName(uName, pass string) (*authms.User, error) {
+func (r *Roach) GetByUserName(uName, pass string) (*authms.User, error) {
 	where := "usernames.userName = $1"
-	usr, err := m.get(where, uName)
-	return m.validateFetchedUser(usr, err, pass)
+	usr, err := r.get(where, uName)
+	return r.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Roach) GetByPhone(phone, pass string) (*authms.User, error) {
+func (r *Roach) GetByPhone(phone, pass string) (*authms.User, error) {
 	where := `phones.phone = $1`
-	usr, err := m.get(where, phone)
-	return m.validateFetchedUser(usr, err, pass)
+	usr, err := r.get(where, phone)
+	return r.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Roach) GetByEmail(email, pass string) (*authms.User, error) {
+func (r *Roach) GetByEmail(email, pass string) (*authms.User, error) {
 	where := `emails.email = $1`
-	usr, err := m.get(where, email)
-	return m.validateFetchedUser(usr, err, pass)
+	usr, err := r.get(where, email)
+	return r.validateFetchedUser(usr, err, pass)
 }
 
-func (m *Roach) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
+func (r *Roach) GetByAppUserID(appName, appUserID string) (*authms.User, error) {
 	usr := &authms.User{}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return usr, err
 	}
 	query := `SELECT userID FROM appUserIDs WHERE appName = $1 AND appUserID = $2`
-	err := m.db.QueryRow(query, appName, appUserID).Scan(&usr.ID)
+	err := r.db.QueryRow(query, appName, appUserID).Scan(&usr.ID)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			return usr, err
@@ -243,116 +243,116 @@ func (m *Roach) GetByAppUserID(appName, appUserID string) (*authms.User, error) 
 		return usr, ErrorPasswordMismatch
 	}
 	where := "users.id=$1"
-	return m.get(where, usr.ID)
+	return r.get(where, usr.ID)
 }
 
-func (m *Roach) UpdateUserName(userID int64, newUserName string) error {
+func (r *Roach) UpdateUserName(userID int64, newUserName string) error {
 	if newUserName == "" {
 		return errors.New("the userName provided was invlaid")
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM userNames WHERE userID=$1`
 	var count int
-	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
+	if err := r.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has usernae: %s", err)
 	}
 	if count == 0 {
 		q = `INSERT INTO userNames (userID, userName, createDate)
 		 		VALUES ($1, $2, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, newUserName)
+		rslt, err := r.db.Exec(q, userID, newUserName)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE userNames
 		 	SET userName=$1, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$2`
-	rslt, err := m.db.Exec(q, newUserName, userID)
+	rslt, err := r.db.Exec(q, newUserName, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Roach) UpdateAppUserID(userID int64, new *authms.OAuth) error {
+func (r *Roach) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	if new == nil {
 		return errors.New("new OAuth was nil")
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM appUserIDs WHERE userID=$1 AND appName=$2`
 	var count int
-	if err := m.db.QueryRow(q, userID, new.AppName).Scan(&count); err != nil {
+	if err := r.db.QueryRow(q, userID, new.AppName).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
 	if count == 0 {
 		q = `INSERT INTO appUserIDs (userID, appUserID, appName, validated, createDate)
 	 		VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, new.AppUserID, new.AppName, new.Verified)
+		rslt, err := r.db.Exec(q, userID, new.AppUserID, new.AppName, new.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE appUserIDs
 		 	SET appUserID=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3 AND appName=$4`
-	rslt, err := m.db.Exec(q, new.AppUserID, new.Verified, userID, new.AppName)
+	rslt, err := r.db.Exec(q, new.AppUserID, new.Verified, userID, new.AppName)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Roach) UpdateEmail(userID int64, newEmail *authms.Value) error {
+func (r *Roach) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	if !hasValue(newEmail) {
 		return errors.New("the email provided was invlaid")
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM emails WHERE userID=$1`
 	var count int
-	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
+	if err := r.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has email: %s", err)
 	}
 	if count == 0 {
 		q = `INSERT INTO emails (userID, email, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, newEmail.Value, newEmail.Verified)
+		rslt, err := r.db.Exec(q, userID, newEmail.Value, newEmail.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE emails
 		 	SET email=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3`
-	rslt, err := m.db.Exec(q, newEmail.Value, newEmail.Verified, userID)
+	rslt, err := r.db.Exec(q, newEmail.Value, newEmail.Verified, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Roach) UpdatePhone(userID int64, newPhone *authms.Value) error {
+func (r *Roach) UpdatePhone(userID int64, newPhone *authms.Value) error {
 	if !hasValue(newPhone) {
 		return errors.New("the phone provided was invlaid")
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT COUNT(id) FROM phones WHERE userID=$1`
 	var count int
-	if err := m.db.QueryRow(q, userID).Scan(&count); err != nil {
+	if err := r.db.QueryRow(q, userID).Scan(&count); err != nil {
 		return fmt.Errorf("error checking if user has phone: %s", err)
 	}
 	if count == 0 {
 		q = `INSERT INTO phones (userID, phone, validated, createDate)
 		 		VALUES ($1, $2, $3, CURRENT_TIMESTAMP())`
-		rslt, err := m.db.Exec(q, userID, newPhone.Value, newPhone.Verified)
+		rslt, err := r.db.Exec(q, userID, newPhone.Value, newPhone.Verified)
 		return checkRowsAffected(rslt, err, 1)
 	}
 	q = `UPDATE phones
 		 	SET phone=$1, validated=$2, updateDate=CURRENT_TIMESTAMP()
 		 	WHERE userID=$3`
-	rslt, err := m.db.Exec(q, newPhone.Value, newPhone.Verified, userID)
+	rslt, err := r.db.Exec(q, newPhone.Value, newPhone.Verified, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error {
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+func (r *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	q := `SELECT password FROM users WHERE id=$1`
 	var actPassHB []byte
-	err := m.db.QueryRow(q, userID).Scan(&actPassHB)
+	err := r.db.QueryRow(q, userID).Scan(&actPassHB)
 	if err != nil {
 		if err != sql.ErrNoRows {
 			log.Println("not found")
@@ -370,33 +370,33 @@ func (m *Roach) UpdatePassword(userID int64, oldPass, newPassword string) error 
 	q = `UPDATE users
 			SET password=$1, updateDate=CURRENT_TIMESTAMP()
 	 		WHERE id=$2`
-	rslt, err := m.db.Exec(q, passHB, userID)
+	rslt, err := r.db.Exec(q, passHB, userID)
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (m *Roach) IsDuplicateError(err error) bool {
+func (r *Roach) IsDuplicateError(err error) bool {
 	pqErr, ok := err.(*pq.Error)
 	return ok && pqErr.Code == "23505"
 }
 
-func (m *Roach) validateFetchedUser(usr *authms.User, getErr error, pass string) (
+func (r *Roach) validateFetchedUser(usr *authms.User, getErr error, pass string) (
 	*authms.User, error) {
 	if getErr != nil {
 		return usr, getErr
 	}
-	if getErr = m.validatePassword(usr.ID, pass); getErr != nil {
+	if getErr = r.validatePassword(usr.ID, pass); getErr != nil {
 		return usr, getErr
 	}
 	return usr, nil
 }
 
-func (m *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error) {
+func (r *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error) {
 	usr := &authms.User{
 		Email:  &authms.Value{},
 		Phone:  &authms.Value{},
 		OAuths: make(map[string]*authms.OAuth),
 	}
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return usr, err
 	}
 	query := `
@@ -411,7 +411,7 @@ func (m *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error
 	query = fmt.Sprintf("%s%s", query, where)
 	var dbUserName, dbPhone, dbEmail sql.NullString
 	var dbPhoneValidated, dbEmailValidated sql.NullBool
-	err := m.db.QueryRow(query, whereArgs...).Scan(&usr.ID, &dbUserName,
+	err := r.db.QueryRow(query, whereArgs...).Scan(&usr.ID, &dbUserName,
 		&dbPhone, &dbPhoneValidated, &dbEmail, &dbEmailValidated)
 	usr.UserName = dbUserName.String
 	usr.Phone.Value = dbPhone.String
@@ -425,7 +425,7 @@ func (m *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error
 		return usr, ErrorPasswordMismatch
 	}
 	query = `SELECT appUserID, appName, validated FROM appUserIDs WHERE userID=$1`
-	rslt, err := m.db.Query(query, usr.ID)
+	rslt, err := r.db.Query(query, usr.ID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return usr, nil
@@ -445,13 +445,13 @@ func (m *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error
 	return usr, nil
 }
 
-func (m *Roach) validatePassword(id int64, password string) error {
-	if err := m.InitDBConnIfNotInitted(); err != nil {
+func (r *Roach) validatePassword(id int64, password string) error {
+	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
 	userQ := `SELECT password FROM users WHERE id = $1`
 	var dbPassword []byte
-	err := m.db.QueryRow(userQ, id).Scan(&dbPassword)
+	err := r.db.QueryRow(userQ, id).Scan(&dbPassword)
 	if err != nil {
 		return err
 	}
@@ -464,10 +464,10 @@ func (m *Roach) validatePassword(id int64, password string) error {
 	return err
 }
 
-func (m *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
+func (r *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
 	passStr := u.Password
 	if passStr == "" {
-		passB, err := m.gen.SecureRandomBytes(36)
+		passB, err := r.gen.SecureRandomBytes(36)
 		if err != nil {
 			return nil, errors.Newf("error generating password: %v",
 				err)
@@ -477,16 +477,16 @@ func (m *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
 	return bcrypt.GenerateFromPassword([]byte(passStr), bcrypt.DefaultCost)
 }
 
-func (h *Roach) instantiate() error {
-	h.isDBInitMutex.Lock()
-	defer h.isDBInitMutex.Unlock()
-	if h.isDBInit {
+func (r *Roach) instantiate() error {
+	r.isDBInitMutex.Lock()
+	defer r.isDBInitMutex.Unlock()
+	if r.isDBInit {
 		return nil
 	}
-	if err := cockroach.InstantiateDB(h.db, h.dsnF.DBName(), AllTableDescs...); err != nil {
+	if err := cockroach.InstantiateDB(r.db, r.dsnF.DBName(), AllTableDescs...); err != nil {
 		return errors.Newf("error instantiating db: %v", err)
 	}
-	h.isDBInit = true
+	r.isDBInit = true
 	return nil
 }
 
