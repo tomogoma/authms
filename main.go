@@ -76,43 +76,9 @@ func main() {
 	if err := db.InitDBConnIfNotInitted(); err != nil {
 		lg.Warn("Error initiating connection to db: %v", err)
 	}
-	var s verification.SMSer
-	if conf.SMS.ActiveAPI != "" {
-		switch conf.SMS.ActiveAPI {
-		case config.SMSAPIAfricasTalking:
-			apiKey, err := readFile(conf.SMS.AfricasTalking.APIKeyFile)
-			if err != nil {
-				lg.Critical("Africa's talking API key: %v", err)
-				return
-			}
-			s, err = sms.NewAfricasTalking(conf.SMS.AfricasTalking.UserName, apiKey)
-		case config.SMSAPITwilio:
-			tkn, err := readFile(conf.SMS.Twilio.TokenKeyFile)
-			if err != nil {
-				lg.Critical("Twilio token: %v", err)
-				return
-			}
-			s, err = sms.NewTwilio(conf.SMS.Twilio.ID, tkn, conf.SMS.Twilio.SenderPhone)
-		default:
-			lg.Critical("Invalid SMS API selected can be africasTalking or twilio")
-			return
-		}
-		var testMessage string
-		if hostName, err := os.Hostname(); err == nil {
-			testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
-		} else {
-			testMessage = "The SMS API is being used on an unknown host"
-		}
-		if err := s.SMS(conf.SMS.TestNumber, testMessage); err != nil {
-			lg.Warn("Error sending test SMS during start up: %v", err)
-		}
-	} else {
-		s = &sms.Stub{}
-	}
+	s, err := smsAPIOrStub(conf.SMS)
 	if err != nil {
-		lg.Critical("Error instantiating %s API client: %v",
-			conf.SMS.ActiveAPI, err)
-		return
+		lg.Warn("Error instantiating SMS API: %v", conf.SMS.ActiveAPI, err)
 	}
 	ng, err := generator.NewRandom(generator.NumberChars)
 	if err != nil {
@@ -125,25 +91,15 @@ func main() {
 		lg.Critical("Error instantiating SMS code verifier: %v", err)
 		return
 	}
-	authOpts := make([]auth.Option, 0)
-	if conf.Authentication.Facebook.ID > 0 {
-		fbSecret, err := readFile(conf.Authentication.Facebook.SecretFilePath)
-		if err != nil {
-			lg.Critical("Error reading facebook secret file: %v", err)
-			return
-		}
-		fb, err := facebook.New(conf.Authentication.Facebook.ID, fbSecret)
-		if err != nil {
-			lg.Critical("Error instantiating facebook OAuth: %v", err)
-			return
-		}
-		authOpts = append(authOpts, auth.WithFB(fb))
-	}
-	a, err := auth.New(tg, lg, db, pv, authOpts...)
 	if err != nil {
 		lg.Critical("Error instantiating auth module: %s", err)
 		return
 	}
+	oAuthOpts, err := oAuthOptions(conf.Authentication)
+	if err != nil {
+		lg.Warn("Authentication options: %v", conf.SMS.ActiveAPI, err)
+	}
+	a, err := auth.New(tg, lg, db, pv, oAuthOpts...)
 	serverRPCQuitCh := make(chan error)
 	serverHttpQuitCh := make(chan error)
 	rpcSrv, err := rpc.New(config.CanonicalName, a, lg)
@@ -166,6 +122,62 @@ func main() {
 	case err = <-serverRPCQuitCh:
 		lg.Critical("rpc server quit with error: %v", err)
 	}
+}
+
+func oAuthOptions(conf config.Auth) ([]auth.Option, error) {
+	authOpts := make([]auth.Option, 0)
+	if conf.Facebook.ID > 0 {
+		fbSecret, err := readFile(conf.Facebook.SecretFilePath)
+		if err != nil {
+			return authOpts, errors.Newf("facebook secret file: %v", err)
+		}
+		fb, err := facebook.New(conf.Facebook.ID, fbSecret)
+		if err != nil {
+			return authOpts, errors.Newf("facebook client: %v", err)
+		}
+		authOpts = append(authOpts, auth.WithFB(fb))
+	}
+	return authOpts, nil
+}
+
+func smsAPIOrStub(conf config.SMSConfig) (verification.SMSer, error) {
+	if conf.ActiveAPI == "" {
+		return &sms.Stub{}, nil
+	}
+	var s verification.SMSer
+	switch conf.ActiveAPI {
+	case config.SMSAPIAfricasTalking:
+		apiKey, err := readFile(conf.AfricasTalking.APIKeyFile)
+		if err != nil {
+			return &sms.Stub{}, fmt.Errorf("africa's talking API key: %v", err)
+		}
+		s, err = sms.NewAfricasTalking(conf.AfricasTalking.UserName, apiKey)
+		if err != nil {
+			return &sms.Stub{}, fmt.Errorf("africasTalking: %v", err)
+		}
+	case config.SMSAPITwilio:
+		tkn, err := readFile(conf.Twilio.TokenKeyFile)
+		if err != nil {
+			return &sms.Stub{}, fmt.Errorf("twilio token: %v", err)
+		}
+		s, err = sms.NewTwilio(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
+		if err != nil {
+			return &sms.Stub{}, fmt.Errorf("twilio: %v", err)
+		}
+	default:
+		return &sms.Stub{}, fmt.Errorf("invalid API selected can be %s or %s",
+			config.SMSAPIAfricasTalking, config.SMSAPITwilio)
+	}
+	var testMessage string
+	if hostName, err := os.Hostname(); err == nil {
+		testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
+	} else {
+		testMessage = "The SMS API is being used on an unknown host"
+	}
+	if err := s.SMS(conf.TestNumber, testMessage); err != nil {
+		return s, fmt.Errorf("test SMS: %v", err)
+	}
+	return s, nil
 }
 
 func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Server, quitCh chan error) {
