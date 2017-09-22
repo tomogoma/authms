@@ -198,7 +198,7 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if user.Email != nil {
 		user.Email.Verified = false
 	}
-	if err := a.checkUserExists(user); err != nil {
+	if err := a.authAvailableForUser(user); err != nil {
 		return err
 	}
 	err := a.dbHelper.SaveUser(user)
@@ -228,7 +228,7 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	}
 	user.Phone.Value = formatPhone(user.Phone.Value)
 	user.Phone.Verified = false
-	if err := a.checkUserExists(user); err != nil {
+	if err := a.authAvailableForUser(user); err != nil {
 		return err
 	}
 	err = a.dbHelper.UpdatePhone(user.ID, user.Phone)
@@ -254,7 +254,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 		return nil, err
 	}
 	req.Phone = formatPhone(req.Phone)
-	err = a.checkUserExists(&authms.User{
+	err = a.authAvailableForUser(&authms.User{
 		ID:    req.UserID,
 		Phone: &authms.Value{Value: req.Phone},
 	})
@@ -374,7 +374,7 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 		return errors.NewClient("device ID was empty")
 	}
 	oa.Verified = true
-	if err := a.checkUserExists(user); err != nil {
+	if err := a.authAvailableForUser(user); err != nil {
 		return err
 	}
 	err = a.dbHelper.UpdateAppUserID(user.ID, oa)
@@ -436,12 +436,15 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 	return usr, nil
 }
 
-func (a *Auth) checkUserExists(user *authms.User) error {
+func (a *Auth) authAvailableForUser(user *authms.User) error {
 	existUsrID, err := a.dbHelper.UserExists(user)
 	if err != nil {
-		return errors.Newf("error checking if user exists: %v", err)
+		if a.dbHelper.IsNotFoundError(err) {
+			return nil
+		}
+		return errors.Newf("checking user exists: %v", err)
 	}
-	if existUsrID >= 1 && user.ID != existUsrID {
+	if user.ID != existUsrID {
 		return errors.NewClient("A user with some of the provided" +
 			" credentials already exists")
 	}
@@ -480,8 +483,8 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	usr.Token = tkn
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
 		AccessLogin)
-	if loginErr != nil {
-		loginErr = errors.Newf("error fetching login history: %v", loginErr)
+	if loginErr != nil && !a.dbHelper.IsNotFoundError(loginErr) {
+		loginErr = errors.Newf("fetch login history: %v", loginErr)
 		return loginErr
 	}
 	usr.LoginHistory = prevLogins

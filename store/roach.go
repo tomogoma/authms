@@ -54,6 +54,7 @@ func (r *Roach) InitDBConnIfNotInitted() error {
 	}
 	return r.instantiate()
 }
+
 func (r *Roach) SaveHistory(h *authms.History) error {
 	if err := validateHistory(h); err != nil {
 		return err
@@ -69,7 +70,7 @@ func (r *Roach) SaveHistory(h *authms.History) error {
 	err := r.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
 		h.DevID, h.IpAddress).Scan(&h.ID)
 	if err != nil {
-		return errors.Newf("error inserting history: %v", err)
+		return err
 	}
 	return nil
 }
@@ -110,16 +111,19 @@ func (r *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*
 		d.DevID = devID.String
 		d.IpAddress = ipAddr.String
 		if err != nil {
-			return nil, errors.Newf("error scanning result row: %v",
-				err)
+			return nil, errors.Newf("scanning row: %v", err)
 		}
 		hists = append(hists, d)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, errors.Newf("error iterating resultset: %v", err)
+		return nil, errors.Newf("iterating resultset: %v", err)
+	}
+	if len(hists) == 0 {
+		return nil, errors.NewNotFound("no history item found")
 	}
 	return hists, nil
 }
+
 func (r *Roach) SaveUser(u *authms.User) error {
 	if u == nil {
 		return errors.New("user was nil")
@@ -177,40 +181,48 @@ func (r *Roach) SaveUser(u *authms.User) error {
 	return err
 }
 
+// returns userID for existence of identifier in the db for any of the user types
+// otherwise returns an error.
+// Roach#IsNotFoundError(err) returns true if on the returned error if the user
+// does not exist.
 func (r *Roach) UserExists(u *authms.User) (int64, error) {
 	userID := int64(-1)
-	if err := r.InitDBConnIfNotInitted(); err != nil {
+	var err error
+	if err = r.InitDBConnIfNotInitted(); err != nil {
 		return userID, err
 	}
 	if u.UserName != "" {
 		q := `SELECT userID FROM userNames WHERE userName=$1`
-		err := r.db.QueryRow(q, u.UserName).Scan(&userID)
-		if err != sql.ErrNoRows {
+		err = r.db.QueryRow(q, u.UserName).Scan(&userID)
+		if err == nil || err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	if hasValue(u.Email) {
 		q := `SELECT userID FROM emails WHERE email=$1`
-		err := r.db.QueryRow(q, u.Email.Value).Scan(&userID)
-		if err != sql.ErrNoRows {
+		err = r.db.QueryRow(q, u.Email.Value).Scan(&userID)
+		if err == nil || err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	if hasValue(u.Phone) {
 		q := `SELECT userID FROM phones WHERE phone=$1`
-		err := r.db.QueryRow(q, u.Phone.Value).Scan(&userID)
-		if err != sql.ErrNoRows {
+		err = r.db.QueryRow(q, u.Phone.Value).Scan(&userID)
+		if err == nil || err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
 	for _, oAuth := range u.OAuths {
 		q := `SELECT userID FROM appUserIDs WHERE appName=$1 AND appUserID=$2`
-		err := r.db.QueryRow(q, oAuth.AppName, oAuth.AppUserID).Scan(&userID)
-		if err != sql.ErrNoRows {
+		err = r.db.QueryRow(q, oAuth.AppName, oAuth.AppUserID).Scan(&userID)
+		if err == nil || err != sql.ErrNoRows {
 			return userID, err
 		}
 	}
-	return -1, nil
+	if err == sql.ErrNoRows {
+		return userID, errors.NewNotFound("User does not exist")
+	}
+	return userID, nil
 }
 
 func (r *Roach) GetByUserName(uName, pass string) (*authms.User, error) {
@@ -481,9 +493,6 @@ func (r *Roach) get(where string, whereArgs ...interface{}) (*authms.User, error
 	query = `SELECT appUserID, appName, validated FROM appUserIDs WHERE userID=$1`
 	rslt, err := r.db.Query(query, usr.ID)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return usr, nil
-		}
 		return usr, err
 	}
 	for rslt.Next() {

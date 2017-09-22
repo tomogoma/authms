@@ -61,11 +61,12 @@ func (s *SMSerMock) SMS(toPhone, message string) error {
 }
 
 type DBHelperMock struct {
+	errors.NotFoundErrCheck
 	ExpErr                     error
+	ExpHistErr                 error
 	ExpUser                    *authms.User
 	ExpHist                    []*authms.History
 	ExpUserID                  int64
-	ExpIsNotFound              bool
 	SaveUserCalled             bool
 	SaveHistoryCalled          bool
 	GetUserCalled              bool
@@ -118,14 +119,11 @@ func (d *DBHelperMock) GetLoginVerifications(verificationType string, userID, of
 }
 
 func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error) {
-	return d.ExpHist, d.ExpErr
+	return d.ExpHist, d.ExpHistErr
 }
 func (d *DBHelperMock) SaveHistory(*authms.History) error {
 	d.SaveHistoryCalled = true
 	return d.ExpErr
-}
-func (d *DBHelperMock) IsNotFoundError(err error) bool {
-	return d.ExpIsNotFound
 }
 func (d *DBHelperMock) IsDuplicateError(err error) bool {
 	return d.ExpIsDuplicate
@@ -837,6 +835,7 @@ func TestAuth_UpdatePassword(t *testing.T) {
 }
 
 func TestAuth_LoginOAuth(t *testing.T) {
+	setUp(t)
 	type LoginOAuthTestCase struct {
 		ExpErr    bool
 		Desc      string
@@ -846,19 +845,44 @@ func TestAuth_LoginOAuth(t *testing.T) {
 		DevID     string
 	}
 	cases := []LoginOAuthTestCase{
-		{Desc: "Valid Creds", ExpErr: false,
+		{
+			Desc: "Valid Creds", ExpErr: false,
 			DBHelper: &DBHelperMock{ExpUser: &authms.User{ID: 123}},
-			OAHandler: &OAuthHandlerMock{ExpValTknClld: true,
-				AppUserID: "test-app-user-id", ExpValid: true},
-			OAuth: &authms.OAuth{AppName: "facebook", AppUserID: "test-app-user-id"}, DevID: "Tes-devID"},
-		{Desc: "Invalid OAuth Creds", ExpErr: true,
+			OAHandler: &OAuthHandlerMock{
+				ExpValTknClld: true,
+				AppUserID:     "test-app-user-id",
+				ExpValid:      true,
+			},
+			OAuth: &authms.OAuth{AppName: "facebook", AppUserID: "test-app-user-id"},
+			DevID: "Tes-devID",
+		},
+		{
+			Desc: "Valid Creds (no history found)", ExpErr: false,
+			DBHelper: &DBHelperMock{
+				ExpUser:    &authms.User{ID: 123},
+				ExpHistErr: errors.NewNotFound("none found"),
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpValTknClld: true,
+				AppUserID:     "test-app-user-id",
+				ExpValid:      true,
+			},
+			OAuth: &authms.OAuth{AppName: "facebook", AppUserID: "test-app-user-id"},
+			DevID: "Tes-devID",
+		},
+		{
+			Desc: "Invalid OAuth Creds", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: true, ExpErr: errors.New("")},
-			OAuth:     &authms.OAuth{AppName: "facebook"}, DevID: "Tes-devID"},
-		{Desc: "Nil OAuth", ExpErr: true,
+			OAuth:     &authms.OAuth{AppName: "facebook"},
+			DevID:     "Tes-devID",
+		},
+		{
+			Desc: "Nil OAuth", ExpErr: true,
 			DBHelper:  &DBHelperMock{T: t},
 			OAHandler: &OAuthHandlerMock{ExpValTknClld: false, ExpErr: errors.New("")},
-			OAuth:     nil, DevID: "Tes-devID"},
+			OAuth:     nil, DevID: "Tes-devID",
+		},
 	}
 	for _, c := range cases {
 		func() {

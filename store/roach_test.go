@@ -139,17 +139,31 @@ func TestModel_SaveHistory(t *testing.T) {
 
 func TestModel_GetHistory(t *testing.T) {
 	type TestCase struct {
-		Desc string
-		Hist *authms.History
+		Desc        string
+		Hist        *authms.History
+		AccessType  string
+		ExpNotFound bool
 	}
+	ch := completeHistory(1)
 	tcs := []TestCase{
-		{Desc: "All values provided", Hist: completeHistory(1)},
+		{
+			Desc:       "All values provided",
+			Hist:       ch,
+			AccessType: ch.AccessType,
+		},
 		{
 			Desc: "Missing devID, IP Addr",
 			Hist: &authms.History{
 				AccessType:    "LOGIN",
 				SuccessStatus: true,
 			},
+			AccessType: "LOGIN",
+		},
+		{
+			Desc:        "All values provided, not found",
+			Hist:        ch,
+			AccessType:  "None exist access type",
+			ExpNotFound: true,
 		},
 	}
 	for _, tc := range tcs {
@@ -174,7 +188,13 @@ func TestModel_GetHistory(t *testing.T) {
 			offset := 0
 			count := 1
 			hists, err := m.GetHistory(tc.Hist.UserID, offset,
-				count, tc.Hist.AccessType)
+				count, tc.AccessType)
+			if tc.ExpNotFound {
+				if !m.IsNotFoundError(err) {
+					t.Fatalf("Expected a not found error but got %v", err)
+				}
+				return
+			}
 			if err != nil {
 				t.Errorf("%s - model.GetHistory(): %s", tc.Desc, err)
 				return
@@ -281,68 +301,139 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 
 func TestDBHelper_UserExists(t *testing.T) {
 	type TestCase struct {
-		Desc       string
-		InsertUser *authms.User
-		TestUser   *authms.User
-		ExpExists  bool
+		Desc            string
+		InsertUser      *authms.User
+		CheckUserExists *authms.User
+		ExpNotExists    bool
 	}
 	cmpltUsr := completeUser()
 	tcs := []TestCase{
 		{
-			Desc:       "Not exist",
-			InsertUser: nil,
-			TestUser:   cmpltUsr,
-			ExpExists:  false,
+			Desc:            "Not exist",
+			InsertUser:      nil,
+			CheckUserExists: cmpltUsr,
+			ExpNotExists:    true,
+		},
+		{
+			Desc:       "Not exist (no field found)",
+			InsertUser: cmpltUsr,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths: map[string]*authms.OAuth{
+					completeUserAppName: {
+						AppName:   completeUserAppName,
+						AppUserID: "none-exist-user-id",
+					},
+				},
+			},
+			ExpNotExists: true,
+		},
+		{
+			Desc:       "Not exist (empty OAuths)",
+			InsertUser: cmpltUsr,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths:   map[string]*authms.OAuth{},
+			},
+			ExpNotExists: true,
+		},
+		{
+			Desc:       "Not exist (nil OAuths)",
+			InsertUser: cmpltUsr,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths:   nil,
+			},
+			ExpNotExists: true,
 		},
 		{
 			Desc:       "UserName Exists",
 			InsertUser: cmpltUsr,
-			TestUser:   &authms.User{UserName: cmpltUsr.UserName},
-			ExpExists:  true,
+			CheckUserExists: &authms.User{
+				UserName: cmpltUsr.UserName,
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths: map[string]*authms.OAuth{
+					completeUserAppName: {
+						AppName:   completeUserAppName,
+						AppUserID: "none-exist-user-id",
+					},
+				},
+			},
 		},
 		{
 			Desc:       "Phone Exists",
 			InsertUser: cmpltUsr,
-			TestUser:   &authms.User{Phone: cmpltUsr.Phone},
-			ExpExists:  true,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    cmpltUsr.Phone,
+				OAuths: map[string]*authms.OAuth{
+					completeUserAppName: {
+						AppName:   completeUserAppName,
+						AppUserID: "none-exist-user-id",
+					},
+				},
+			},
 		},
 		{
 			Desc:       "Email Exists",
 			InsertUser: cmpltUsr,
-			TestUser:   &authms.User{Email: cmpltUsr.Email},
-			ExpExists:  true,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    cmpltUsr.Email,
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths: map[string]*authms.OAuth{
+					completeUserAppName: {
+						AppName:   completeUserAppName,
+						AppUserID: "none-exist-user-id",
+					},
+				},
+			},
 		},
 		{
 			Desc:       "OAuth Exists",
 			InsertUser: cmpltUsr,
-			TestUser:   &authms.User{OAuths: cmpltUsr.OAuths},
-			ExpExists:  true,
+			CheckUserExists: &authms.User{
+				UserName: "none_exist_username",
+				Email:    &authms.Value{Value: "none@exist.email"},
+				Phone:    &authms.Value{Value: "+none-exist-phone"},
+				OAuths:   cmpltUsr.OAuths,
+			},
 		},
 	}
 	for _, tc := range tcs {
-		func() {
+		t.Run(tc.Desc, func(t *testing.T) {
 			setUp(t)
 			defer tearDown(t)
 			m := newModel(t)
 			if tc.InsertUser != nil {
 				insertUser(tc.InsertUser, t)
 			}
-			usrID, err := m.UserExists(tc.TestUser)
+			usrID, err := m.UserExists(tc.CheckUserExists)
+			if tc.ExpNotExists {
+				if !m.IsNotFoundError(err) {
+					t.Errorf("%s - expected not found error but got %v",
+						tc.Desc, err)
+				}
+				return
+			}
 			if err != nil {
 				t.Errorf("%s - store.UserExists(): %v",
 					tc.Desc, err)
 				return
 			}
-			if tc.ExpExists && usrID != tc.InsertUser.ID {
+			if usrID != tc.InsertUser.ID {
 				t.Errorf("%s - expected existing userID %d "+
-					"but got %d", tc.Desc, tc.InsertUser.ID,
-					usrID)
+					"but got %d", tc.Desc, tc.InsertUser.ID, usrID)
 			}
-			if !tc.ExpExists && usrID != -1 {
-				t.Errorf("%s - expected non-existing userID -1"+
-					" but got %d", tc.Desc, usrID)
-			}
-		}()
+		})
 	}
 }
 
