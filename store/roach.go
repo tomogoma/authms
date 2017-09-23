@@ -55,12 +55,9 @@ func (r *Roach) InitDBConnIfNotInitted() error {
 	return r.instantiate()
 }
 
-func (r *Roach) SaveHistory(h *authms.History) error {
-	if err := validateHistory(h); err != nil {
-		return err
-	}
+func (r *Roach) SaveHistory(h authms.History) (*authms.History, error) {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
-		return err
+		return nil, err
 	}
 	q := `
 	INSERT INTO history (userID, accessMethod, successful, devID, ipAddress, date)
@@ -70,9 +67,9 @@ func (r *Roach) SaveHistory(h *authms.History) error {
 	err := r.db.QueryRow(q, h.UserID, h.AccessType, h.SuccessStatus,
 		h.DevID, h.IpAddress).Scan(&h.ID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return &h, nil
 }
 
 func (r *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*authms.History, error) {
@@ -124,16 +121,13 @@ func (r *Roach) GetHistory(userID int64, offset, count int, acMs ...string) ([]*
 	return hists, nil
 }
 
-func (r *Roach) SaveUser(u *authms.User) error {
-	if u == nil {
-		return errors.New("user was nil")
-	}
+func (r *Roach) SaveUser(u authms.User) (*authms.User, error) {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
-		return err
+		return nil, err
 	}
 	passHB, err := r.getPasswordHash(u)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancelFunc()
@@ -178,14 +172,17 @@ func (r *Roach) SaveUser(u *authms.User) error {
 		}
 		return nil
 	})
-	return err
+	if err != nil {
+		return nil, err
+	}
+	return &u, nil
 }
 
 // returns userID for existence of identifier in the db for any of the user types
 // otherwise returns an error.
 // Roach#IsNotFoundError(err) returns true if on the returned error if the user
 // does not exist.
-func (r *Roach) UserExists(u *authms.User) (int64, error) {
+func (r *Roach) UserExists(u authms.User) (int64, error) {
 	userID := int64(-1)
 	var err error
 	if err = r.InitDBConnIfNotInitted(); err != nil {
@@ -285,10 +282,7 @@ func (r *Roach) UpdateUserName(userID int64, newUserName string) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (r *Roach) UpdateAppUserID(userID int64, new *authms.OAuth) error {
-	if new == nil {
-		return errors.New("new OAuth was nil")
-	}
+func (r *Roach) UpdateAppUserID(userID int64, new authms.OAuth) error {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
@@ -310,10 +304,7 @@ func (r *Roach) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (r *Roach) UpdateEmail(userID int64, newEmail *authms.Value) error {
-	if !hasValue(newEmail) {
-		return errors.New("the email provided was invlaid")
-	}
+func (r *Roach) UpdateEmail(userID int64, newEmail authms.Value) error {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
@@ -335,10 +326,7 @@ func (r *Roach) UpdateEmail(userID int64, newEmail *authms.Value) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (r *Roach) UpdatePhone(userID int64, newPhone *authms.Value) error {
-	if !hasValue(newPhone) {
-		return errors.New("the phone provided was invlaid")
-	}
+func (r *Roach) UpdatePhone(userID int64, newPhone authms.Value) error {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
 		return err
 	}
@@ -527,7 +515,7 @@ func (r *Roach) validatePassword(id int64, password string) error {
 	return err
 }
 
-func (r *Roach) getPasswordHash(u *authms.User) ([]byte, error) {
+func (r *Roach) getPasswordHash(u authms.User) ([]byte, error) {
 	passStr := u.Password
 	if passStr == "" {
 		passB, err := r.gen.SecureRandomBytes(36)

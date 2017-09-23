@@ -21,9 +21,9 @@ CREATE TABLE IF NOT EXISTS userNames (
 `
 	EmailsTblDesc = `
 CREATE TABLE IF NOT EXISTS emails (
-  userID     SERIAL             NOT NULL REFERENCES users (id),
-  id         SERIAL		NOT NULL,
-  email      STRING UNIQUE      NOT NULL,
+  userID     SERIAL             NOT NULL REFERENCES users (id) CHECK (userID > 0),
+  id         SERIAL		NOT NULL CHECK (id > 0),
+  email      STRING UNIQUE      NOT NULL CHECK (email != ''),
   validated  BOOL               NOT NULL DEFAULT FALSE,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
@@ -32,9 +32,9 @@ CREATE TABLE IF NOT EXISTS emails (
 `
 	PhonesTblDesc = `
 CREATE TABLE IF NOT EXISTS phones (
-  userID     SERIAL             NOT NULL REFERENCES users (id),
-  id         SERIAL		NOT NULL,
-  phone      STRING UNIQUE      NOT NULL,
+  userID     SERIAL             NOT NULL REFERENCES users (id) CHECK (userID > 0),
+  id         SERIAL		NOT NULL CHECK (id > 0),
+  phone      STRING UNIQUE      NOT NULL CHECK (phone != ''),
   validated  BOOL               NOT NULL DEFAULT FALSE,
   createDate TIMESTAMP          NOT NULL,
   updateDate TIMESTAMP          NOT NULL DEFAULT CURRENT_TIMESTAMP(),
@@ -58,10 +58,10 @@ CREATE TABLE IF NOT EXISTS appUserIDs (
 	// TODO add error column
 	HistoryTblDesc = `
 CREATE TABLE IF NOT EXISTS history (
-  userID       SERIAL             NOT NULL REFERENCES users (id),
-  id           SERIAL		  NOT NULL,
+  userID       SERIAL             NOT NULL REFERENCES users (id) CHECK (userID > 0),
+  id           SERIAL		  	NOT NULL CHECK (id > 0),
   date         TIMESTAMP          NOT NULL,
-  accessMethod STRING             NOT NULL,
+  accessMethod STRING             NOT NULL CHECK (accessMethod != ''),
   successful   BOOL               NOT NULL,
   ipAddress    STRING,
   devID        STRING,

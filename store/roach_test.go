@@ -59,19 +59,19 @@ func TestModel_SaveHistory(t *testing.T) {
 	insertUser(usr, t)
 	type SaveHistoryTestCase struct {
 		Desc   string
-		Hist   *authms.History
+		Hist   authms.History
 		ExpErr bool
 	}
 	tcs := []SaveHistoryTestCase{
 		{
 			Desc:   "Valid history",
 			ExpErr: false,
-			Hist:   completeHistory(usr.ID),
+			Hist:   *completeHistory(usr.ID),
 		},
 		{
 			Desc:   "Invalid user ID",
 			ExpErr: true,
-			Hist: &authms.History{
+			Hist: authms.History{
 				UserID:        -1,
 				IpAddress:     "127.0.0.1",
 				AccessType:    "LOGIN",
@@ -82,7 +82,7 @@ func TestModel_SaveHistory(t *testing.T) {
 		{
 			Desc:   "Non existent user ID",
 			ExpErr: true,
-			Hist: &authms.History{
+			Hist: authms.History{
 				UserID:        1,
 				IpAddress:     "127.0.0.1",
 				AccessType:    "LOGIN",
@@ -93,7 +93,7 @@ func TestModel_SaveHistory(t *testing.T) {
 		{
 			Desc:   "Empty access type",
 			ExpErr: true,
-			Hist: &authms.History{
+			Hist: authms.History{
 				UserID:        usr.ID,
 				IpAddress:     "127.0.0.1",
 				AccessType:    "",
@@ -103,37 +103,22 @@ func TestModel_SaveHistory(t *testing.T) {
 		},
 	}
 	for _, tc := range tcs {
-		func() {
-			err := m.SaveHistory(tc.Hist)
+		t.Run(tc.Desc, func(t *testing.T) {
+			actHist, err := m.SaveHistory(tc.Hist)
 			if tc.ExpErr {
 				if err == nil {
-					t.Errorf("%s - expected an error but got none",
-						tc.Desc)
+					t.Errorf("Expected an error but got none")
 				}
 				return
-			} else if err != nil {
-				t.Errorf("%s - model.SaveHistory(): %v",
-					tc.Desc, err)
-				return
 			}
-			q := `SELECT id, accessMethod, successful, userID, date, devID, ipAddress
-				FROM history WHERE id=$1`
-			db := getDB(t)
-			hist := new(authms.History)
-			err = db.QueryRow(q, tc.Hist.ID).Scan(&hist.ID,
-				&hist.AccessType, &hist.SuccessStatus,
-				&hist.UserID, &hist.Date, &hist.DevID,
-				&hist.IpAddress)
 			if err != nil {
-				t.Fatalf("%s - Error fetching history for"+
-					" validation: %s", tc.Desc, err)
+				t.Errorf("model.SaveHistory(): %v", err)
 				return
 			}
-			if !compareHistory(tc.Hist, hist) {
-				t.Errorf("%s - expected %+v but got %+v",
-					tc.Desc, tc.Hist, hist)
+			if actHist.ID < 1 {
+				t.Fatalf("ID was not assigned, got %d", actHist.ID)
 			}
-		}()
+		})
 	}
 }
 
@@ -215,7 +200,7 @@ func TestModel_SaveUser(t *testing.T) {
 	setUp(t)
 	defer tearDown(t)
 	m := newModel(t)
-	usr := &authms.User{
+	usr := authms.User{
 		OAuths: map[string]*authms.OAuth{
 			completeUserAppName: {
 				AppName:   completeUserAppName,
@@ -225,18 +210,20 @@ func TestModel_SaveUser(t *testing.T) {
 			},
 		},
 	}
-	if err := m.SaveUser(usr); err != nil {
+	insUsr, err := m.SaveUser(usr)
+	if err != nil {
 		t.Fatalf("model.Save(): %s", err)
 	}
-	dbUsr := fetchUser(usr.ID, t)
-	assertUsersEqual(dbUsr, usr, t)
+	if insUsr.ID < 1 {
+		t.Fatalf("ID not assigned, got %d", insUsr.ID)
+	}
 }
 
 func TestModel_SaveUser_duplicate(t *testing.T) {
 	setUp(t)
 	defer tearDown(t)
 	m := newModel(t)
-	usr := &authms.User{
+	usr := authms.User{
 		OAuths: map[string]*authms.OAuth{
 			completeUserAppName: {
 				AppName:   completeUserAppName,
@@ -246,14 +233,11 @@ func TestModel_SaveUser_duplicate(t *testing.T) {
 			},
 		},
 	}
-	err := m.SaveUser(usr)
+	insUsr, err := m.SaveUser(usr)
 	if err != nil {
 		t.Fatalf("model.Save(): %s", err)
 	}
-	if m.IsDuplicateError(err) {
-		t.Error("Expected no duplicate error assigned on nil error")
-	}
-	err = m.SaveUser(usr)
+	_, err = m.SaveUser(*insUsr)
 	if !m.IsDuplicateError(err) {
 		t.Errorf("Expected the error %v to be a duplicate error", err)
 	}
@@ -272,7 +256,7 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 		{Desc: "Is to insert", User: bareBoneUser},
 	}
 	for _, tc := range tcs {
-		func() {
+		t.Run(tc.Desc, func(t *testing.T) {
 			expUsr := tc.User
 			setUp(t)
 			defer tearDown(t)
@@ -288,14 +272,14 @@ func TestModel_UpdateAppUserID(t *testing.T) {
 				}
 			}
 			expUsr.OAuths[appName].AppUserID = "test-user-id-updated"
-			err := m.UpdateAppUserID(tc.User.ID, expUsr.OAuths[appName])
+			err := m.UpdateAppUserID(tc.User.ID, *expUsr.OAuths[appName])
 			if err != nil {
 				t.Errorf("%s - model.UpdateAppUserID(): %s", tc.Desc, err)
 				return
 			}
 			dbUsr := fetchUser(expUsr.ID, t)
 			assertUsersEqual(dbUsr, expUsr, t)
-		}()
+		})
 	}
 }
 
@@ -303,7 +287,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 	type TestCase struct {
 		Desc            string
 		InsertUser      *authms.User
-		CheckUserExists *authms.User
+		CheckUserExists authms.User
 		ExpNotExists    bool
 	}
 	cmpltUsr := completeUser()
@@ -311,13 +295,13 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:            "Not exist",
 			InsertUser:      nil,
-			CheckUserExists: cmpltUsr,
+			CheckUserExists: *cmpltUsr,
 			ExpNotExists:    true,
 		},
 		{
 			Desc:       "Not exist (no field found)",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -333,7 +317,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "Not exist (empty OAuths)",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -344,7 +328,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "Not exist (nil OAuths)",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -355,7 +339,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "UserName Exists",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: cmpltUsr.UserName,
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -370,7 +354,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "Phone Exists",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    cmpltUsr.Phone,
@@ -385,7 +369,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "Email Exists",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    cmpltUsr.Email,
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -400,7 +384,7 @@ func TestDBHelper_UserExists(t *testing.T) {
 		{
 			Desc:       "OAuth Exists",
 			InsertUser: cmpltUsr,
-			CheckUserExists: &authms.User{
+			CheckUserExists: authms.User{
 				UserName: "none_exist_username",
 				Email:    &authms.Value{Value: "none@exist.email"},
 				Phone:    &authms.Value{Value: "+none-exist-phone"},
@@ -419,19 +403,18 @@ func TestDBHelper_UserExists(t *testing.T) {
 			usrID, err := m.UserExists(tc.CheckUserExists)
 			if tc.ExpNotExists {
 				if !m.IsNotFoundError(err) {
-					t.Errorf("%s - expected not found error but got %v",
-						tc.Desc, err)
+					t.Errorf("Expected not found error but got %v", err)
 				}
 				return
 			}
 			if err != nil {
-				t.Errorf("%s - store.UserExists(): %v",
+				t.Errorf("Etore.UserExists(): %v",
 					tc.Desc, err)
 				return
 			}
 			if usrID != tc.InsertUser.ID {
-				t.Errorf("%s - expected existing userID %d "+
-					"but got %d", tc.Desc, tc.InsertUser.ID, usrID)
+				t.Errorf("Expected existing userID %d "+
+					"but got %d", tc.InsertUser.ID, usrID)
 			}
 		})
 	}
@@ -459,7 +442,7 @@ func TestModel_UpdatePhone(t *testing.T) {
 			}
 			expUsr.Phone.Value = "+254098765432"
 			expUsr.Phone.Verified = true
-			err := m.UpdatePhone(tc.User.ID, expUsr.Phone)
+			err := m.UpdatePhone(tc.User.ID, *expUsr.Phone)
 			if err != nil {
 				t.Errorf("%s - model.UpdatePhone(): %s", tc.Desc, err)
 				return
@@ -492,7 +475,7 @@ func TestModel_UpdateEmail(t *testing.T) {
 			}
 			expUsr.Email.Value = "test.update@email.com"
 			expUsr.Email.Verified = true
-			err := m.UpdateEmail(tc.User.ID, expUsr.Email)
+			err := m.UpdateEmail(tc.User.ID, *expUsr.Email)
 			if err != nil {
 				t.Errorf("%s - model.UpdateEmail(): %s", tc.Desc, err)
 				return
