@@ -8,6 +8,8 @@ import (
 	"net/url"
 	"strings"
 
+	"fmt"
+
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -36,6 +38,7 @@ type atResponse struct {
 				} `xml:"status"`
 			} `xml:"Recipient"`
 		} `xml:"Recipients"`
+		Message string `xml:"Message"`
 	} `xml:"SMSMessageData"`
 }
 
@@ -83,8 +86,8 @@ func (at *SMSCl) SMS(toPhone, message string) error {
 	}
 	recipients := respBody.SMSMessageData.Recipients.Recipient
 	if len(recipients) != 1 {
-		return errors.Newf("%d recipients were recorded while expecting 1",
-			len(recipients))
+		return errors.Newf("%d recipients recorded, expecting 1 - got err message(%s)",
+			len(recipients), respBody.SMSMessageData.Message)
 	}
 	if !strings.EqualFold(strings.TrimSpace(recipients[0].Status.Val), "success") {
 		return errors.Newf("API reported an error: %v", recipients[0].Status.Val)
@@ -117,6 +120,7 @@ func readRespBody(resp io.Reader) (atResponse, error) {
 	if err != nil {
 		return atResponse{}, errors.Newf("error reading response body: %v", err)
 	}
+	fmt.Printf("Response:\n%s", respBody)
 	respStruct := atResponse{}
 	if err := xml.Unmarshal(respBody, &respStruct); err != nil {
 		return atResponse{}, errors.Newf("error unmarshalling response body: %v", err)
