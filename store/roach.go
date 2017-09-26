@@ -348,9 +348,9 @@ func (r *Roach) UpdatePhone(userID int64, newPhone authms.Value) error {
 	return checkRowsAffected(rslt, err, 1)
 }
 
-func (r *Roach) UpsertLoginVerification(lv model.LoginVerification) (model.LoginVerification, error) {
+func (r *Roach) UpsertLoginVerification(lv model.LoginVerification) (*model.LoginVerification, error) {
 	if err := r.InitDBConnIfNotInitted(); err != nil {
-		return lv, err
+		return nil, err
 	}
 	if lv.ID == "" {
 		lv.ID = genID()
@@ -362,7 +362,7 @@ func (r *Roach) UpsertLoginVerification(lv model.LoginVerification) (model.Login
 	`
 	rslt, err := r.db.Exec(q, lv.ID, lv.Type, lv.SubjectValue, lv.UserID, lv.CodeHash,
 		lv.IsUsed, lv.Issue, lv.Expiry)
-	return lv, checkRowsAffected(rslt, err, 1)
+	return &lv, checkRowsAffected(rslt, err, 1)
 }
 
 func (r *Roach) GetLoginVerifications(vType string, userID, offset, count int64) ([]model.LoginVerification, error) {

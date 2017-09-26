@@ -63,6 +63,7 @@ func (s *SMSerMock) SMS(toPhone, message string) error {
 type DBHelperMock struct {
 	errors.NotFoundErrCheck
 	ExpErr                     error
+	ExpExistsErr               error
 	ExpHistErr                 error
 	ExpUser                    *authms.User
 	ExpHist                    []*authms.History
@@ -80,7 +81,7 @@ type DBHelperMock struct {
 	ExpLoginVers               []model.LoginVerification
 }
 
-func (d *DBHelperMock) SaveUser(u *authms.User) error {
+func (d *DBHelperMock) SaveUser(u authms.User) (*authms.User, error) {
 	for _, oauth := range u.OAuths {
 		if oauth.Verified == false {
 			d.T.Error("expected OAuth verified=true but got false")
@@ -93,7 +94,8 @@ func (d *DBHelperMock) SaveUser(u *authms.User) error {
 		d.T.Error("expected Email verified=false but got true")
 	}
 	d.SaveUserCalled = true
-	return d.ExpErr
+	u.ID = d.ExpUserID
+	return &u, d.ExpErr
 }
 func (d *DBHelperMock) GetByUserName(uname, pass string) (*authms.User, error) {
 	d.GetUserCalled = true
@@ -111,8 +113,8 @@ func (d *DBHelperMock) GetByAppUserID(appName, appUserID string) (*authms.User, 
 	d.GetUserCalled = true
 	return d.ExpUser, d.ExpErr
 }
-func (d *DBHelperMock) UpsertLoginVerification(code model.LoginVerification) (model.LoginVerification, error) {
-	return d.ExpLoginVer, d.ExpErr
+func (d *DBHelperMock) UpsertLoginVerification(code model.LoginVerification) (*model.LoginVerification, error) {
+	return &d.ExpLoginVer, d.ExpErr
 }
 func (d *DBHelperMock) GetLoginVerifications(verificationType string, userID, offset, count int64) ([]model.LoginVerification, error) {
 	return d.ExpLoginVers, d.ExpErr
@@ -121,15 +123,15 @@ func (d *DBHelperMock) GetLoginVerifications(verificationType string, userID, of
 func (d *DBHelperMock) GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error) {
 	return d.ExpHist, d.ExpHistErr
 }
-func (d *DBHelperMock) SaveHistory(*authms.History) error {
+func (d *DBHelperMock) SaveHistory(h authms.History) (*authms.History, error) {
 	d.SaveHistoryCalled = true
-	return d.ExpErr
+	return &h, d.ExpErr
 }
 func (d *DBHelperMock) IsDuplicateError(err error) bool {
 	return d.ExpIsDuplicate
 }
 
-func (d *DBHelperMock) UpdatePhone(userID int64, newPhone *authms.Value) error {
+func (d *DBHelperMock) UpdatePhone(userID int64, newPhone authms.Value) error {
 	d.UpdatePhoneCalled = true
 	if !d.IgnoreDefaultVerifiedCheck && newPhone.Verified == true {
 		d.T.Error("expected Phone verified=false but got true")
@@ -142,7 +144,7 @@ func (d *DBHelperMock) UpdatePassword(userID int64, oldPass, newPassword string)
 	return d.ExpErr
 }
 
-func (d *DBHelperMock) UpdateAppUserID(userID int64, new *authms.OAuth) error {
+func (d *DBHelperMock) UpdateAppUserID(userID int64, new authms.OAuth) error {
 	d.UpdateAppUserIDCalled = true
 	if new.Verified == false {
 		d.T.Error("expected OAuth verified=true but got false")
@@ -150,8 +152,8 @@ func (d *DBHelperMock) UpdateAppUserID(userID int64, new *authms.OAuth) error {
 	return d.ExpErr
 }
 
-func (d *DBHelperMock) UserExists(u *authms.User) (int64, error) {
-	return d.ExpUserID, d.ExpErr
+func (d *DBHelperMock) UserExists(u authms.User) (int64, error) {
+	return d.ExpUserID, d.ExpExistsErr
 }
 
 type RegisterTestCase struct {
@@ -186,16 +188,19 @@ func TestAuth_Register(t *testing.T) {
 	cases := []RegisterTestCase{
 		{
 			Desc:      "Valid args",
-			User:      &authms.User{ID: 123, UserName: "some-name", Password: "some-password"},
+			User:      &authms.User{UserName: "some-name", Password: "some-password"},
 			OAHandler: &OAuthHandlerMock{},
-			DBHelper:  &DBHelperMock{T: t},
-			ExpErr:    false,
-			DevID:     "test-dev",
+			DBHelper: &DBHelperMock{
+				T:            t,
+				ExpExistsErr: errors.NewNotFound("not exists"),
+				ExpUserID:      123,
+			},
+			ExpErr: false,
+			DevID:  "test-dev",
 		},
 		{
-			Desc: "Valid args, verified=true",
+			Desc: "Valid args with verified = true",
 			User: &authms.User{
-				ID: 123,
 				OAuths: map[string]*authms.OAuth{
 					appName: {
 						AppName:   appName,
@@ -208,9 +213,37 @@ func TestAuth_Register(t *testing.T) {
 				Email: &authms.Value{Verified: true},
 			},
 			OAHandler: &OAuthHandlerMock{AppUserID: "1", ExpValid: true},
-			DBHelper:  &DBHelperMock{T: t},
-			ExpErr:    false,
-			DevID:     "test-dev",
+			DBHelper: &DBHelperMock{
+				T:            t,
+				ExpExistsErr: errors.NewNotFound("not exists"),
+				ExpUserID:      123,
+			},
+			ExpErr: false,
+			DevID:  "test-dev",
+		},
+		{
+			Desc: "OAuth user",
+			User: &authms.User{
+				OAuths: map[string]*authms.OAuth{
+					appName: {
+						AppName:   appName,
+						AppUserID: "test-oauth-app-uid",
+						AppToken:  "some-test-app-token",
+					},
+				},
+			},
+			OAHandler: &OAuthHandlerMock{
+				ExpValTknClld: true,
+				ExpValid:      true,
+				AppUserID:     "test-oauth-app-uid",
+			},
+			DBHelper: &DBHelperMock{
+				T:            t,
+				ExpExistsErr: errors.NewNotFound("not exists"),
+				ExpUserID:      123,
+			},
+			ExpErr: false,
+			DevID:  "test-dev",
 		},
 		{
 			Desc:      "Invalid user (has password only)",
@@ -227,27 +260,6 @@ func TestAuth_Register(t *testing.T) {
 			ExpErr:   true,
 			DevID:    "test-dev"},
 		{
-			Desc: "OAuth user",
-			User: &authms.User{
-				ID: 123,
-				OAuths: map[string]*authms.OAuth{
-					appName: {
-						AppName:   appName,
-						AppUserID: "test-oauth-app-uid",
-						AppToken:  "some-test-app-token",
-					},
-				},
-			},
-			OAHandler: &OAuthHandlerMock{
-				ExpValTknClld: true,
-				ExpValid:      true,
-				AppUserID:     "test-oauth-app-uid",
-			},
-			DBHelper: &DBHelperMock{T: t},
-			ExpErr:   false,
-			DevID:    "test-dev",
-		},
-		{
 			Desc:      "Missing DevID",
 			User:      &authms.User{ID: 123, UserName: "some-name", Password: "some-password"},
 			OAHandler: &OAuthHandlerMock{},
@@ -256,7 +268,7 @@ func TestAuth_Register(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		func() {
+		t.Run(c.Desc, func(t *testing.T) {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.Register(c.User, c.DevID, "")
@@ -284,7 +296,7 @@ func TestAuth_Register(t *testing.T) {
 			if !c.DBHelper.SaveHistoryCalled {
 				t.Errorf("%s - Save history not called", c.Desc)
 			}
-		}()
+		})
 	}
 }
 
@@ -306,9 +318,10 @@ func TestAuth_UpdatePhone(t *testing.T) {
 			Desc: "Valid phone",
 			User: &authms.User{
 				ID:    usrID,
-				Phone: &authms.Value{Value: "+254123456789"},
+				Phone: &authms.Value{Value: "+254123456789",
+				},
 			},
-			DBHelper: &DBHelperMock{T: t},
+			DBHelper: &DBHelperMock{T: t, ExpUserID: usrID},
 			ExpErr:   false,
 			DevID:    devID,
 			Token:    tkn,
@@ -319,9 +332,10 @@ func TestAuth_UpdatePhone(t *testing.T) {
 				ID: usrID,
 				Phone: &authms.Value{
 					Value:    "+254123456789",
-					Verified: true},
+					Verified: true,
+					},
 			},
-			DBHelper: &DBHelperMock{T: t},
+			DBHelper: &DBHelperMock{T: t, ExpUserID: usrID},
 			ExpErr:   false,
 			DevID:    devID,
 			Token:    tkn,
@@ -377,7 +391,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 		},
 	}
 	for _, c := range cases {
-		func() {
+		t.Run(c.Desc, func(t *testing.T) {
 			setUp(t)
 			a := newAuth(t, c.DBHelper, c.OAHandler, &SMSerMock{})
 			err := a.UpdatePhone(c.User, c.Token, c.DevID, "")
@@ -398,7 +412,7 @@ func TestAuth_UpdatePhone(t *testing.T) {
 			if !c.DBHelper.SaveHistoryCalled {
 				t.Errorf("%s - Save history not called", c.Desc)
 			}
-		}()
+		})
 	}
 }
 
@@ -426,7 +440,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{T: t},
+			DBHelper: &DBHelperMock{T: t, ExpUserID: usrID},
 			ExpErr:   false,
 			DevID:    devID,
 			Token:    tkn,
@@ -522,7 +536,7 @@ func TestAuth_UpdateOAuth(t *testing.T) {
 				AppUserID:     appUsrID,
 				ExpValTknClld: true,
 			},
-			DBHelper: &DBHelperMock{T: t},
+			DBHelper: &DBHelperMock{T: t, ExpUserID: usrID},
 			ExpErr:   false,
 			DevID:    devID,
 			Token:    tkn,
@@ -653,7 +667,7 @@ func TestAuth_VerifyPhone(t *testing.T) {
 				Token:    validToken,
 				Verified: false,
 			},
-			DB: &DBHelperMock{T: t},
+			DB: &DBHelperMock{T: t, ExpUserID: userID},
 		},
 		{
 			Desc:   "Nil SMSer",

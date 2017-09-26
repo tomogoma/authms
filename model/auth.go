@@ -36,17 +36,17 @@ type SecureRandomByteser interface {
 }
 
 type DBHelper interface {
-	UserExists(u *authms.User) (int64, error)
-	SaveUser(*authms.User) error
-	SaveHistory(*authms.History) error
+	UserExists(u authms.User) (int64, error)
+	SaveUser(authms.User) (*authms.User, error)
+	SaveHistory(authms.History) (*authms.History, error)
 	GetByUserName(uname, pass string) (*authms.User, error)
 	GetByAppUserID(appName, appUserID string) (*authms.User, error)
 	GetByPhone(phone, pass string) (*authms.User, error)
 	GetByEmail(email, pass string) (*authms.User, error)
 	GetHistory(userID int64, offset, count int, accessType ...string) ([]*authms.History, error)
-	UpdatePhone(userID int64, newPhone *authms.Value) error
-	UpdateAppUserID(userID int64, new *authms.OAuth) error
-	UpsertLoginVerification(code LoginVerification) (LoginVerification, error)
+	UpdatePhone(userID int64, newPhone authms.Value) error
+	UpdateAppUserID(userID int64, new authms.OAuth) error
+	UpsertLoginVerification(code LoginVerification) (*LoginVerification, error)
 	GetLoginVerifications(verificationType string, userID, offset, count int64) ([]LoginVerification, error)
 	IsNotFoundError(err error) bool
 	IsDuplicateError(err error) bool
@@ -198,13 +198,18 @@ func (a *Auth) Register(user *authms.User, devID, rIP string) error {
 	if user.Email != nil {
 		user.Email.Verified = false
 	}
-	if err := a.authAvailableForUser(user); err != nil {
-		return err
+
+	_, err := a.dbHelper.UserExists(*user)
+	if err == nil {
+		return errors.NewClient("user exists with some of provided credentials")
+	} else if !a.dbHelper.IsNotFoundError(err) {
+		return errors.Newf("checking user exists: %v", err)
 	}
-	err := a.dbHelper.SaveUser(user)
+	usr, err := a.dbHelper.SaveUser(*user)
 	if err != nil {
 		return errors.Newf("error persisting user: %v", err)
 	}
+	user.ID = usr.ID
 	go a.saveHistory(user, devID, AccessRegistration, rIP, nil)
 	return nil
 }
@@ -228,10 +233,10 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	}
 	user.Phone.Value = formatPhone(user.Phone.Value)
 	user.Phone.Verified = false
-	if err := a.authAvailableForUser(user); err != nil {
+	if err := a.authAvailableForUser(*user); err != nil {
 		return err
 	}
-	err = a.dbHelper.UpdatePhone(user.ID, user.Phone)
+	err = a.dbHelper.UpdatePhone(user.ID, *user.Phone)
 	if err != nil {
 		return errors.Newf("error persisting phone update: %v", err)
 	}
@@ -254,7 +259,7 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 		return nil, err
 	}
 	req.Phone = formatPhone(req.Phone)
-	err = a.authAvailableForUser(&authms.User{
+	err = a.authAvailableForUser(authms.User{
 		ID:    req.UserID,
 		Phone: &authms.Value{Value: req.Phone},
 	})
@@ -334,11 +339,10 @@ resumeFunc:
 	if time.Now().After(verification.Expiry) {
 		return nil, errors.NewAuth("code is expired")
 	}
-	err = a.dbHelper.UpdatePhone(
-		req.UserID, &authms.Value{
-			Verified: true,
-			Value:    verification.SubjectValue,
-		})
+	err = a.dbHelper.UpdatePhone(req.UserID, authms.Value{
+		Verified: true,
+		Value:    verification.SubjectValue,
+	})
 	if err != nil {
 		return nil, errors.Newf("persist phone update: %v", err)
 	}
@@ -374,10 +378,10 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 		return errors.NewClient("device ID was empty")
 	}
 	oa.Verified = true
-	if err := a.authAvailableForUser(user); err != nil {
+	if err := a.authAvailableForUser(*user); err != nil {
 		return err
 	}
-	err = a.dbHelper.UpdateAppUserID(user.ID, oa)
+	err = a.dbHelper.UpdateAppUserID(user.ID, *oa)
 	if err != nil {
 		return errors.Newf("error persisting OAuth changes: %v", err)
 	}
@@ -436,7 +440,7 @@ func (a *Auth) LoginOAuth(app *authms.OAuth, devID, rIP string) (*authms.User, e
 	return usr, nil
 }
 
-func (a *Auth) authAvailableForUser(user *authms.User) error {
+func (a *Auth) authAvailableForUser(user authms.User) error {
 	existUsrID, err := a.dbHelper.UserExists(user)
 	if err != nil {
 		if a.dbHelper.IsNotFoundError(err) {
@@ -522,7 +526,7 @@ func (a *Auth) saveHistory(user *authms.User, devID, accType, rIP string, err er
 	}
 	h := &authms.History{UserID: user.ID, AccessType: accType,
 		SuccessStatus: accSuccessful, IpAddress: rIP, DevID: devID}
-	err = a.dbHelper.SaveHistory(h)
+	h, err = a.dbHelper.SaveHistory(*h)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			logging.FieldAction:  "save history entry",
