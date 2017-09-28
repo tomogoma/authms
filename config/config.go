@@ -11,7 +11,7 @@ import (
 // during runtime.
 const (
 	Name                = "authms"
-	Version             = "v1"
+	Version             = ""
 	Description         = "Authentication Micro-Service"
 	CanonicalName       = Name + Version
 	RPCNamePrefix       = ""
