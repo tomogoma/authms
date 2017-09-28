@@ -373,8 +373,8 @@ func (r *Roach) GetLoginVerifications(vType string, userID, offset, count int64)
 	SELECT id, type, subjectValue, userID, codeHash, isUsed, issueDate, expiryDate
 		FROM authVerifications
 		WHERE type=$1 AND userID=$2
-		LIMIT $3 OFFSET $4
 		ORDER BY isused ASC, expirydate DESC
+		LIMIT $3 OFFSET $4
 	`
 	rows, err := r.db.Query(q, vType, userID, count, offset)
 	if err != nil {
@@ -552,16 +552,6 @@ func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
 	if c != expAffected {
 		return errors.Newf("expected %d affected rows but got %d",
 			expAffected, c)
-	}
-	return nil
-}
-
-func validateHistory(h *authms.History) error {
-	if h.UserID < 1 {
-		return errors.New("userID was invalid")
-	}
-	if h.AccessType == "" {
-		return errors.New("access type was empty")
 	}
 	return nil
 }
