@@ -28,6 +28,7 @@ const (
 
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
+	SMSAPIMessageBird    = "messageBird"
 
 	TimeFormat = time.RFC3339
 )
@@ -48,13 +49,19 @@ type AfricasTalkingConfig struct {
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
+type MessageBirdConfig struct {
+	AccountName string `json:"accountName" yaml:"accountName"`
+	APIKeyFile  string `json:"apiKeyFile" yaml:"apiKeyFile"`
+}
+
 type SMSConfig struct {
-	TestNumber     string               `json:"testNumber" yaml:"testNumber"`
-	Twilio         TwilioConfig         `json:"twilio" yaml:"twilio"`
-	AfricasTalking AfricasTalkingConfig `json:"africasTalking" yaml:"africasTalking"`
-	ActiveAPI      string               `json:"activeAPI" yaml:"activeAPI"`
-	MessageFmt      string        `json:"messageFormat" yaml:"messageFormat"`
-	SMSCodeValidity time.Duration `json:"smsCodeValidity" yaml:"smsCodeValidity"`
+	TestNumber      string               `json:"testNumber" yaml:"testNumber"`
+	Twilio          TwilioConfig         `json:"twilio" yaml:"twilio"`
+	AfricasTalking  AfricasTalkingConfig `json:"africasTalking" yaml:"africasTalking"`
+	ActiveAPI       string               `json:"activeAPI" yaml:"activeAPI"`
+	MessageFmt      string               `json:"messageFormat" yaml:"messageFormat"`
+	SMSCodeValidity time.Duration        `json:"smsCodeValidity" yaml:"smsCodeValidity"`
+	MessageBird     MessageBirdConfig    `json:"messageBird" yaml:"messageBird"`
 }
 
 type Facebook struct {

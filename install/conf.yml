@@ -61,7 +61,7 @@ token:
 sms:
   # activeAPI is the API to use for sending SMSes.
   # Only the activeAPI's configuration values are required, the rest can be ignored.
-  # The value can either be empty or one of (twilio, africasTalking)
+  # The value can either be empty or one of (twilio, africasTalking, messageBird)
   # the sms section is not necessary if this is left empty.
   activeAPI:
 
@@ -97,3 +97,14 @@ sms:
     # at https://account.africastalking.com/auth/api
     # The file must contain only the api key and no new line characters.
     apiKeyFile: /etc/authms/keys/africastalkingapi.key
+
+  # messageBird - configuration values for using messageBird as the active API.
+  messageBird:
+    # accountName is the sender of the message. This can be a telephone number
+    # (including country code) or an alphanumeric string. In case of an
+    # alphanumeric string, the maximum length is 11 characters.
+    accountName:
+    # apiKeyFile is the location of the file containing the Message Bird
+    # API access key. This can be found/generated here:
+    # https://dashboard.messagebird.com/app/settings/developers/access
+    apiKeyFile: /etc/authms/keys/messagebirdapi.key

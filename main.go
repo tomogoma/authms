@@ -28,6 +28,7 @@ import (
 	"github.com/tomogoma/authms/store"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
+	"github.com/tomogoma/authms/sms/messagebird"
 )
 
 type defLogWriter struct {
@@ -134,20 +135,29 @@ func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
 	case config.SMSAPIAfricasTalking:
 		apiKey, err := readFile(conf.AfricasTalking.APIKeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("africa's talking API key: %v", err)
+			return nil, fmt.Errorf("read africa's talking API key: %v", err)
 		}
 		s, err = africas_talking.NewSMSCl(conf.AfricasTalking.UserName, apiKey)
 		if err != nil {
-			return nil, fmt.Errorf("africasTalking: %v", err)
+			return nil, fmt.Errorf("new africasTalking client: %v", err)
 		}
 	case config.SMSAPITwilio:
 		tkn, err := readFile(conf.Twilio.TokenKeyFile)
 		if err != nil {
-			return nil, fmt.Errorf("twilio token: %v", err)
+			return nil, fmt.Errorf("read twilio token: %v", err)
 		}
 		s, err = twilio.NewSMSCl(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
 		if err != nil {
-			return nil, fmt.Errorf("twilio: %v", err)
+			return nil, fmt.Errorf("new twilio client: %v", err)
+		}
+	case config.SMSAPIMessageBird:
+		apiKey, err := readFile(conf.MessageBird.APIKeyFile)
+		if err != nil {
+			return nil, fmt.Errorf("read messageBird API key: %v", err)
+		}
+		s, err = messagebird.NewClient(conf.MessageBird.AccountName, apiKey)
+		if err != nil {
+			return nil, fmt.Errorf("new messageBird client: %v", err)
 		}
 	default:
 		return nil, fmt.Errorf("invalid API selected can be %s or %s",
