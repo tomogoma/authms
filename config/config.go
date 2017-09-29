@@ -31,6 +31,8 @@ const (
 	SMSAPIMessageBird    = "messageBird"
 
 	TimeFormat = time.RFC3339
+
+	APIKeyLength = 56
 )
 
 type ServiceConfig struct {
