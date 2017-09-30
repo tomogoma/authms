@@ -31,10 +31,6 @@ type OAuthClient interface {
 	ValidateToken(string) (OAuthResponse, error)
 }
 
-type SecureRandomByteser interface {
-	SecureRandomBytes(length int) ([]byte, error)
-}
-
 type DBHelper interface {
 	UserExists(u authms.User) (int64, error)
 	SaveUser(authms.User) (*authms.User, error)
@@ -89,14 +85,12 @@ const (
 	AccessUpdate         = "UPDATE"
 	AccessVerification   = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
-	numExp               = `[0-9]+`
 	tokenValidity        = 8 * time.Hour
 	AppFacebook          = "facebook"
 
 	verTypePhone = "phone"
 )
 
-var rePhone = regexp.MustCompile(numExp)
 
 func WithFB(fb OAuthClient) Option {
 	return func(a *Auth) {
@@ -455,19 +449,6 @@ func (a *Auth) authAvailableForUser(user authms.User) error {
 	return nil
 }
 
-func (a *Auth) validateToken(userID int64, token string) (Claim, error) {
-	clm := Claim{}
-	_, err := a.tokenG.Validate(token, &clm)
-	if err != nil {
-		return clm, errors.NewAuthf("invalid token: %v", err)
-	}
-	if clm.UsrID != userID {
-		return clm, errors.NewAuthf("token-user (userid) mismatch:"+
-			" userID is %d token belongs to %d", userID, clm.UsrID)
-	}
-	return clm, nil
-}
-
 func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr error) error {
 	if a.dbHelper.IsNotFoundError(loginErr) {
 		loginErr = errors.NewAuth("invalid credentials")
@@ -545,18 +526,6 @@ func testMessageFormat(msgFmt string) error {
 		return errors.Newf("Expected 1 '%%s' formatter but got %d", len(formatters))
 	}
 	return nil
-}
-
-func formatPhone(phone string) string {
-	parts := rePhone.FindAllString(phone, -1)
-	formatted := ""
-	if strings.HasPrefix(phone, "+") {
-		formatted = "+"
-	}
-	for _, part := range parts {
-		formatted = formatted + part
-	}
-	return formatted
 }
 
 func havePasswordComboAuth(u *authms.User) bool {

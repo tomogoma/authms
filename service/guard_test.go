@@ -3,6 +3,7 @@ package service_test
 import (
 	"testing"
 
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/service"
 	"github.com/tomogoma/go-commons/errors"
 	"golang.org/x/crypto/bcrypt"
@@ -11,7 +12,7 @@ import (
 type APIKeyStoreMock struct {
 	errors.NotFoundErrCheck
 	expKeys   [][]byte
-	expAPIKey *service.APIKey
+	expAPIKey *model.APIKey
 	expErr    error
 }
 
@@ -27,7 +28,7 @@ func (kg *KeyGeneratorMock) SecureRandomBytes(length int) ([]byte, error) {
 func (db *APIKeyStoreMock) GetAPIKeys(userID string) ([][]byte, error) {
 	return db.expKeys, db.expErr
 }
-func (db *APIKeyStoreMock) SaveAPIKey(userID string, key []byte) (*service.APIKey, error) {
+func (db *APIKeyStoreMock) SaveAPIKey(userID string, key []byte) (*model.APIKey, error) {
 	return db.expAPIKey, db.expErr
 }
 
@@ -98,14 +99,14 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "valid",
 			userID: "johndoe",
 			kg:     &KeyGeneratorMock{expKey: []byte(validKey)},
-			db:     &APIKeyStoreMock{expAPIKey: &service.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
 			expErr: false,
 		},
 		{
 			name:     "missing userID",
 			userID:   "",
 			kg:       &KeyGeneratorMock{expKey: []byte(validKey)},
-			db:       &APIKeyStoreMock{expAPIKey: &service.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:       &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
 			expErr:   true,
 			expClErr: true,
 		},
@@ -113,7 +114,7 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "key gen report error",
 			userID: "johndoe",
 			kg:     &KeyGeneratorMock{expErr: errors.Newf("an error")},
-			db:     &APIKeyStoreMock{expAPIKey: &service.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
 			expErr: true,
 		},
 		{

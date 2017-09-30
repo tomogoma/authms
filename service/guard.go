@@ -7,20 +7,13 @@ import (
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/go-commons/errors"
 	"golang.org/x/crypto/bcrypt"
+	"github.com/tomogoma/authms/model"
 )
-
-type APIKey struct {
-	ID         string
-	UserID     string
-	APIKey     string
-	CreateDate time.Time
-	UpdateDate time.Time
-}
 
 type APIKeyStore interface {
 	IsNotFoundError(error) bool
 	GetAPIKeys(userID string) ([][]byte, error)
-	SaveAPIKey(userID string, key []byte) (*APIKey, error)
+	SaveAPIKey(userID string, key []byte) (*model.APIKey, error)
 }
 
 type KeyGenerator interface {
@@ -92,7 +85,7 @@ func (s *Guard) APIKeyValid(userID, key string) error {
 	return errors.NewForbiddenf(invalidAPIKeyErrorf, key, userID)
 }
 
-func (s *Guard) NewAPIKey(userID string) (*APIKey, error) {
+func (s *Guard) NewAPIKey(userID string) (*model.APIKey, error) {
 	if userID == "" {
 		return nil, errors.NewClient("userID was empty")
 	}
