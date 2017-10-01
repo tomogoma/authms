@@ -2,7 +2,6 @@ package smtp
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/smtp"
@@ -13,13 +12,15 @@ import (
 
 type ConfigStore interface {
 	IsNotFoundError(error) bool
-	GetSMTPConfig() ([]byte, error)
+	UpsertSMTPConfig(config interface{}) error
+	GetSMTPConfig(config interface{}) error
 }
 
 type Mailer struct {
 	errors.NotFoundErrCheck
-	db    ConfigStore
-	tmplt *template.Template
+	db      ConfigStore
+	tmplt   *template.Template
+	appName string
 }
 
 func New(cs ConfigStore) (*Mailer, error) {
@@ -45,17 +46,24 @@ func (m *Mailer) SendEmail(email model.SendMail) error {
 	return sendMessage(*conf, email.ToEmails, msg)
 }
 
-func (m *Mailer) getConfig() (*Config, error) {
-	confB, err := m.db.GetSMTPConfig()
+func (m *Mailer) SetConfig(conf Config, notifEmail model.SendMail) error {
+	msg, err := m.generateMessage(notifEmail)
 	if err != nil {
+		return errors.Newf("generate notification email message: %v", err)
+	}
+	if err := sendMessage(conf, notifEmail.ToEmails, msg); err != nil {
+		return errors.Newf("test configuration: %v", err)
+	}
+	return m.db.UpsertSMTPConfig(conf)
+}
+
+func (m *Mailer) getConfig() (*Config, error) {
+	conf := new(Config)
+	if err := m.db.GetSMTPConfig(conf); err != nil {
 		if m.db.IsNotFoundError(err) {
 			return nil, errors.NewNotFound("SMTP not configured")
 		}
 		return nil, errors.Newf("get SMTP configuration: %v", err)
-	}
-	conf := new(Config)
-	if err := json.Unmarshal(confB, conf); err != nil {
-		return nil, errors.Newf("unmarshal SMTP configuration: %v", err)
 	}
 	return conf, nil
 }
@@ -74,7 +82,7 @@ func sendMessage(conf Config, recipients []string, msg []byte) error {
 	addr := fmt.Sprintf("%s:%d", conf.ServerAddress, conf.TLSPort)
 	err := smtp.SendMail(addr, auth, conf.FromEmail, recipients, msg)
 	if err != nil {
-		return errors.Newf("send mail: %v", err)
+		return err
 	}
 	return nil
 }
