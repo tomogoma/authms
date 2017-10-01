@@ -3,10 +3,8 @@ package model
 import (
 	"fmt"
 	"regexp"
-	"strings"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
 	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
@@ -19,11 +17,6 @@ import (
 type OAuthHandler interface {
 	IsAuthError(error) bool
 	ValidateToken(appName, token string) (OAuthResponse, error)
-}
-
-type TokenGenerator interface {
-	Generate(claims jwt.Claims) (string, error)
-	Validate(token string, claims jwt.Claims) (*jwt.Token, error)
 }
 
 type OAuthClient interface {
@@ -48,10 +41,6 @@ type DBHelper interface {
 	IsDuplicateError(err error) bool
 }
 
-type SMSer interface {
-	SMS(toPhone, message string) error
-}
-
 type LoginVerification struct {
 	ID           string
 	Type         string
@@ -65,7 +54,7 @@ type LoginVerification struct {
 
 type Auth struct {
 	dbHelper         DBHelper
-	tokenG           TokenGenerator
+	tokenG           Tokener
 	smser            SMSer
 	randomSMSCodeser SecureRandomByteser
 	oAuthCls         map[string]OAuthClient
@@ -90,7 +79,6 @@ const (
 
 	verTypePhone = "phone"
 )
-
 
 func WithFB(fb OAuthClient) Option {
 	return func(a *Auth) {
@@ -123,7 +111,7 @@ func WithSMSCodeGenerator(g SecureRandomByteser) Option {
 	}
 }
 
-func New(tg TokenGenerator, db DBHelper, opts ...Option) (*Auth, error) {
+func New(tg Tokener, db DBHelper, opts ...Option) (*Auth, error) {
 	randSMSCodeser, err := generator.NewRandom(generator.NumberChars)
 	if err != nil {
 		return nil, errors.Newf("instantiate random number code generator: %v", err)
@@ -216,9 +204,9 @@ func (a *Auth) UpdatePhone(user *authms.User, token, devID, rIP string) error {
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if _, err = a.validateToken(user.ID, token); err != nil {
-		return err
-	}
+	//if _, err = a.validateToken(user.ID, token); err != nil {
+	//	return err
+	//}
 	if !hasValue(user.Phone) {
 		return errors.NewClient("phone was invalid")
 	}
@@ -249,9 +237,9 @@ func (a *Auth) VerifyPhone(req *authms.SMSVerificationRequest, rIP string) (*aut
 	if a.smser == nil {
 		return nil, errors.NewNotImplementedf("SMS capability not available")
 	}
-	if _, err = a.validateToken(req.UserID, req.Token); err != nil {
-		return nil, err
-	}
+	//if _, err = a.validateToken(req.UserID, req.Token); err != nil {
+	//	return nil, err
+	//}
 	req.Phone = formatPhone(req.Phone)
 	err = a.authAvailableForUser(authms.User{
 		ID:    req.UserID,
@@ -303,9 +291,9 @@ func (a *Auth) VerifyPhoneCode(req *authms.SMSVerificationCodeRequest, rIP strin
 		go a.saveHistory(&authms.User{ID: req.UserID}, req.DeviceID,
 			AccessCodeValidation, rIP, err)
 	}()
-	if _, err = a.validateToken(req.UserID, req.Token); err != nil {
-		return nil, err
-	}
+	//if _, err = a.validateToken(req.UserID, req.Token); err != nil {
+	//	return nil, err
+	//}
 	offset := int64(0)
 	count := int64(100)
 	var verification LoginVerification
@@ -358,9 +346,9 @@ func (a *Auth) UpdateOAuth(user *authms.User, appName, token, devID, rIP string)
 	defer func() {
 		go a.saveHistory(user, devID, AccessUpdate, rIP, err)
 	}()
-	if _, err = a.validateToken(user.ID, token); err != nil {
-		return err
-	}
+	//if _, err = a.validateToken(user.ID, token); err != nil {
+	//	return err
+	//}
 	if user.OAuths == nil || user.OAuths[appName] == nil {
 		return errors.NewClient("OAuth was not provided")
 	}
@@ -459,13 +447,13 @@ func (a *Auth) processLoginResults(usr *authms.User, devID, rIP string, loginErr
 	if loginErr != nil {
 		return loginErr
 	}
-	clm := NewClaim(usr.ID, devID, tokenValidity)
-	tkn, loginErr := a.tokenG.Generate(clm)
-	if loginErr != nil {
-		loginErr = errors.Newf("error generating token: %v", loginErr)
-		return loginErr
-	}
-	usr.Token = tkn
+	//clm := NewClaim(usr.ID, devID, tokenValidity)
+	//tkn, loginErr := a.tokenG.Generate(clm)
+	//if loginErr != nil {
+	//	loginErr = errors.Newf("error generating token: %v", loginErr)
+	//	return loginErr
+	//}
+	//usr.Token = tkn
 	prevLogins, loginErr := a.dbHelper.GetHistory(usr.ID, 0, numPrevLogins,
 		AccessLogin)
 	if loginErr != nil && !a.dbHelper.IsNotFoundError(loginErr) {

@@ -1,0 +1,1 @@
+Use the code {{.Code}} to reset your {{.AppName}} password or visit {{.URLToken}}

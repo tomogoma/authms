@@ -1,0 +1,1 @@
+Visit {{.URLToken}} to verify your new {{.AppName}} account.

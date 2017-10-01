@@ -60,6 +60,11 @@ INSTALL_DIR="` + config.DefaultInstallDir + `"
 INSTALL_FILE="` + config.DefaultInstallPath + `"
 UNIT_NAME="` + config.DefaultSysDUnitName + `"
 UNIT_FILE="` + config.DefaultSysDUnitFilePath + `"
+TPL_DIR="` + config.DefaultTplDir + `"
+EMAIL_INVITE_TPL="` + config.DefaultEmailInviteTpl + `"
+PHONE_INVITE_TPL="` + config.DefaultPhoneInviteTpl + `"
+EMAIL_RESET_PASS_TPL="` + config.DefaultEmailResetPassTpl + `"
+PHONE_RESET_PASS_TPL="` + config.DefaultPhoneResetPassTpl + `"
 `
 	return ioutil.WriteFile("install/vars.sh", []byte(content), 0755)
 }

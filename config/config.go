@@ -20,11 +20,16 @@ const (
 	CanonicalWebName    = WebNamePrefix + CanonicalName
 	DefaultSysDUnitName = CanonicalName + ".service"
 
-	DefaultInstallDir       = "/usr/local/bin"
-	DefaultInstallPath      = DefaultInstallDir + "/" + CanonicalName
-	DefaultSysDUnitFilePath = "/etc/systemd/system/" + DefaultSysDUnitName
-	DefaultConfDir          = "/etc/" + Name
-	DefaultConfPath         = DefaultConfDir + "/" + CanonicalName + ".conf.yml"
+	DefaultInstallDir        = "/usr/local/bin"
+	DefaultInstallPath       = DefaultInstallDir + "/" + CanonicalName
+	DefaultSysDUnitFilePath  = "/etc/systemd/system/" + DefaultSysDUnitName
+	DefaultConfDir           = "/etc/" + Name
+	DefaultConfPath          = DefaultConfDir + "/" + CanonicalName + ".conf.yml"
+	DefaultTplDir            = DefaultConfDir + "/templates"
+	DefaultEmailInviteTpl    = DefaultTplDir + "/" + CanonicalName + "_email_invite.html"
+	DefaultPhoneInviteTpl    = DefaultTplDir + "/" + CanonicalName + "_phone_invite.tpl"
+	DefaultEmailResetPassTpl = DefaultTplDir + "/" + CanonicalName + "_email_reset_pass.html"
+	DefaultPhoneResetPassTpl = DefaultTplDir + "/" + CanonicalName + "_phone_reset_pass.tpl"
 
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"
