@@ -200,10 +200,22 @@ func genTestEmail(t *testing.T, subject string) model.SendMail {
 	tmpltData := struct {
 		URL string
 	}{URL: "https://google.com"}
-	tmplt, err := template.New("content").Parse(`
-<code>Begin Body</code><br/>
-<a href="{{.URL}}">a link</a><br/>
-<code>End Body</code>
+	tmplt, err := template.New("content").Parse(`<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<p>
+	Hello tester,
+</p>
+<div>
+	<code>Begin Body</code><br/>
+	<a href="{{.URL}}">a link</a><br/>
+	<code>End Body</code><p/>
+	Best regards,<br/>
+	Tester Bot
+</div>
+<div>
+	<small>The footer of the email<small>
+</div>
+</html>
 	`)
 	if err != nil {
 		t.Fatalf("Error setting up: parse email body template: %v", err)
@@ -211,11 +223,8 @@ func genTestEmail(t *testing.T, subject string) model.SendMail {
 	bw := new(bytes.Buffer)
 	tmplt.Execute(bw, tmpltData)
 	return model.SendMail{
-		ToEmails:      []string{"ogomatom.test3@mailinator.com", "ogomatom.test4@mailinator.com"},
-		RecipientName: "<b>Tester</b>",
-		Subject:       subject,
-		Body:          template.HTML(bw.String()),
-		Signature:     "Best regards,<br/>Tester Bot",
-		Footer:        "<small>The footer of the email<small>",
+		ToEmails: []string{"ogomatom.test3@mailinator.com", "ogomatom.test4@mailinator.com"},
+		Subject:  subject,
+		Body:     template.HTML(bw.String()),
 	}
 }

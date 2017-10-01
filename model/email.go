@@ -8,10 +8,7 @@ type Email struct {
 }
 
 type SendMail struct {
-	Subject       string
-	ToEmails      []string
-	RecipientName template.HTML
-	Body          template.HTML
-	Signature     template.HTML
-	Footer        template.HTML
+	ToEmails []string
+	Subject  string
+	Body     template.HTML
 }
