@@ -15,7 +15,7 @@ import (
 
 type ConfigStoreMock struct {
 	errors.NotFoundErrCheck
-	expConf smtp.Config
+	expConf model.SMTPConfig
 	expErr  error
 }
 
@@ -37,13 +37,13 @@ func (c *ConfigStoreMock) UpsertSMTPConfig(conf interface{}) error {
 	return c.expErr
 }
 
-var testConf *smtp.Config
+var testConf *model.SMTPConfig
 
-func setup(t *testing.T) smtp.Config {
+func setup(t *testing.T) model.SMTPConfig {
 	if testConf != nil {
 		return *testConf
 	}
-	c := new(smtp.Config)
+	c := new(model.SMTPConfig)
 	if err := config.ReadJSONConfig("mailer_test_config.json", c); err != nil {
 		t.Fatalf("Error setting up: read test config file: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestNew(t *testing.T) {
 func TestMailer_SendEmail(t *testing.T) {
 	validConf := setup(t)
 	fmt.Printf("valid conf: %+v\n", validConf)
-	invalidConfig := smtp.Config{}
+	invalidConfig := model.SMTPConfig{}
 	validEmail := genTestEmail(t, "Authms smtp SendEmail Test")
 	tt := []struct {
 		name   string
@@ -137,12 +137,12 @@ func TestMailer_SendEmail(t *testing.T) {
 
 func TestMailer_SetConfig(t *testing.T) {
 	validConf := setup(t)
-	invalidConf := smtp.Config{}
+	invalidConf := model.SMTPConfig{}
 	validEmail := genTestEmail(t, "Authms smtp SetConfig Test")
 	invalidEmail := model.SendMail{}
 	tt := []struct {
 		name       string
-		conf       smtp.Config
+		conf       model.SMTPConfig
 		notifEmail model.SendMail
 		cs         *ConfigStoreMock
 		expErr     bool

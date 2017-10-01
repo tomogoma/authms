@@ -1,6 +1,6 @@
-package smtp
+package model
 
-type Config struct {
+type SMTPConfig struct {
 	ServerAddress string `json:"serverAddress,omitempty"`
 	TLSPort       int32  `json:"TLSPort,omitempty"`
 	SSLPort       int32  `json:"SSLPort,omitempty"`
