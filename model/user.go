@@ -6,8 +6,8 @@ type User struct {
 	ID         string
 	Type       UserType
 	UserName   Username
-	Phone      Phone
-	Email      Email
+	Phone      VerifLogin
+	Email      VerifLogin
 	Facebook   Facebook
 	Groups     []Group
 	CreateDate time.Time

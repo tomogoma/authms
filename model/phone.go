@@ -2,10 +2,10 @@ package model
 
 import "time"
 
-type Phone struct {
+type VerifLogin struct {
 	ID         string
 	UserID     string
-	Number     string
+	Address    string
 	Verified   bool
 	CreateDate time.Time
 	UpdateDate time.Time

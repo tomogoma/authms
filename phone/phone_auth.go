@@ -12,6 +12,6 @@ type PhoneStore struct {
 type Login struct {
 }
 
-func (l *Login) Create(phone model.Phone) (*model.Phone, error) {
+func (l *Login) Create(phone model.VerifLogin) (*model.VerifLogin, error) {
 
 }

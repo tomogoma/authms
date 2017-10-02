@@ -54,7 +54,7 @@ type LoginVerification struct {
 
 type Auth struct {
 	dbHelper         DBHelper
-	tokenG           Tokener
+	tokenG           JWTEr
 	smser            SMSer
 	randomSMSCodeser SecureRandomByteser
 	oAuthCls         map[string]OAuthClient
@@ -111,7 +111,7 @@ func WithSMSCodeGenerator(g SecureRandomByteser) Option {
 	}
 }
 
-func New(tg Tokener, db DBHelper, opts ...Option) (*Auth, error) {
+func New(tg JWTEr, db DBHelper, opts ...Option) (*Auth, error) {
 	randSMSCodeser, err := generator.NewRandom(generator.NumberChars)
 	if err != nil {
 		return nil, errors.Newf("instantiate random number code generator: %v", err)

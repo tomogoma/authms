@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-type Token struct {
+type DBToken struct {
 	ID         string
 	UserID     string
 	Phone      string

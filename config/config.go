@@ -30,6 +30,8 @@ const (
 	DefaultPhoneInviteTpl    = DefaultTplDir + "/" + CanonicalName + "_phone_invite.tpl"
 	DefaultEmailResetPassTpl = DefaultTplDir + "/" + CanonicalName + "_email_reset_pass.html"
 	DefaultPhoneResetPassTpl = DefaultTplDir + "/" + CanonicalName + "_phone_reset_pass.tpl"
+	DefaultEmailVerifyTpl    = DefaultTplDir + "/" + CanonicalName + "_email_verify.html"
+	DefaultPhoneVerifyTpl    = DefaultTplDir + "/" + CanonicalName + "_phone_verify.tpl"
 
 	SMSAPITwilio         = "twilio"
 	SMSAPIAfricasTalking = "africasTalking"

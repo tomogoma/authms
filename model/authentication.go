@@ -30,26 +30,27 @@ type AuthStore interface {
 	InsertUserType(name string) (*UserType, error)
 	InsertUserAtomic(tx *sql.Tx, typeID string, password []byte) (*User, error)
 
-	UpdateUserPhone(userID, phone string, verified bool) (*Phone, error)
-	UpdateUserEmail(userID, email string, verified bool) (*Email, error)
+	UpdateUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
+	UpdateUserEmail(userID, email string, verified bool) (*VerifLogin, error)
 
+	UpdatePassword(userID string, password []byte) error
 	UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error
-	UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*Phone, error)
-	UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*Email, error)
+	UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
+	UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
 
-	InsertUserPhone(userID, phone string, verified bool) (*Phone, error)
-	InsertUserEmail(userID, email string, verified bool) (*Email, error)
-	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*Phone, error)
-	InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*Email, error)
+	InsertUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
+	InsertUserEmail(userID, email string, verified bool) (*VerifLogin, error)
+	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
+	InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
 	InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*Username, error)
 	InsertUserFacebookIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*Facebook, error)
 
-	InsertPhoneToken(userID, phone string, token []byte, isUsed bool, expiry time.Time) (*Token, error)
-	InsertEmailToken(userID, email string, token []byte, isUsed bool, expiry time.Time) (*Token, error)
-	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, token []byte, isUsed bool, expiry time.Time) (*Token, error)
-	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, token []byte, isUsed bool, expiry time.Time) (*Token, error)
-	PhoneTokens(userID string, offset, count int64) ([]*Token, error)
-	EmailTokens(userID string, offset, count int64) ([]*Token, error)
+	InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	PhoneTokens(userID string, offset, count int64) ([]*DBToken, error)
+	EmailTokens(userID string, offset, count int64) ([]*DBToken, error)
 
 	User(id string) (*User, []byte, error)
 	UserByPhone(phone string) (*User, []byte, error)
@@ -76,9 +77,9 @@ type SMSer interface {
 	SMS(toPhone, message string) error
 }
 
-type Tokener interface {
+type JWTEr interface {
 	Generate(claims jwt.Claims) (string, error)
-	Validate(token string, claims jwt.Claims) (*jwt.Token, error)
+	Validate(jwt string, claims jwt.Claims) (*jwt.Token, error)
 }
 
 type Mailer interface {
@@ -106,17 +107,13 @@ type Authentication struct {
 	numGen       SecureRandomByteser
 	urlTokenGen  SecureRandomByteser
 	smser        SMSer
-	tokener      Tokener
+	jwter        JWTEr
 	mailer       Mailer
 
-	invitationSubject    string
-	verificationSubject  string
-	emailInvitationTpl   *template.Template
-	emailVerificationTpl *template.Template
-	emailPassResetTpl    *template.Template
-	phoneInvitationTpl   *template.Template
-	phoneVerificationTpl *template.Template
-	phonePassResetTpl    *template.Template
+	invitationSubject   string
+	verificationSubject string
+	resetPassSubject    string
+	loginTpActionTplts  map[string]map[string]*template.Template
 }
 
 const (
@@ -133,34 +130,81 @@ const (
 	UserTypeIndividual = "individual"
 	UserTypeCompany    = "company"
 
-	numExp = `[0-9]+`
+	rePhoneChars = `[0-9]+`
 
 	minPassLen = 8
 	genPassLen = 32
 
-	inviteTokenValidity = 2 * time.Hour
+	inviteValidity = 24 * time.Hour * 30
+	resetValidity  = 2 * time.Hour
+	verifyValidity = 5 * time.Minute
 
-	pathConfirm = "confirm"
-	pathVerify  = "verify"
+	ActionInvite    = "invite"
+	ActionVerify    = "verify"
+	ActionResetPass = "reset/password"
 
-	loginTypeUsername = "username"
-	loginTypeEmail    = "phone"
-	loginTypePhone    = "email"
+	loginTypeUsername = "usernames"
+	loginTypeEmail    = "phones"
+	loginTypePhone    = "emails"
 	loginTypeFacebook = "facebook"
-
-	msgTypeVerification = "verification"
-	msgTypePassReset    = "pass_reset"
 )
 
-var rePhone = regexp.MustCompile(numExp)
-var validUserTypes = []string{UserTypeIndividual, UserTypeCompany}
+var (
+	rePhone        = regexp.MustCompile(rePhoneChars)
+	validUserTypes = []string{UserTypeIndividual, UserTypeCompany}
+
+	ActionNotSupportedErrorF    = "action not supported for request: %s"
+	LoginTypeNotSupportedErrorF = "login type not supported for request: %s"
+)
 
 func NewAuthentication() (*Authentication, error) {
 	a := Authentication{}
+	a.loginTpActionTplts = map[string]map[string]*template.Template{
+		loginTypePhone: make(map[string]*template.Template),
+		loginTypeEmail: make(map[string]*template.Template),
+	}
 	var err error
-	a.emailInvitationTpl, err = template.ParseFiles(config.DefaultEmailInviteTpl)
-	if err != nil {
-		return nil, errors.Newf("read new account email template: %v", err)
+	if _, ok := a.loginTpActionTplts[loginTypePhone][ActionInvite]; !ok {
+		a.loginTpActionTplts[loginTypePhone][ActionInvite], err =
+			template.ParseFiles(config.DefaultPhoneInviteTpl)
+		if err != nil {
+			return nil, errors.Newf("read SMS invitation template: %v", err)
+		}
+	}
+	if _, ok := a.loginTpActionTplts[loginTypePhone][ActionVerify]; !ok {
+		a.loginTpActionTplts[loginTypePhone][ActionVerify], err =
+			template.ParseFiles(config.DefaultPhoneVerifyTpl)
+		if err != nil {
+			return nil, errors.Newf("read SMS verification template: %v", err)
+		}
+	}
+	if _, ok := a.loginTpActionTplts[loginTypePhone][ActionResetPass]; !ok {
+		a.loginTpActionTplts[loginTypePhone][ActionResetPass], err =
+			template.ParseFiles(config.DefaultPhoneResetPassTpl)
+		if err != nil {
+			return nil, errors.Newf("read SMS reset password template: %v", err)
+		}
+	}
+	if _, ok := a.loginTpActionTplts[loginTypeEmail][ActionInvite]; !ok {
+		a.loginTpActionTplts[loginTypeEmail][ActionInvite], err =
+			template.ParseFiles(config.DefaultEmailInviteTpl)
+		if err != nil {
+			return nil, errors.Newf("read email invitation template: %v", err)
+		}
+	}
+	if _, ok := a.loginTpActionTplts[loginTypeEmail][ActionVerify]; !ok {
+		a.loginTpActionTplts[loginTypeEmail][ActionVerify], err =
+			template.ParseFiles(config.DefaultEmailVerifyTpl)
+		if err != nil {
+			return nil, errors.Newf("read email verification template: %v", err)
+		}
+	}
+	if _, ok := a.loginTpActionTplts[loginTypeEmail][ActionResetPass]; !ok {
+		a.loginTpActionTplts[loginTypeEmail][ActionResetPass], err =
+			template.ParseFiles(config.DefaultEmailResetPassTpl)
+		if err != nil {
+			return nil, errors.Newf("read email reset password template: %v", err)
+		}
 	}
 	return nil, errors.NewNotImplemented()
 }
@@ -187,22 +231,8 @@ func (a *Authentication) RegisterPublicByPhone(clientID, apiKey, userType, numbe
 		if a.smser == nil {
 			return nil
 		}
-		SMSURLToken, err := a.generateAndInsertToken(tx, loginTypePhone, usr.ID, number)
-		if err != nil {
-			return err
-		}
-		SMSURL, err := a.generateVerificationURL(loginTypePhone, usr.ID, SMSURLToken)
-		if err != nil {
-			return err
-		}
-		SMSCode, err := a.generateAndInsertCode(tx, loginTypePhone, usr.ID, number)
-		if err != nil {
-			return err
-		}
-		if err := a.sendPhoneVerification(a.phoneVerificationTpl, number, SMSURL, string(SMSCode)); err != nil {
-			return err
-		}
-		return nil
+		_, err := a.genAndSendTokens(tx, ActionVerify, loginTypePhone, number, usr.ID)
+		return err
 	})
 }
 
@@ -211,26 +241,18 @@ func (a *Authentication) RegisterPublicByEmail(clientID, apiKey, userType, addre
 		if err := a.insertEmailAtomic(tx, usr, address); err != nil {
 			return err
 		}
-		token, err := a.generateAndInsertToken(tx, loginTypeEmail, usr.ID, address)
-		if err != nil {
-			return err
+		if a.mailer == nil {
+			return nil
 		}
-		verURL, err := a.generateVerificationURL(loginTypeEmail, usr.ID, token)
-		if err != nil {
-			return err
-		}
-		code, err := a.generateAndInsertCode(tx, loginTypeEmail, usr.ID, address)
-		if err != nil {
-			return err
-		}
-		if err := a.sendEmailVerification(a.emailVerificationTpl, address, verURL, string(code)); err != nil {
-			return err
-		}
-		return nil
+		_, err := a.genAndSendTokens(tx, ActionVerify, loginTypeEmail, address, usr.ID)
+		return err
 	})
 }
 
 func (a *Authentication) RegisterPublicByFacebook(clientID, apiKey, userType, fbToken string) (*User, error) {
+	if a.fb == nil {
+		return nil, errors.NewNotImplementedf("facebook registration not available")
+	}
 	passwordB, err := a.passGen.SecureRandomBytes(genPassLen)
 	if err != nil {
 		return nil, errors.Newf("generate password: %v", err)
@@ -252,227 +274,224 @@ func (a *Authentication) RegisterPublicByFacebook(clientID, apiKey, userType, fb
 	})
 }
 
-func (a *Authentication) CreateByPhone(clientID, apiKey, token, userType, number, groupID string) (*User, error) {
+func (a *Authentication) CreateByPhone(clientID, apiKey, jwt, userType, number, groupID string) (*User, error) {
 	if a.smser == nil {
 		return nil, errors.NewNotImplementedf("SMS notification (to created user) not available")
 	}
-	return a.createUser(clientID, apiKey, token, userType, groupID, func(tx *sql.Tx, usr *User) error {
+	return a.createUser(clientID, apiKey, jwt, userType, groupID, func(tx *sql.Tx, usr *User) error {
 		if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
 			return err
 		}
-		SMSURLToken, err := a.generateAndInsertToken(tx, loginTypePhone, usr.ID, number)
-		if err != nil {
-			return err
-		}
-		SMSURL, err := a.generateConfirmationURL(loginTypePhone, usr.ID, SMSURLToken)
-		if err != nil {
-			return err
-		}
-		if err := a.sendPhoneInvite(number, SMSURL); err != nil {
-			return err
-		}
-		return nil
+		_, err := a.genAndSendTokens(tx, ActionInvite, loginTypePhone, number, usr.ID)
+		return err
 	})
 }
 
-func (a *Authentication) CreateByEmail(clientID, apiKey, token, userType, address, groupID string) (*User, error) {
+func (a *Authentication) CreateByEmail(clientID, apiKey, jwt, userType, address, groupID string) (*User, error) {
 	if a.mailer == nil {
 		return nil, errors.NewNotImplementedf("email notification (to created user) not available")
 	}
-	return a.createUser(clientID, apiKey, token, userType, groupID, func(tx *sql.Tx, usr *User) error {
+	return a.createUser(clientID, apiKey, jwt, userType, groupID, func(tx *sql.Tx, usr *User) error {
 		if err := a.insertEmailAtomic(tx, usr, address); err != nil {
 			return err
 		}
-		token, err := a.generateAndInsertToken(tx, loginTypeEmail, usr.ID, address)
-		if err != nil {
-			return err
-		}
-		verURL, err := a.generateConfirmationURL(loginTypeEmail, usr.ID, token)
-		if err != nil {
-			return err
-		}
-		if err := a.sendEmailInvite(address, verURL); err != nil {
-			return err
-		}
-		return nil
+		_, err := a.genAndSendTokens(tx, ActionInvite, loginTypeEmail, address, usr.ID)
+		return err
 	})
 }
 
-func (a *Authentication) ConfirmPhoneAccount(clientID, apiKey, userID, token, password string) (*Phone, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-	tkn, err := a.phoneTokenValid(userID, token)
-	if err != nil {
-		return nil, err
-	}
-	passH, err := hashIfValid(password)
-	if err != nil {
-		return nil, err
-	}
-	var phone *Phone
-	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		err = a.db.UpdatePasswordAtomic(tx, userID, passH)
-		if err != nil {
-			return errors.Newf("update password: %v", err)
-		}
-		phone, err = a.db.UpdateUserPhoneAtomic(tx, userID, tkn.Phone, true)
-		if err != nil {
-			return errors.Newf("update phone to verified: %v", err)
-		}
-		return nil
-	})
-	if err != nil {
-		return nil, err
-	}
-	return phone, nil
-}
+func (a *Authentication) UpdatePassword(clientID, apiKey, jwt, old, new string) error {
 
-func (a *Authentication) ConfirmEmailAccount(clientID, apiKey, userID, token, password string) (*Email, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-	tkn, err := a.emailTokenValid(userID, token)
-	if err != nil {
-		return nil, err
-	}
-	passH, err := hashIfValid(password)
-	if err != nil {
-		return nil, err
-	}
-	var email *Email
-	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		err = a.db.UpdatePasswordAtomic(tx, userID, passH)
-		if err != nil {
-			return errors.Newf("update password: %v", err)
-		}
-		email, err = a.db.UpdateUserEmailAtomic(tx, userID, tkn.Email, true)
-		if err != nil {
-			return errors.Newf("update phone to verified: %v", err)
-		}
-		return nil
-	})
-	return email, nil
-}
-
-func (a *Authentication) SendMsg(clientID, apiKey, messageType, loginType, jwt, identifier string) error {
 	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
 		return err
 	}
+
+	clm := new(Claim)
+	if _, err := a.jwter.Validate(jwt, clm); err != nil {
+		return err
+	}
+	_, oldPassH, err := a.db.User(clm.UsrID)
+	if err != nil {
+		return errors.Newf("get user: %v", err)
+	}
+
+	if err = passwordValid(oldPassH, []byte(old)); err != nil {
+		return err
+	}
+	newPassH, err := hashIfValid(new)
+	if err != nil {
+		return err
+	}
+	if err = a.db.UpdatePassword(clm.UsrID, newPassH); err != nil {
+		return errors.Newf("update password: %v", err)
+	}
+
+	return nil
+}
+
+func (a *Authentication) SetPassword(clientID, apiKey, loginType, userID, dbt, pass string) (*VerifLogin, error) {
+
+	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
+		return nil, err
+	}
+
+	var tkn *DBToken
+	var err error
+	var updtVerifiedFunc func(*sql.Tx, string, string, bool) (*VerifLogin, error)
+
+	switch loginType {
+	case loginTypeEmail:
+		updtVerifiedFunc = a.db.UpdateUserEmailAtomic
+		tkn, err = a.dbTokenValid(userID, dbt, a.db.EmailTokens)
+	case loginTypePhone:
+		updtVerifiedFunc = a.db.UpdateUserPhoneAtomic
+		tkn, err = a.dbTokenValid(userID, dbt, a.db.PhoneTokens)
+	default:
+		return nil, errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	passH, err := hashIfValid(pass)
+	if err != nil {
+		return nil, err
+	}
+
+	var addr *VerifLogin
+	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
+		err = a.db.UpdatePasswordAtomic(tx, userID, passH)
+		if err != nil {
+			return errors.Newf("update password: %v", err)
+		}
+		addr, err = updtVerifiedFunc(tx, userID, tkn.Phone, true)
+		if err != nil {
+			return errors.Newf("update phone to verified: %v", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return addr, nil
+}
+
+func (a *Authentication) SendVerCode(clientID, apiKey, loginType, jwt, toAddr string) (string, error) {
+	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
+		return "", err
+	}
+
 	clms := new(Claim)
-	if _, err := a.tokener.Validate(jwt, clms); err != nil {
-		return errors.NewForbiddenf("you have no access")
+	if _, err := a.jwter.Validate(jwt, clms); err != nil {
+		return "", err
 	}
 
 	var err error
 	var usr *User
+	var insFunc func(userID, phone string, verified bool) (*VerifLogin, error)
+
 	switch loginType {
 	case loginTypePhone:
-		usr, _, err = a.db.UserByPhone(identifier)
+		insFunc = a.db.InsertUserPhone
+		usr, _, err = a.db.UserByPhone(toAddr)
 	case loginTypeEmail:
-		usr, _, err = a.db.UserByEmail(identifier)
+		insFunc = a.db.InsertUserEmail
+		usr, _, err = a.db.UserByEmail(toAddr)
 	default:
-		return errors.NewClientf("login type not supported: %v", loginType)
+		return "", errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
 	}
 
 	if err != nil {
 		if !a.db.IsNotFoundError(err) {
-			return errors.Newf("user by identifier: %v", err)
+			return "", errors.Newf("user by %s: %v", loginType, err)
 		}
+
 		usr, _, err = a.db.User(clms.UsrID)
 		if err != nil {
 			if a.db.IsNotFoundError(err) {
-				return errors.Newf("valid claims with non-exist user found: %+v", clms)
+				return "", errors.Newf("valid claims with non-exist user found: %+v", clms)
 			}
-			return errors.Newf("get user: %v", err)
+			return "", errors.Newf("get user: %v", err)
 		}
-		switch loginType {
-		case loginTypePhone:
-			_, err = a.db.InsertUserPhone(usr.ID, identifier, false)
-		case loginTypeEmail:
-			_, err = a.db.InsertUserEmail(usr.ID, identifier, false)
-		default:
-			return errors.Newf("login type not supported: %v", loginType)
-		}
+
+		_, err = insFunc(usr.ID, toAddr, false)
 		if err != nil {
-			return errors.Newf("insert identifier: %v", err)
+			return "", errors.Newf("insert toAddr: %v", err)
 		}
+
+	} else if usr.ID != clms.UsrID {
+		return "", errors.NewForbiddenf("%s does not belong to you: %v", loginType)
 	}
-	tkn, err := a.generateAndInsertToken(nil, loginTypePhone, usr.ID, identifier)
-	if err != nil {
-		return err
-	}
-	SMSURL, err := a.generateConfirmationURL(loginTypePhone, usr.ID, tkn)
-	if err != nil {
-		return err
-	}
-	code, err := a.generateAndInsertCode(nil, loginTypePhone, usr.ID, identifier)
-	if err != nil {
-		return err
-	}
-	var phoneTpl *template.Template
-	var emailTpl *template.Template
-	switch messageType {
-	case msgTypePassReset:
-		phoneTpl = a.phonePassResetTpl
-		emailTpl = a.emailPassResetTpl
-	case msgTypeVerification:
-		phoneTpl = a.phoneVerificationTpl
-		emailTpl = a.emailVerificationTpl
-	default:
-		return errors.Newf("message type unsupported: %v", messageType)
-	}
-	switch loginType {
-	case loginTypePhone:
-		err = a.sendPhoneVerification(phoneTpl, identifier, SMSURL, string(code))
-	case loginTypeEmail:
-		err = a.sendEmailVerification(emailTpl, identifier, SMSURL, string(code))
-	default:
-		return errors.Newf("login type not supported: %v", loginType)
-	}
-	if err != nil {
-		return err
-	}
-	return nil
+
+	return a.genAndSendTokens(nil, ActionVerify, loginType, toAddr, usr.ID)
 }
 
-func (a *Authentication) VerifyPhone(clientID, apiKey, userID, token string) (*Phone, error) {
+func (a *Authentication) SendPassResetCode(clientID, apiKey, loginType, toAddr string) (string, error) {
+	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
+		return "", err
+	}
+	var err error
+	var usr *User
+
+	switch loginType {
+	case loginTypePhone:
+		usr, _, err = a.db.UserByPhone(toAddr)
+	case loginTypeEmail:
+		usr, _, err = a.db.UserByEmail(toAddr)
+	default:
+		return "", errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
+	}
+
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return "", errors.NewForbiddenf("%s does not exist", toAddr)
+		}
+		return "", errors.Newf("user by %s: %v", loginType, err)
+	}
+
+	return a.genAndSendTokens(nil, ActionResetPass, loginType, toAddr, usr.ID)
+}
+
+func (a *Authentication) Verify(clientID, apiKey, loginType, userID, dbt string) (*VerifLogin, error) {
 	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
 		return nil, err
 	}
-	tkn, err := a.phoneTokenValid(userID, token)
+
+	var tokensFetchFunc func(string, int64, int64) ([]*DBToken, error)
+	var updateLoginFunc func(string, string, bool) (*VerifLogin, error)
+
+	switch loginType {
+	case loginTypeEmail:
+		tokensFetchFunc = a.db.EmailTokens
+		updateLoginFunc = a.db.UpdateUserEmail
+	case loginTypePhone:
+		tokensFetchFunc = a.db.PhoneTokens
+		updateLoginFunc = a.db.UpdateUserPhone
+	default:
+		return nil, errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
+	}
+
+	tkn, err := a.dbTokenValid(userID, dbt, tokensFetchFunc)
 	if err != nil {
 		return nil, err
 	}
-	phone, err := a.db.UpdateUserPhone(userID, tkn.Phone, true)
+	phone, err := updateLoginFunc(userID, tkn.Phone, true)
 	if err != nil {
 		return nil, errors.Newf("update phone to verified: %v", err)
 	}
 	return phone, nil
-}
-
-func (a *Authentication) VerifyEmail(clientID, apiKey, userID, token string) (*Email, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-	tkn, err := a.emailTokenValid(userID, token)
-	if err != nil {
-		return nil, err
-	}
-	email, err := a.db.UpdateUserEmail(userID, tkn.Email, true)
-	if err != nil {
-		return nil, errors.Newf("update phone to verified: %v", err)
-	}
-	return email, nil
 }
 
 func (a *Authentication) Login(clientID, apiKey, loginType, identifier, password string) (*User, error) {
 	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
 		return nil, err
 	}
+
 	var usr *User
 	var passHB []byte
 	var err error
+
 	switch loginType {
 	case loginTypePhone:
 		usr, passHB, err = a.db.UserByPhone(identifier)
@@ -480,8 +499,10 @@ func (a *Authentication) Login(clientID, apiKey, loginType, identifier, password
 		usr, passHB, err = a.db.UserByEmail(identifier)
 	case loginTypeUsername:
 		usr, passHB, err = a.db.UserByUserName(identifier)
+	case loginTypeFacebook:
+		return a.loginFacebook(identifier)
 	default:
-		return nil, errors.Newf("unknown login type %s", loginType)
+		return nil, errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
 	}
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
@@ -489,51 +510,71 @@ func (a *Authentication) Login(clientID, apiKey, loginType, identifier, password
 		}
 		return nil, errors.Newf("get user by %s: %v", loginType, err)
 	}
+
 	if err := passwordValid(passHB, []byte(password)); err != nil {
-		return nil, errors.NewUnauthorized("invalid username/password combination")
-	}
-	return usr, nil
-}
-
-func (a *Authentication) LoginFacebook(clientID, apiKey, fbToken string) (*User, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
 		return nil, err
 	}
-	fbID, err := a.validateFbToken(fbToken)
-	if err != nil {
-		return nil, err
-	}
-	usr, err := a.db.UserByFacebook(fbID)
-	if err != nil {
-		if a.db.IsNotFoundError(err) {
-			return nil, errors.NewNotFound("facebook user not registered")
-		}
-		return nil, errors.Newf("get user by facebook ID: %v", err)
-	}
 	return usr, nil
-}
-
-func (a *Authentication) SendPasswordResetToken(c context.Context, loginType, withAddress string) (string, error) {
-	return "", errors.NewNotImplemented()
-}
-
-func (a *Authentication) ResetPassword(c context.Context, loginType, resetToken, newPassword string) error {
-	return errors.NewNotImplemented()
 }
 
 func (a *Authentication) UpdatePhoneLogin(c context.Context, userID, phone string) (*User, error) {
 	return nil, errors.NewNotImplemented()
 }
 
-func (a *Authentication) validateFbToken(fbToken string) (string, error) {
-	oa, err := a.fb.ValidateToken(fbToken)
+func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr, usrID string) (string, error) {
+
+	tkn, err := a.genAndInsertToken(tx, action, loginType, usrID, toAddr)
 	if err != nil {
-		if a.fb.IsAuthError(err) {
-			return "", errors.NewAuthf("facebook: %v", err)
-		}
-		return "", errors.Newf("validate facebook token: %v", err)
+		return "", err
 	}
-	return oa.UserID(), nil
+
+	URL, err := a.genURL(action, loginType, usrID, tkn)
+	if err != nil {
+		return "", err
+	}
+
+	code, err := a.genAndInsertCode(tx, action, loginType, usrID, toAddr)
+	if err != nil {
+		return "", err
+	}
+
+	var sendData interface{}
+	var subj string
+
+	switch action {
+	case ActionInvite:
+		sendData = InvitationTemplate{AppName: a.appName, URLToken: URL}
+		subj = a.invitationSubject
+	case ActionVerify:
+		sendData = VerificationTemplate{AppName: a.appName, URLToken: URL,
+			Code: string(code)}
+		subj = a.verificationSubject
+	case ActionResetPass:
+		sendData = VerificationTemplate{AppName: a.appName, URLToken: URL,
+			Code: string(code)}
+		subj = a.resetPassSubject
+	default:
+		return "", errors.Newf(ActionNotSupportedErrorF, action)
+	}
+
+	var obfuscateFunc func(string) string
+	tpl := a.loginTpActionTplts[loginType][action]
+
+	switch loginType {
+	case loginTypePhone:
+		obfuscateFunc = obfuscatePhone
+		err = a.sendSMS(toAddr, tpl, sendData)
+	case loginTypeEmail:
+		obfuscateFunc = obfuscateEmail
+		err = a.sendEmail(toAddr, subj, tpl, sendData)
+	default:
+		return "", errors.Newf(LoginTypeNotSupportedErrorF, loginType)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	return obfuscateFunc(toAddr), nil
 }
 
 func (a *Authentication) registerUser(clientID, apiKey, userType,
@@ -587,7 +628,7 @@ func (a *Authentication) registerUser(clientID, apiKey, userType,
 	return usr, nil
 }
 
-func (a *Authentication) createUser(clientID, apiKey, token, userType,
+func (a *Authentication) createUser(clientID, apiKey, jwt, userType,
 	groupID string, f func(tx *sql.Tx, usr *User) error) (*User, error) {
 
 	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
@@ -597,7 +638,7 @@ func (a *Authentication) createUser(clientID, apiKey, token, userType,
 	if err != nil {
 		return nil, err
 	}
-	if _, err := a.validateTokenInGroup(token, *adminGrp); err != nil {
+	if _, err := a.validateJWTInGroup(jwt, *adminGrp); err != nil {
 		return nil, err
 	}
 
@@ -653,124 +694,103 @@ func (a *Authentication) genPasswordWithHash() (password []byte, passwordH []byt
 	return
 }
 
-func (a *Authentication) generateConfirmationURL(loginType, userID string, token []byte) (string, error) {
-	verURL, err := url.Parse(a.webAppURL)
+func (a *Authentication) genAndInsertToken(tx *sql.Tx, action, loginType, forUsrID, loginID string) ([]byte, error) {
+	dbt, err := a.urlTokenGen.SecureRandomBytes(56)
 	if err != nil {
-		return "", errors.Newf("parsing web app URL: %v", err)
+		return nil, errors.Newf("generate %s verification db token", loginType)
 	}
-	verURL.Path = path.Join(verURL.Path, pathConfirm, loginType, userID, string(token))
-	return verURL.String(), nil
+	if err := a.hashAndInsertToken(tx, action, loginType, forUsrID, loginID, dbt); err != nil {
+		return nil, errors.Newf("%s verification db token: %v", loginType, err)
+	}
+	return dbt, nil
 }
 
-func (a *Authentication) generateVerificationURL(loginType, userID string, token []byte) (string, error) {
-	verURL, err := url.Parse(a.webAppURL)
-	if err != nil {
-		return "", errors.Newf("parsing web app URL: %v", err)
-	}
-	verURL.Path = path.Join(verURL.Path, pathVerify, loginType, userID, string(token))
-	return verURL.String(), nil
-}
-
-func (a *Authentication) sendEmailInvite(toAddress, verURL string) error {
-	emailBf := bytes.NewBuffer(make([]byte, 0, 256))
-	err := a.emailInvitationTpl.Execute(emailBf, InvitationTemplate{
-		AppName:  a.appName,
-		URLToken: verURL,
-	})
-	if err != nil {
-		return errors.Newf("email body from template: %v", err)
-	}
-	err = a.mailer.SendEmail(SendMail{
-		ToEmails: []string{toAddress},
-		Subject:  a.invitationSubject,
-		Body:     template.HTML(emailBf.String()),
-	})
-	if err != nil {
-		return errors.Newf("send email: %v", err)
-	}
-	return nil
-}
-
-func (a *Authentication) sendEmailVerification(t *template.Template, toAddress, verURL, verCode string) error {
-	emailBf := bytes.NewBuffer(make([]byte, 0, 256))
-	err := t.Execute(emailBf, VerificationTemplate{
-		AppName:  a.appName,
-		URLToken: verURL,
-		Code:     verCode,
-	})
-	if err != nil {
-		return errors.Newf("email body from template: %v", err)
-	}
-	err = a.mailer.SendEmail(SendMail{
-		ToEmails: []string{toAddress},
-		Subject:  a.invitationSubject,
-		Body:     template.HTML(emailBf.String()),
-	})
-	if err != nil {
-		return errors.Newf("send email: %v", err)
-	}
-	return nil
-}
-
-func (a *Authentication) generateAndInsertToken(tx *sql.Tx, loginType, forUsrID, loginID string) ([]byte, error) {
-	token, err := a.passGen.SecureRandomBytes(56)
-	if err != nil {
-		return nil, errors.Newf("generate %s verification token", loginType)
-	}
-	if err := a.hashAndInsertToken(tx, loginType, forUsrID, loginID, token); err != nil {
-		return nil, errors.Newf("%s verification token: %v", loginType, err)
-	}
-	return token, nil
-}
-
-func (a *Authentication) generateAndInsertCode(tx *sql.Tx, loginType, forUsrID, loginID string) ([]byte, error) {
+func (a *Authentication) genAndInsertCode(tx *sql.Tx, action, loginType, forUsrID, loginID string) ([]byte, error) {
 	code, err := a.numGen.SecureRandomBytes(6)
 	if err != nil {
 		return nil, errors.Newf("generate %s verification code", loginType)
 	}
-	if err := a.hashAndInsertToken(tx, loginType, forUsrID, loginID, code); err != nil {
+	if err := a.hashAndInsertToken(tx, action, loginType, forUsrID, loginID, code); err != nil {
 		return nil, errors.Newf("%s verification code: %v", loginType, err)
 	}
 	return code, nil
 }
 
-func (a *Authentication) hashAndInsertToken(tx *sql.Tx, loginType, forUsrID, loginID string, code []byte) error {
+func (a *Authentication) hashAndInsertToken(tx *sql.Tx, action, loginType, forUsrID, loginID string, code []byte) error {
 	codeH, err := hash([]byte(code))
 	if err != nil {
 		return errors.Newf("hash for storage: %v", err)
 	}
-	expiry := time.Now().Add(inviteTokenValidity)
+
+	var insFuncAtomic func(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	var insFunc func(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+
+	switch loginType {
+	case loginTypePhone:
+		insFunc = a.db.InsertPhoneToken
+		insFuncAtomic = a.db.InsertPhoneTokenAtomic
+	case loginTypeEmail:
+		insFunc = a.db.InsertEmailToken
+		insFuncAtomic = a.db.InsertEmailTokenAtomic
+	default:
+		return errors.NewClientf(LoginTypeNotSupportedErrorF, loginType)
+	}
+
+	var validity time.Duration
+
+	switch action {
+	case ActionResetPass:
+		validity = resetValidity
+	case ActionVerify:
+		validity = verifyValidity
+	case ActionInvite:
+		validity = inviteValidity
+	default:
+		return errors.NewClientf(ActionNotSupportedErrorF, action)
+	}
+
+	expiry := time.Now().Add(validity)
 	if tx == nil {
-		switch loginType {
-		case loginTypePhone:
-			_, err = a.db.InsertPhoneToken(forUsrID, loginID, codeH, false, expiry)
-		case loginTypeEmail:
-			_, err = a.db.InsertEmailToken(forUsrID, loginID, codeH, false, expiry)
-		default:
-			return errors.Newf("unsupported loginType")
-		}
+		_, err = insFunc(forUsrID, loginID, codeH, false, expiry)
 	} else {
-		switch loginType {
-		case loginTypePhone:
-			_, err = a.db.InsertPhoneTokenAtomic(tx, forUsrID, loginID, codeH, false, expiry)
-		case loginTypeEmail:
-			_, err = a.db.InsertEmailTokenAtomic(tx, forUsrID, loginID, codeH, false, expiry)
-		default:
-			return errors.Newf("unsupported loginType")
-		}
+		_, err = insFuncAtomic(tx, forUsrID, loginID, codeH, false, expiry)
 	}
 	if err != nil {
 		return errors.Newf("insert: %v", err)
 	}
+
 	return nil
 }
 
-func (a *Authentication) sendPhoneInvite(toPhone, urlToken string) error {
-	SMSBf := bytes.NewBuffer(make([]byte, 0, 256))
-	err := a.phoneInvitationTpl.Execute(SMSBf, InvitationTemplate{
-		AppName:  a.appName,
-		URLToken: urlToken,
+func (a *Authentication) genURL(action, loginType, userID string, dbt []byte) (string, error) {
+	URL, err := url.Parse(a.webAppURL)
+	if err != nil {
+		return "", errors.Newf("parsing web app URL: %v", err)
+	}
+	URL.Path = path.Join(URL.Path, action, loginType, userID, string(dbt))
+	return URL.String(), nil
+}
+
+func (a *Authentication) sendEmail(toAddr, subj string, t *template.Template, data interface{}) error {
+	emailBf := bytes.NewBuffer(make([]byte, 0, 256))
+	err := t.Execute(emailBf, data)
+	if err != nil {
+		return errors.Newf("email body from template: %v", err)
+	}
+	err = a.mailer.SendEmail(SendMail{
+		ToEmails: []string{toAddr},
+		Subject:  subj,
+		Body:     template.HTML(emailBf.String()),
 	})
+	if err != nil {
+		return errors.Newf("send email: %v", err)
+	}
+	return nil
+}
+
+func (a *Authentication) sendSMS(toPhone string, t *template.Template, data interface{}) error {
+	SMSBf := bytes.NewBuffer(make([]byte, 0, 256))
+	err := t.Execute(SMSBf, data)
 	if err != nil {
 		return errors.Newf("SMS from template: %v", err)
 	}
@@ -780,33 +800,10 @@ func (a *Authentication) sendPhoneInvite(toPhone, urlToken string) error {
 	return nil
 }
 
-func (a *Authentication) sendPhoneVerification(t *template.Template, toPhone, urlToken, smsCode string) error {
-	SMSBf := bytes.NewBuffer(make([]byte, 0, 256))
-	err := t.Execute(SMSBf, VerificationTemplate{
-		AppName:  a.appName,
-		URLToken: urlToken,
-		Code:     smsCode,
-	})
-	if err != nil {
-		return errors.Newf("SMS from template: %v", err)
-	}
-	if err := a.smser.SMS(toPhone, SMSBf.String()); err != nil {
-		return errors.Newf("send SMS: %v", err)
-	}
-	return nil
-}
+func (a *Authentication) dbTokenValid(userID, dbtStr string,
+	f func(userID string, offset, count int64) ([]*DBToken, error)) (*DBToken, error) {
 
-func (a *Authentication) phoneTokenValid(userID, token string) (*Token, error) {
-	return a.tokenValid(userID, token, a.db.PhoneTokens)
-}
-
-func (a *Authentication) emailTokenValid(userID, token string) (*Token, error) {
-	return a.tokenValid(userID, token, a.db.EmailTokens)
-}
-
-func (a *Authentication) tokenValid(userID, token string,
-	f func(userID string, offset, count int64) ([]*Token, error)) (*Token, error) {
-	if token == "" {
+	if dbtStr == "" {
 		return nil, errors.NewUnauthorized("confirmation token cannot be empty")
 	}
 	if userID == "" {
@@ -814,7 +811,7 @@ func (a *Authentication) tokenValid(userID, token string,
 	}
 	offset := int64(0)
 	count := int64(100)
-	var tkn *Token
+	var dbt *DBToken
 resumeFunc:
 	for {
 		codes, err := f(userID, offset, count)
@@ -822,24 +819,24 @@ resumeFunc:
 			return nil, errors.NewForbidden("token is invalid")
 		}
 		if err != nil {
-			return nil, errors.Newf("get phone tokens: %v", err)
+			return nil, errors.Newf("get phone db tokens: %v", err)
 		}
 		offset = offset + count
-		for _, tkn = range codes {
-			err = bcrypt.CompareHashAndPassword(tkn.Token, []byte(token))
+		for _, dbt = range codes {
+			err = bcrypt.CompareHashAndPassword(dbt.Token, []byte(dbtStr))
 			if err != nil {
 				continue
 			}
 			break resumeFunc
 		}
 	}
-	if tkn.IsUsed {
+	if dbt.IsUsed {
 		return nil, errors.NewForbiddenf("token already used")
 	}
-	if time.Now().After(tkn.ExpiryDate) {
+	if time.Now().After(dbt.ExpiryDate) {
 		return nil, errors.NewAuth("token has expired")
 	}
-	return tkn, nil
+	return dbt, nil
 }
 
 func (a *Authentication) insertPhoneAtomic(tx *sql.Tx, usr *User, number string) error {
@@ -894,23 +891,55 @@ func (a *Authentication) getOrCreateUserType(name string) (*UserType, error) {
 	return ut, nil
 }
 
-func (a *Authentication) validateTokenInGroup(token string, g Group) (Claim, error) {
+func (a *Authentication) validateJWTInGroup(jwt string, g Group) (Claim, error) {
 	clm := Claim{}
-	if token == "" {
-		return clm, errors.NewUnauthorizedf("token must be provided")
+	if jwt == "" {
+		return clm, errors.NewUnauthorizedf("jwt must be provided")
 	}
-	_, err := a.tokener.Validate(token, &clm)
+	_, err := a.jwter.Validate(jwt, &clm)
 	if err != nil {
-		return clm, errors.NewForbidden("invalid token")
+		return clm, errors.NewForbidden("invalid jwt")
 	}
 	if !inGroups(g, clm.Groups) {
-		return clm, errors.NewForbidden("invalid token")
+		return clm, errors.NewForbidden("invalid jwt")
 	}
 	return clm, nil
 }
 
+func (a *Authentication) loginFacebook(fbToken string) (*User, error) {
+	if a.fb == nil {
+		return nil, errors.NewNotImplementedf("facebook registration not available")
+	}
+	fbID, err := a.validateFbToken(fbToken)
+	if err != nil {
+		return nil, err
+	}
+	usr, err := a.db.UserByFacebook(fbID)
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound("facebook user not registered")
+		}
+		return nil, errors.Newf("get user by facebook ID: %v", err)
+	}
+	return usr, nil
+}
+
+func (a *Authentication) validateFbToken(fbToken string) (string, error) {
+	oa, err := a.fb.ValidateToken(fbToken)
+	if err != nil {
+		if a.fb.IsAuthError(err) {
+			return "", errors.NewAuthf("facebook: %v", err)
+		}
+		return "", errors.Newf("validate facebook token: %v", err)
+	}
+	return oa.UserID(), nil
+}
+
 func passwordValid(hashed, password []byte) error {
-	return bcrypt.CompareHashAndPassword(hashed, password)
+	if err := bcrypt.CompareHashAndPassword(hashed, password); err != nil {
+		return errors.NewForbiddenf("invalid username/password combination")
+	}
+	return nil
 }
 
 func hash(password []byte) ([]byte, error) {
@@ -956,4 +985,35 @@ func formatPhone(phone string) string {
 		formatted = formatted + part
 	}
 	return formatted
+}
+
+func obfuscatePhone(num string) string {
+	n := len(num)
+	if n < 4 {
+		return "xxx"
+	}
+	showFrom := n - 3
+	if n < 6 {
+		showFrom = n - 2
+	}
+	mask := strings.Repeat("x", showFrom)
+	return mask + num[showFrom:]
+}
+
+func obfuscateEmail(addr string) string {
+	j := strings.Index(addr, "@")
+	if j == -1 {
+		return "xxx"
+	}
+	num := addr[0:j]
+	n := len(num)
+	if n < 5 {
+		return "xxx" + addr[j:]
+	}
+	showFrom := n - 3
+	if n < 7 {
+		showFrom = n - 2
+	}
+	mask := strings.Repeat("x", showFrom-1)
+	return num[0:1] + mask + num[showFrom:] + addr[j:]
 }
