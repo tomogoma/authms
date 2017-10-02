@@ -12,4 +12,6 @@ type User struct {
 	Groups     []Group
 	CreateDate time.Time
 	UpdateDate time.Time
+	Devices    []Device
+	JWT        string
 }

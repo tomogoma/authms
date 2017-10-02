@@ -4,11 +4,12 @@ const (
 	Version = 1
 
 	TblConfigurations = "configurations"
-	TblUserTypes      = "userTypes"
-	TblUsers          = "users"
-	TblGroups         = "groups"
-	TblUserGroupsJoin = "userGroupsJoin"
 	TblAPIKeys        = "apiKeys"
+	TblUserTypes      = "userTypes"
+	TblGroups         = "groups"
+	TblUsers          = "users"
+	TblUserGroupsJoin = "userGroupsJoin"
+	TblDeviceIDs      = "deviceIDs"
 	TblUserNameIDs    = "userNameIDs"
 	TblEmailIDs       = "emailIDs"
 	TblEmailTokens    = "emailTokens"
@@ -37,7 +38,7 @@ const (
 	ColValue       = "value"
 	ColAPIKey      = "apiKey"
 	ColTypeID      = "typeID"
-	ColDescription = "description"
+	ColDevID       = "deviceID"
 
 	TblDescConfigurations = `
 	CREATE TABLE IF NOT EXISTS ` + TblConfigurations + ` (
@@ -56,15 +57,6 @@ const (
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
-	TblDescUsers = `
-	CREATE TABLE IF NOT EXISTS ` + TblUsers + ` (
-		` + ColID + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColID + ` != ''),
-		` + ColTypeID + ` CHAR NOT NULL REFERENCES ` + TblUsers + ` (` + ColUserID + `),
-		` + ColPassword + ` BYTEA NOT NULL CHECK ( LENGTH(` + ColPassword + `) >= 8 ),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
-	);
-	`
 	TblDescGroups = `
 	CREATE TABLE IF NOT EXISTS ` + TblGroups + ` (
 		` + ColID + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColID + ` != ''),
@@ -74,11 +66,29 @@ const (
 		` + ColUpdateDate + ` TIMESTAMP NOT NULL
 	);
 	`
+	TblDescUsers = `
+	CREATE TABLE IF NOT EXISTS ` + TblUsers + ` (
+		` + ColID + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColID + ` != ''),
+		` + ColTypeID + ` CHAR NOT NULL REFERENCES ` + TblUsers + ` (` + ColUserID + `),
+		` + ColPassword + ` BYTEA NOT NULL CHECK ( LENGTH(` + ColPassword + `) >= 8 ),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
+	);
+	`
 	TblDescUsersGroupsJoin = `
 	CREATE TABLE IF NOT EXISTS ` + TblUserGroupsJoin + ` (
 		` + ColID + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColID + ` != ''),
 		` + ColUserID + ` CHAR UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColUserID + `),
 		` + ColGroupID + ` CHAR NOT NULL REFERENCES ` + TblGroups + ` (` + ColGroupID + `),
+		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+	);
+	`
+	TblDescDeviceIDs = `
+	CREATE TABLE IF NOT EXISTS ` + TblDeviceIDs + ` (
+		` + ColID + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColID + ` != ''),
+		` + ColUserID + ` CHAR NOT NULL REFERENCES ` + TblUsers + ` (` + ColUserID + `),
+		` + ColDevID + ` CHAR UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
 		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
 		` + ColUpdateDate + ` TIMESTAMP NOT NULL
 	);
@@ -161,11 +171,12 @@ const (
 
 var AllTableDescs = []string{
 	TblDescConfigurations,
-	TblDescUserTypes,
-	TblDescUsers,
-	TblDescGroups,
-	TblDescUsersGroupsJoin,
 	TblDescAPIKeys,
+	TblDescUserTypes,
+	TblDescGroups,
+	TblDescUsers,
+	TblDescUsersGroupsJoin,
+	TblDescDeviceIDs,
 	TblDescUserNameIDs,
 	TblDescEmailIDs,
 	TblDescEmailTokens,

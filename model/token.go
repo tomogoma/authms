@@ -5,8 +5,7 @@ import "time"
 type DBToken struct {
 	ID         string
 	UserID     string
-	Phone      string
-	Email      string
+	Address    string
 	IsUsed     bool
 	Token      []byte
 	IssueDate  time.Time

@@ -74,7 +74,6 @@ const (
 	AccessUpdate         = "UPDATE"
 	AccessVerification   = "VERIFICATION"
 	AccessCodeValidation = "VERIFICATION_CODE_VALIDATION"
-	tokenValidity        = 8 * time.Hour
 	AppFacebook          = "facebook"
 
 	verTypePhone = "phone"
