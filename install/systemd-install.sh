@@ -51,6 +51,12 @@ fi
 if [ ! -f "${PHONE_RESET_PASS_TPL}" ]; then
     cp "reset_pass_sms.tpl" "${PHONE_RESET_PASS_TPL}" || exit 1
 fi
+if [ ! -f "${EMAIL_VERIFY_TPL}" ]; then
+    cp "verify_email.html" "${EMAIL_VERIFY_TPL}" || exit 1
+fi
+if [ ! -f "${PHONE_VERIFY_TPL}" ]; then
+    cp "verify_sms.tpl" "${PHONE_VERIFY_TPL}" || exit 1
+fi
 
 mkdir -p "${INSTALL_DIR}" || exit 1
 cp -f ../bin/app "${INSTALL_FILE}" || exit 1

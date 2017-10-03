@@ -65,6 +65,8 @@ EMAIL_INVITE_TPL="` + config.DefaultEmailInviteTpl + `"
 PHONE_INVITE_TPL="` + config.DefaultPhoneInviteTpl + `"
 EMAIL_RESET_PASS_TPL="` + config.DefaultEmailResetPassTpl + `"
 PHONE_RESET_PASS_TPL="` + config.DefaultPhoneResetPassTpl + `"
+EMAIL_VERIFY_TPL="` + config.DefaultEmailVerifyTpl + `"
+PHONE_VERIFY_TPL="` + config.DefaultPhoneVerifyTpl + `"
 `
 	return ioutil.WriteFile("install/vars.sh", []byte(content), 0755)
 }
