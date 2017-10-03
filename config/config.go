@@ -3,7 +3,6 @@ package config
 import (
 	"time"
 
-	"github.com/tomogoma/go-commons/auth/token"
 	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
@@ -84,10 +83,14 @@ type Auth struct {
 	BlacklistWindow    time.Duration `json:"blacklistWindow" yaml:"blacklistWindow"`
 }
 
+type JWT struct {
+	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
+}
+
 type General struct {
-	Service        ServiceConfig    `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
-	Database       cockroach.DSN    `json:"database,omitempty" yaml:"database"`
-	Authentication Auth             `json:"authentication,omitempty" yaml:"authentication"`
-	Token          token.ConfigStub `json:"token,omitempty" yaml:"token"`
-	SMS            SMSConfig        `json:"sms" yaml:"sms"`
+	Service        ServiceConfig `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Database       cockroach.DSN `json:"database,omitempty" yaml:"database"`
+	Authentication Auth          `json:"authentication,omitempty" yaml:"authentication"`
+	Token          JWT           `json:"token,omitempty" yaml:"token"`
+	SMS            SMSConfig     `json:"sms" yaml:"sms"`
 }

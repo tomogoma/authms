@@ -13,52 +13,57 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/go-commons/errors"
 	"golang.org/x/crypto/bcrypt"
+	"reflect"
 )
 
 type AuthStore interface {
 	IsNotFoundError(error) bool
 	ExecuteTx(fn func(*sql.Tx) error) error
 
-	GroupByName(string) (*Group, error)
-	Group(string) (*Group, error)
 	InsertGroup(name string, acl int) (*Group, error)
-	AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error
+	Group(string) (*Group, error)
+	GroupByName(string) (*Group, error)
 
-	UserTypeByName(string) (*UserType, error)
 	InsertUserType(name string) (*UserType, error)
+	UserTypeByName(string) (*UserType, error)
+
 	InsertUserAtomic(tx *sql.Tx, typeID string, password []byte) (*User, error)
-
-	UpdateUsername(userID, username string) (*Username, error)
-	UpdateUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
-	UpdateUserEmail(userID, email string, verified bool) (*VerifLogin, error)
-
 	UpdatePassword(userID string, password []byte) error
 	UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error
-	UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
-	UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
-
-	InsertUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
-	InsertUserEmail(userID, email string, verified bool) (*VerifLogin, error)
-	InsertUserName(userID, username string) (*Username, error)
-	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
-	InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
-	InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*Username, error)
-	InsertUserFacebookIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*Facebook, error)
-	InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*Device, error)
-
-	InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
-	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
-	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
-	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
-	PhoneTokens(userID string, offset, count int64) ([]*DBToken, error)
-	EmailTokens(userID string, offset, count int64) ([]*DBToken, error)
-
 	User(id string) (*User, []byte, error)
+	UserByDeviceID(devID string) (*User, []byte, error)
+	UserByUsername(username string) (*User, []byte, error)
 	UserByPhone(phone string) (*User, []byte, error)
 	UserByEmail(email string) (*User, []byte, error)
-	UserByUsername(username string) (*User, []byte, error)
 	UserByFacebook(facebookID string) (*User, error)
-	UserByDeviceID(devID string) (*User, []byte, error)
+
+	AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error
+
+	InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*Device, error)
+
+	InsertUserName(userID, username string) (*Username, error)
+	InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*Username, error)
+	UpdateUsername(userID, username string) (*Username, error)
+
+	InsertUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
+	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
+	UpdateUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
+	UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
+
+	InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	PhoneTokens(userID string, offset, count int64) ([]DBToken, error)
+
+	InsertUserEmail(userID, email string, verified bool) (*VerifLogin, error)
+	InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
+	UpdateUserEmail(userID, email string, verified bool) (*VerifLogin, error)
+	UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
+
+	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	EmailTokens(userID string, offset, count int64) ([]DBToken, error)
+
+	InsertUserFbIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*Facebook, error)
 }
 
 type Guard interface {
@@ -173,13 +178,13 @@ var (
 // NewAuthentication constructs an Authentication structs or returns an error
 // if invalid parameters were provided.
 func NewAuthentication(db AuthStore, g Guard, j JWTEr, opts ...Option) (*Authentication, error) {
-	if db == nil {
+	if db == nil || reflect.ValueOf(db).IsNil() {
 		return nil, errors.New("AuthStore was nil")
 	}
-	if g == nil {
+	if g == nil || reflect.ValueOf(j).IsNil() {
 		return nil, errors.New("Guard was nil")
 	}
-	if j == nil {
+	if j == nil || reflect.ValueOf(g).IsNil() {
 		return nil, errors.New("JWTEr was nil")
 	}
 
@@ -320,7 +325,7 @@ func (a *Authentication) RegisterSelfByFacebook(clID, apiKey, userType, fbToken 
 		if err = a.usrIdentifierAvail(loginTypeFacebook, err); err != nil {
 			return err
 		}
-		fb, err := a.db.InsertUserFacebookIDAtomic(tx, usr.ID, fbID, true)
+		fb, err := a.db.InsertUserFbIDAtomic(tx, usr.ID, fbID, true)
 		if err != nil {
 			return errors.Newf("insert facebook: %v", err)
 		}
@@ -414,7 +419,7 @@ func (a *Authentication) UpdatePhone(clientID, apiKey, JWT, newNum string) (*Ver
 }
 
 // UpdatePassword updates a user account's password.
-func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, new string) error {
+func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, newPass string) error {
 
 	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
 		return err
@@ -432,7 +437,7 @@ func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, new string) 
 	if err = passwordValid(oldPassH, []byte(old)); err != nil {
 		return err
 	}
-	newPassH, err := hashIfValid(new)
+	newPassH, err := hashIfValid(newPass)
 	if err != nil {
 		return err
 	}
@@ -680,7 +685,7 @@ func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) er
 
 func (a *Authentication) verifyDBT(loginType, userID, dbt string) (*VerifLogin, error) {
 
-	var tokensFetchFunc func(string, int64, int64) ([]*DBToken, error)
+	var tokensFetchFunc func(string, int64, int64) ([]DBToken, error)
 	var updateLoginFunc func(string, string, bool) (*VerifLogin, error)
 
 	switch loginType {
@@ -995,7 +1000,7 @@ func (a *Authentication) sendSMS(toPhone string, t *template.Template, data inte
 }
 
 func (a *Authentication) dbTokenValid(userID, dbtStr string,
-	f func(userID string, offset, count int64) ([]*DBToken, error)) (*DBToken, error) {
+	f func(userID string, offset, count int64) ([]DBToken, error)) (*DBToken, error) {
 
 	if dbtStr == "" {
 		return nil, errors.NewUnauthorized("confirmation token cannot be empty")
@@ -1005,7 +1010,7 @@ func (a *Authentication) dbTokenValid(userID, dbtStr string,
 	}
 	offset := int64(0)
 	count := int64(100)
-	var dbt *DBToken
+	var dbt DBToken
 resumeFunc:
 	for {
 		codes, err := f(userID, offset, count)
@@ -1030,7 +1035,7 @@ resumeFunc:
 	if time.Now().After(dbt.ExpiryDate) {
 		return nil, errors.NewAuth("token has expired")
 	}
-	return dbt, nil
+	return &dbt, nil
 }
 
 func (a *Authentication) insertPhoneAtomic(tx *sql.Tx, usr *User, number string) error {
