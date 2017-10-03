@@ -3,19 +3,24 @@ package model
 import (
 	"errors"
 	"html/template"
+	"reflect"
 
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
 )
 
+// Option is used by NewAuthentication to pass additional configuration. Use
+// the With... methods to create Options e.g.
+//     nameOpt := WithAppName("My Awesome App")
 type Option func(*authenticationConfig) error
 
+// WithPasswordGen sets the password generator to be used. It cannot be nil;
 func WithPasswordGen(g SecureRandomByteser, initErr error) Option {
 	return func(c *authenticationConfig) error {
 		if initErr != nil {
 			return initErr
 		}
-		if g == nil {
+		if g == nil || reflect.ValueOf(g).IsNil() {
 			return errors.New("password Generator cannot be nil")
 		}
 		c.passGen = g
@@ -23,12 +28,13 @@ func WithPasswordGen(g SecureRandomByteser, initErr error) Option {
 	}
 }
 
+// WithNumGen sets the number generator to be used. It cannot be nil;
 func WithNumGen(g SecureRandomByteser, intiErr error) Option {
 	return func(c *authenticationConfig) error {
 		if intiErr != nil {
 			return intiErr
 		}
-		if g == nil {
+		if g == nil || reflect.ValueOf(g).IsNil() {
 			return errors.New("number Generator cannot be nil")
 		}
 		c.numGen = g
@@ -36,12 +42,15 @@ func WithNumGen(g SecureRandomByteser, intiErr error) Option {
 	}
 }
 
+// WithURLTokenGen sets the string generator for URL tokens. It cannot be nil.
+// Strings from this generator will be used in URLs and should thus conform to
+// encoding rules.
 func WithURLTokenGen(g SecureRandomByteser, intiErr error) Option {
 	return func(c *authenticationConfig) error {
 		if intiErr != nil {
 			return intiErr
 		}
-		if g == nil {
+		if g == nil || reflect.ValueOf(g).IsNil() {
 			return errors.New("URL token Generator cannot be nil")
 		}
 		c.urlTokenGen = g
@@ -49,6 +58,8 @@ func WithURLTokenGen(g SecureRandomByteser, intiErr error) Option {
 	}
 }
 
+// WithDevLockedToUser requires a device ID during self-registration and only
+// allows one user per device.
 func WithDevLockedToUser(t bool) Option {
 	return func(c *authenticationConfig) error {
 		c.lockDevToUser = t
@@ -66,6 +77,7 @@ func WithSelfRegAllowed(t bool) Option {
 	}
 }
 
+// WithAppName sets the name of the application.
 func WithAppName(n string) Option {
 	return func(c *authenticationConfig) error {
 		c.appNameEmptyable = n
@@ -73,6 +85,7 @@ func WithAppName(n string) Option {
 	}
 }
 
+// WithFacebookCl sets the facebook client to be used.
 func WithFacebookCl(fb FacebookCl) Option {
 	return func(c *authenticationConfig) error {
 		c.fbNilable = fb
@@ -82,9 +95,9 @@ func WithFacebookCl(fb FacebookCl) Option {
 
 // WithSMSCl sets the SMS client to use.
 // You may provide templates
-// for sending SMSes e.g. WithPhoneVerifyTplt(), WithPhoneInviteTplt(),
-// WithPhoneResetPassTplt() ...otherwise default template files in the config
-// package are used.
+// for sending SMSes e.g.
+//     WithPhoneVerifyTplt()
+// ...otherwise default template files in the config package are used.
 // NewAuthentication() fails if this option is not nil and one of the
 // templates couldn't be loaded.
 func WithSMSCl(cl SMSer) Option {
@@ -96,9 +109,9 @@ func WithSMSCl(cl SMSer) Option {
 
 // WithEmailCl sets the email client to use.
 // You may provide templates
-// for sending Emails e.g. WithEmailVerifyTplt(), WithEmailInviteTplt(),
-// WithEmailResetPassTplt() ...otherwise default template files in the config
-// package are used.
+// for sending Emails e.g.
+//     WithEmailVerifyTplt()
+// ...otherwise default template files in the config package are used.
 // NewAuthentication() fails if this option is not nil and one of the
 // templates couldn't be loaded.
 func WithEmailCl(cl Mailer) Option {
@@ -108,6 +121,8 @@ func WithEmailCl(cl Mailer) Option {
 	}
 }
 
+// WithWebAppURL sets the webapp URL that will consume requests from users.
+// TODO document types of request and URL endpoints that will be suffixed
 func WithWebAppURL(URL string) Option {
 	return func(c *authenticationConfig) error {
 		c.webAppURLEmptyable = URL
@@ -115,6 +130,7 @@ func WithWebAppURL(URL string) Option {
 	}
 }
 
+// WithInvitationSubject sets the subject to be used when sending invites to a user.
 func WithInvitationSubject(s string) Option {
 	return func(c *authenticationConfig) error {
 		c.invSubjEmptyable = s
@@ -122,6 +138,8 @@ func WithInvitationSubject(s string) Option {
 	}
 }
 
+// WithVerificationSubject sets the subject to be used when sending verification
+// messages to a user.
 func WithVerificationSubject(s string) Option {
 	return func(c *authenticationConfig) error {
 		c.verSubjEmptyable = s
@@ -129,6 +147,8 @@ func WithVerificationSubject(s string) Option {
 	}
 }
 
+// WithResetPassSubject sets the subject to be used when sending password reset
+// codes/links to a user.
 func WithResetPassSubject(s string) Option {
 	return func(c *authenticationConfig) error {
 		c.resPassSubjEmptyable = s
@@ -136,12 +156,15 @@ func WithResetPassSubject(s string) Option {
 	}
 }
 
+// WithPhoneInviteTplt sets the message template to be used when composing SMS
+// invite messages.
+// TODO define valid template values
 func WithPhoneInviteTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
 		c.loginTpActionTplts[loginTypePhone][ActionInvite] = t
@@ -149,12 +172,15 @@ func WithPhoneInviteTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+// WithPhoneResetPassTplt sets the message template to be used when composing SMS
+// password reset messages.
+// TODO define valid template values
 func WithPhoneResetPassTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
 		c.loginTpActionTplts[loginTypePhone][ActionResetPass] = t
@@ -162,12 +188,15 @@ func WithPhoneResetPassTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+// WithPhoneVerifyTplt sets the message template to be used when composing phone
+// verification messages.
+// TODO define valid template values
 func WithPhoneVerifyTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
 		c.loginTpActionTplts[loginTypePhone][ActionVerify] = t
@@ -175,12 +204,15 @@ func WithPhoneVerifyTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+// WithEmailInviteTplt sets the message template to be used when composing email
+// invite messages.
+// TODO define valid template values
 func WithEmailInviteTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
 		c.loginTpActionTplts[loginTypeEmail][ActionInvite] = t
@@ -188,12 +220,15 @@ func WithEmailInviteTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+// WithEmailResetPassTplt sets the message template to be used when composing email
+// password reset messages.
+// TODO define valid template values
 func WithEmailResetPassTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided email reset pass template was nil")
 		}
 		c.loginTpActionTplts[loginTypeEmail][ActionResetPass] = t
@@ -201,12 +236,15 @@ func WithEmailResetPassTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+// WithEmailVerifyTplt sets the message template to be used when composing email
+// verification messages.
+// TODO define valid template values
 func WithEmailVerifyTplt(t *template.Template, parseErr error) Option {
 	return func(c *authenticationConfig) error {
 		if parseErr != nil {
 			return parseErr
 		}
-		if t == nil {
+		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided email verify template was nil")
 		}
 		c.loginTpActionTplts[loginTypeEmail][ActionVerify] = t
@@ -318,50 +356,6 @@ func (c *authenticationConfig) fillDefaults() error {
 }
 
 func (c *authenticationConfig) valid() error {
-	// TODO get rid of this chunk, app deserves to panic if these conditions
-	// aren't met. Reason for decision: c.initialzeValues() and c.fillDefaults()
-	//
-	//if c.passGen == nil {
-	//	return errors.New("password generator was nil")
-	//}
-	//if c.numGen == nil {
-	//	return errors.New("number generator was nil")
-	//}
-	//if c.urlTokenGen == nil {
-	//	return errors.New("URL token generator was nil")
-	//}
-	//if c.loginTpActionTplts == nil {
-	//	return errors.New("login type action templates maps were nil")
-	//}
-	//phoneActTpls, ok := c.loginTpActionTplts[loginTypePhone]
-	//if !ok {
-	//	return errors.New("phone action templates was nil")
-	//}
-	//if c.smserNilable != nil {
-	//	if _, ok = phoneActTpls[ActionVerify]; !ok {
-	//		return errors.New("phone verification template not found")
-	//	}
-	//	if _, ok = phoneActTpls[ActionInvite]; !ok {
-	//		return errors.New("phone invite template not found")
-	//	}
-	//	if _, ok = phoneActTpls[ActionResetPass]; !ok {
-	//		return errors.New("phone reset password template not found")
-	//	}
-	//}
-	//emailActTpls, ok := c.loginTpActionTplts[loginTypeEmail]
-	//if c.mailerNilable != nil {
-	//	if _, ok = emailActTpls[ActionVerify]; !ok {
-	//		return errors.New("email verification template not found")
-	//	}
-	//	if _, ok = emailActTpls[ActionInvite]; !ok {
-	//		return errors.New("email invite template not found")
-	//	}
-	//	if _, ok = emailActTpls[ActionResetPass]; !ok {
-	//		return errors.New("email reset password template not found")
-	//	}
-	//}
-	//
-	// End TODO
 
 	// with no means of communicating with the created user, the only means
 	// of registration is self registration.
