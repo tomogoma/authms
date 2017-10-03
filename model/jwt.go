@@ -7,16 +7,16 @@ import (
 	"github.com/tomogoma/authms/config"
 )
 
-type Claim struct {
+type JWTClaim struct {
 	UsrID  string
 	Groups []Group
 	jwt.StandardClaims
 }
 
-func newClaim(usrID string, groups []Group) *Claim {
+func newJWTClaim(usrID string, groups []Group) *JWTClaim {
 	issue := time.Now()
 	expiry := issue.Add(tokenValidity)
-	return &Claim{
+	return &JWTClaim{
 		UsrID:  usrID,
 		Groups: groups,
 		StandardClaims: jwt.StandardClaims{

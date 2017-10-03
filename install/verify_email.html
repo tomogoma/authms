@@ -6,10 +6,9 @@
     Hello,
 </p>
 <div>
-    You have recently requested for a password reset{{if .AppName}} on your {{.AppName}}
-    account{{end}}.<br/>
+    Welcome {{if .AppName}}to {{.AppName}} {{end}}.<br/>
 {{if .URLToken -}}
-    Click <a href="{{.URLToken}}">this link</a> to reset password.
+    Click <a href="{{.URLToken}}">this link</a> to verify this email address.
     If the link does not work, copy the URL below and paste it into your
     browser's window:
     <p>
@@ -19,9 +18,6 @@
 {{- end}}
     Use the code {{.Code}} when requested for one.
 </div>
-<p>
-    You may ignore this email if you did not make the request.
-</p>
 <p>
     Your's truly,<br/>
     the {{.AppName}} admin

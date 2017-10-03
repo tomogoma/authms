@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -36,32 +35,32 @@ func New(appID int64, appSecret string) (*FacebookOAuth, error) {
 	return &FacebookOAuth{appID: appID, appSecret: appSecret}, nil
 }
 
-func (f *FacebookOAuth) ValidateToken(token string) (model.OAuthResponse, error) {
+func (f *FacebookOAuth) ValidateToken(token string) (string, error) {
 	URL, err := url.Parse(fmt.Sprintf("%s?%s=%s&%s=%d|%s", fbURL,
 		fbInputTokenKey, token, fbAppTokenKey, f.appID, f.appSecret))
 	if err != nil {
-		return nil, fmt.Errorf("error parsing facebook url: %s", err)
+		return "", fmt.Errorf("error parsing facebook url: %s", err)
 	}
 	r, err := http.Get(URL.String())
 	if err != nil {
-		return nil, fmt.Errorf("error communicating with facebook: %s", err)
+		return "", fmt.Errorf("error communicating with facebook: %s", err)
 	}
 	defer r.Body.Close()
 	if r.StatusCode >= 400 {
-		return nil, fmt.Errorf("error communicating with facebook (%d): %s",
+		return "", fmt.Errorf("error communicating with facebook (%d): %s",
 			r.StatusCode, r.Status)
 	}
 	rb, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading facebook response: %s", err)
+		return "", fmt.Errorf("error reading facebook response: %s", err)
 	}
 	resp := new(Response)
 	err = json.Unmarshal(rb, resp)
 	if err != nil {
-		return nil, fmt.Errorf("error unmarshaling facebook response: %s", err)
+		return "", fmt.Errorf("error unmarshaling facebook response: %s", err)
 	}
 	if !resp.Valid {
-		return nil, errors.NewAuth("OAuth token invalid")
+		return "", errors.NewAuth("OAuth token invalid")
 	}
-	return resp, nil
+	return resp.UsrID, nil
 }
