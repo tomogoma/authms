@@ -2,19 +2,19 @@ package db
 
 import (
 	"database/sql"
-	"sync"
-
-	"strconv"
-
+	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
 
 	"github.com/pborman/uuid"
 	"github.com/tomogoma/authms/config"
-	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
 )
 
+// Roach is a cockroach db store.
+// Use NewRoach() to instantiate.
 type Roach struct {
 	errors.NotFoundErrCheck
 	dsn              string
@@ -26,24 +26,13 @@ type Roach struct {
 	isDBInit      bool
 }
 
-type Option func(*Roach)
-
 const (
-	KeyConfigDBVersion = "db.version"
+	keyDBVersion = "db.version"
+	keySMTPConf  = "conf.smtp"
 )
 
-func WithDSN(dsn string) Option {
-	return func(r *Roach) {
-		r.dsn = dsn
-	}
-}
-
-func WithDBName(db string) Option {
-	return func(r *Roach) {
-		r.dbName = db
-	}
-}
-
+// NewRoach creates an instance of *Roach. A db connection is only established
+// when InitDBIfNot() or one of the Execute/Query methods is called.
 func NewRoach(opts ...Option) *Roach {
 	r := &Roach{
 		isDBInit:      false,
@@ -56,13 +45,22 @@ func NewRoach(opts ...Option) *Roach {
 	return r
 }
 
-func (r *Roach) InitDBConnIfNotInitted() error {
+// InitDBIfNot connects to and sets up the DB; creating it and tables if necessary.
+func (r *Roach) InitDBIfNot() error {
 	var err error
 	r.db, err = cockroach.TryConnect(r.dsn, r.db)
 	if err != nil {
 		return errors.Newf("connect to db: %v", err)
 	}
 	return r.instantiate()
+}
+
+func (r *Roach) UpsertSMTPConfig(conf interface{}) error {
+	return r.upsertConf(keySMTPConf, conf)
+}
+
+func (r *Roach) GetSMTPConfig(conf interface{}) error {
+	return r.getConf(keySMTPConf, conf)
 }
 
 func (r *Roach) instantiate() error {
@@ -81,7 +79,7 @@ func (r *Roach) instantiate() error {
 		if !r.IsNotFoundError(err) {
 			return fmt.Errorf("check db version: %v", err)
 		}
-		if err := r.upsertDBVersion(); err != nil {
+		if err := r.setRunningVersion(); err != nil {
 			return errors.Newf("set db version: %v", err)
 		}
 	}
@@ -89,34 +87,80 @@ func (r *Roach) instantiate() error {
 	return nil
 }
 
-func (r *Roach) upsertDBVersion() error {
-	q := `
-		UPSERT INTO ` + TblConfigurations + ` (` + ColKey + `, ` + ColValue + `)
-			VALUES ('` + KeyConfigDBVersion + `', '` + strconv.Itoa(Version) + `')`
-	res, err := r.db.Exec(q)
-	return checkRowsAffected(res, err, 1)
-}
-
 func (r *Roach) validateRunningVersion() error {
-	runningVersionStr := ""
-	q := `
-	SELECT ` + ColValue + `
-		FROM ` + TblConfigurations + `
-		WHERE ` + ColKey + `=` + KeyConfigDBVersion
-	err := r.db.QueryRow(q).Scan(&runningVersionStr)
-	if err != nil {
-		if err != sql.ErrNoRows {
-			return err
+	var runningVersion int
+	q := `SELECT ` + ColValue + ` FROM ` + TblConfigurations + ` WHERE ` + ColKey + `=$1`
+	var confB []byte
+	if err := r.db.QueryRow(q, keyDBVersion).Scan(&confB); err != nil {
+		if err == sql.ErrNoRows {
+			return errors.NewNotFoundf("config not found")
 		}
-		return errors.NewNotFound("version not set")
+		return errors.Newf("get conf: %v", err)
 	}
-	runningVersion, err := strconv.Atoi(runningVersionStr)
-	if err != nil || runningVersion != Version {
+	if err := json.Unmarshal(confB, &runningVersion); err != nil {
+		return errors.Newf("Unmarshalling config: %v", err)
+	}
+	if runningVersion != Version {
 		r.compatibilityErr = errors.Newf("db incompatible: need db"+
-			" version '%d', found '%s'", Version, runningVersionStr)
+			" version '%d', found '%d'", Version, runningVersion)
 		return r.compatibilityErr
 	}
 	return nil
+}
+
+func (r *Roach) setRunningVersion() error {
+	valB, err := json.Marshal(Version)
+	if err != nil {
+		return errors.Newf("marshal conf: %v", err)
+	}
+	cols := ColDesc(ColKey, ColValue, ColUpdateDate)
+	q := `UPSERT INTO ` + TblConfigurations + ` (` + cols + `) VALUES ($1, $2, CURRENT_TIMESTAMP)`
+	res, err := r.db.Exec(q, keyDBVersion, valB)
+	return checkRowsAffected(res, err, 1)
+}
+
+func (r *Roach) upsertConf(key string, conf interface{}) error {
+	if err := r.InitDBIfNot(); err != nil {
+		return err
+	}
+	valB, err := json.Marshal(conf)
+	if err != nil {
+		return errors.Newf("marshal conf: %v", err)
+	}
+	cols := ColDesc(ColKey, ColValue, ColUpdateDate)
+	q := `UPSERT INTO ` + TblConfigurations + ` (` + cols + `) VALUES ($1, $2, CURRENT_TIMESTAMP)`
+	res, err := r.db.Exec(q, key, valB)
+	return checkRowsAffected(res, err, 1)
+}
+
+func (r *Roach) getConf(key string, conf interface{}) error {
+	if err := r.InitDBIfNot(); err != nil {
+		return err
+	}
+	q := `SELECT ` + ColValue + ` FROM ` + TblConfigurations + ` WHERE ` + ColKey + `=$1`
+	var confB []byte
+	if err := r.db.QueryRow(q, key).Scan(&confB); err != nil {
+		if err == sql.ErrNoRows {
+			return errors.NewNotFoundf("config not found")
+		}
+		return err
+	}
+	if err := json.Unmarshal(confB, conf); err != nil {
+		return errors.Newf("Unmarshalling config: %v", err)
+	}
+	return nil
+}
+
+func genID() string {
+	return uuid.New()
+}
+
+func ColDesc(cols ...string) string {
+	desc := ""
+	for _, col := range cols {
+		desc = desc + col + ","
+	}
+	return strings.TrimSuffix(desc, ",")
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
@@ -132,12 +176,4 @@ func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
 			expAffected, c)
 	}
 	return nil
-}
-
-func hasValue(v *authms.Value) bool {
-	return v != nil && v.Value != ""
-}
-
-func genID() string {
-	return uuid.New()
 }

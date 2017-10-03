@@ -1,4 +1,4 @@
-package mocks
+package testing
 
 import "github.com/dgrijalva/jwt-go"
 
