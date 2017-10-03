@@ -7,7 +7,6 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/pborman/uuid"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
@@ -55,12 +54,24 @@ func (r *Roach) InitDBIfNot() error {
 	return r.instantiate()
 }
 
+// UpsertSMTPConfig upserts SMTP config values into the db.
 func (r *Roach) UpsertSMTPConfig(conf interface{}) error {
 	return r.upsertConf(keySMTPConf, conf)
 }
 
+// GetSMTPConfig fetches SMTP config values from the db and unmarshals them
+// into conf. this method fails if conf is nil or not a pointer.
 func (r *Roach) GetSMTPConfig(conf interface{}) error {
 	return r.getConf(keySMTPConf, conf)
+}
+
+// ColDesc returns a string containing cols in the given order separated by ",".
+func ColDesc(cols ...string) string {
+	desc := ""
+	for _, col := range cols {
+		desc = desc + col + ","
+	}
+	return strings.TrimSuffix(desc, ",")
 }
 
 func (r *Roach) instantiate() error {
@@ -79,7 +90,7 @@ func (r *Roach) instantiate() error {
 		if !r.IsNotFoundError(err) {
 			return fmt.Errorf("check db version: %v", err)
 		}
-		if err := r.setRunningVersion(); err != nil {
+		if err := r.setRunningVersionCurrent(); err != nil {
 			return errors.Newf("set db version: %v", err)
 		}
 	}
@@ -108,7 +119,7 @@ func (r *Roach) validateRunningVersion() error {
 	return nil
 }
 
-func (r *Roach) setRunningVersion() error {
+func (r *Roach) setRunningVersionCurrent() error {
 	valB, err := json.Marshal(Version)
 	if err != nil {
 		return errors.Newf("marshal conf: %v", err)
@@ -149,18 +160,6 @@ func (r *Roach) getConf(key string, conf interface{}) error {
 		return errors.Newf("Unmarshalling config: %v", err)
 	}
 	return nil
-}
-
-func genID() string {
-	return uuid.New()
-}
-
-func ColDesc(cols ...string) string {
-	desc := ""
-	for _, col := range cols {
-		desc = desc + col + ","
-	}
-	return strings.TrimSuffix(desc, ",")
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
