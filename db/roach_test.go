@@ -247,7 +247,7 @@ func TestRoach_InsertUserAtomic(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.testName, func(t *testing.T) {
-			err := r.ExecuteTx(func(tx *sql.Tx) error {
+			r.ExecuteTx(func(tx *sql.Tx) error {
 				ret, err := r.InsertUserAtomic(tx, tc.typeID, tc.password)
 				if tc.expErr {
 					if err == nil {
@@ -276,9 +276,6 @@ func TestRoach_InsertUserAtomic(t *testing.T) {
 				}
 				return nil
 			})
-			if err != nil {
-				t.Fatalf("Unable to set up: execute transaction: %v", err)
-			}
 		})
 	}
 }
