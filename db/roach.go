@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"reflect"
+
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/model"
@@ -27,6 +29,10 @@ type Roach struct {
 
 	isDBInitMutex sync.Mutex
 	isDBInit      bool
+}
+
+type inserter interface {
+	QueryRow(query string, args ...interface{}) *sql.Row
 }
 
 const (
@@ -128,18 +134,18 @@ func (r *Roach) UserTypeByName(string) (*model.UserType, error) {
 }
 
 // InsertUserType inserts into the database returning calculated values.
-func (r *Roach) InsertUserAtomic(tx *sql.Tx, typeID string, password []byte) (*model.User, error) {
-	if tx == nil {
+func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
 		return nil, errorNilTx
 	}
-	u := model.User{Type: model.UserType{ID: typeID}}
+	u := model.User{Type: t}
 	insCols := ColDesc(ColTypeID, ColPassword, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
 	INSERT INTO ` + TblUsers + ` (` + insCols + `)
 		VALUES ($1,$2,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
-	err := tx.QueryRow(q, typeID, password).Scan(&u.ID, &u.CreateDate, &u.UpdateDate)
+	err := tx.QueryRow(q, t.ID, password).Scan(&u.ID, &u.CreateDate, &u.UpdateDate)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +181,7 @@ func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
 }
 
 func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model.Device, error) {
-	if tx == nil {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
 		return nil, errorNilTx
 	}
 	dev := model.Device{UserID: userID, DeviceID: devID}
@@ -192,12 +198,16 @@ func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model
 	return &dev, nil
 }
 
+// InsertUserType inserts into the database returning calculated values.
 func (r *Roach) InsertUserName(userID, username string) (*model.Username, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserName(r.db, userID, username)
 }
+
+// InsertUserType inserts through tx returning calculated values.
 func (r *Roach) InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*model.Username, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserName(tx, userID, username)
 }
+
 func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error) {
 	return nil, errors.NewNotImplemented()
 }
@@ -361,6 +371,24 @@ func (r *Roach) getConf(key string, conf interface{}) error {
 		return errors.Newf("Unmarshalling config: %v", err)
 	}
 	return nil
+}
+
+func insertUserName(tx inserter, userID, username string) (*model.Username, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return nil, errorNilTx
+	}
+	dev := model.Username{UserID: userID, Value: username}
+	insCols := ColDesc(ColUserID, ColUserName, ColUpdateDate)
+	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
+	q := `
+	INSERT INTO ` + TblUserNameIDs + ` (` + insCols + `)
+		VALUES ($1,$2,CURRENT_TIMESTAMP)
+		RETURNING ` + retCols
+	err := tx.QueryRow(q, userID, username).Scan(&dev.ID, &dev.CreateDate, &dev.UpdateDate)
+	if err != nil {
+		return nil, err
+	}
+	return &dev, nil
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {

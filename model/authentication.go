@@ -10,10 +10,11 @@ import (
 	"strings"
 	"time"
 
+	"reflect"
+
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/go-commons/errors"
 	"golang.org/x/crypto/bcrypt"
-	"reflect"
 )
 
 type AuthStore interface {
@@ -27,7 +28,7 @@ type AuthStore interface {
 	InsertUserType(name string) (*UserType, error)
 	UserTypeByName(string) (*UserType, error)
 
-	InsertUserAtomic(tx *sql.Tx, typeID string, password []byte) (*User, error)
+	InsertUserAtomic(tx *sql.Tx, t UserType, password []byte) (*User, error)
 	UpdatePassword(userID string, password []byte) error
 	UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error
 	User(id string) (*User, []byte, error)
@@ -797,7 +798,7 @@ func (a *Authentication) registerSelf(clID, apiKey, userType,
 
 	usr := new(User)
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		usr, err = a.db.InsertUserAtomic(tx, ut.ID, passH)
+		usr, err = a.db.InsertUserAtomic(tx, *ut, passH)
 		if err != nil {
 			return errors.Newf("insert user: %v", err)
 		}
@@ -854,7 +855,7 @@ func (a *Authentication) createUser(clientID, apiKey, JWT, userType,
 	}
 	usr := new(User)
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		usr, err = a.db.InsertUserAtomic(tx, ut.ID, passH)
+		usr, err = a.db.InsertUserAtomic(tx, *ut, passH)
 		if err != nil {
 			return errors.Newf("insert user: %v", err)
 		}

@@ -119,7 +119,7 @@ func (db *DBMock) UserTypeByName(string) (*model.UserType, error) {
 func (db *DBMock) InsertUserType(name string) (*model.UserType, error) {
 	return db.ExpInsUsrTyp, db.ExpInsUsrTypErr
 }
-func (db *DBMock) InsertUserAtomic(tx *sql.Tx, typeID string, password []byte) (*model.User, error) {
+func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
 	return db.ExpInsUsrAtm, db.ExpInsUsrAtmErr
 }
 
