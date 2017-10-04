@@ -213,10 +213,10 @@ func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error)
 }
 
 func (r *Roach) InsertUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserPhone(r.db, userID, phone, verified)
 }
 func (r *Roach) InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserPhone(tx, userID, phone, verified)
 }
 func (r *Roach) UpdateUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
 	return nil, errors.NewNotImplemented()
@@ -226,20 +226,20 @@ func (r *Roach) UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified
 }
 
 func (r *Roach) InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
+	return insertPhoneToken(r.db, userID, phone, dbt, isUsed, expiry)
 }
 func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
+	return insertPhoneToken(tx, userID, phone, dbt, isUsed, expiry)
 }
 func (r *Roach) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
 	return nil, errors.NewNotImplemented()
 }
 
 func (r *Roach) InsertUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserEmail(r.db, userID, email, verified)
 }
 func (r *Roach) InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
+	return insertUserEmail(tx, userID, email, verified)
 }
 func (r *Roach) UpdateUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
 	return nil, errors.NewNotImplemented()
@@ -266,8 +266,8 @@ func (r *Roach) InsertUserFbIDAtomic(tx *sql.Tx, userID, fbID string, verified b
 	insCols := ColDesc(ColUserID, ColFacebookID, ColVerified, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	INSERT INTO ` + TblUsers + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
+	INSERT INTO ` + TblFacebookIDs + ` (` + insCols + `)
+		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
 	err := tx.QueryRow(q, userID, fbID, verified).Scan(&fb.ID, &fb.CreateDate, &fb.UpdateDate)
 	if err != nil {
@@ -377,18 +377,104 @@ func insertUserName(tx inserter, userID, username string) (*model.Username, erro
 	if tx == nil || reflect.ValueOf(tx).IsNil() {
 		return nil, errorNilTx
 	}
-	dev := model.Username{UserID: userID, Value: username}
+	un := model.Username{UserID: userID, Value: username}
 	insCols := ColDesc(ColUserID, ColUserName, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
 	INSERT INTO ` + TblUserNameIDs + ` (` + insCols + `)
 		VALUES ($1,$2,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, username).Scan(&dev.ID, &dev.CreateDate, &dev.UpdateDate)
+	err := tx.QueryRow(q, userID, username).Scan(&un.ID, &un.CreateDate, &un.UpdateDate)
 	if err != nil {
 		return nil, err
 	}
-	return &dev, nil
+	return &un, nil
+}
+
+func insertUserPhone(tx inserter, userID, phone string, verified bool) (*model.VerifLogin, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return nil, errorNilTx
+	}
+	vl := model.VerifLogin{UserID: userID, Address: phone, Verified: verified}
+	insCols := ColDesc(ColUserID, ColPhone, ColVerified, ColUpdateDate)
+	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
+	q := `
+	INSERT INTO ` + TblPhoneIDs + ` (` + insCols + `)
+		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
+		RETURNING ` + retCols
+	err := tx.QueryRow(q, userID, phone, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
+	if err != nil {
+		return nil, err
+	}
+	return &vl, nil
+}
+
+func insertPhoneToken(tx inserter, userID, phone string, dbtB []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return nil, errorNilTx
+	}
+	dbt := model.DBToken{
+		UserID:     userID,
+		Address:    phone,
+		Token:      dbtB,
+		IsUsed:     isUsed,
+		ExpiryDate: expiry,
+	}
+	insCols := ColDesc(ColUserID, ColPhone, ColToken, ColIsUsed, ColExpiryDate)
+	retCols := ColDesc(ColID, ColIssueDate)
+	q := `
+	INSERT INTO ` + TblPhoneTokens + ` (` + insCols + `)
+		VALUES ($1,$2,$3,$4,$5)
+		RETURNING ` + retCols
+	err := tx.QueryRow(q, userID, phone, dbtB, isUsed, expiry).
+		Scan(&dbt.ID, &dbt.IssueDate)
+	if err != nil {
+		return nil, err
+	}
+	return &dbt, nil
+}
+
+func insertUserEmail(tx inserter, userID, address string, verified bool) (*model.VerifLogin, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return nil, errorNilTx
+	}
+	vl := model.VerifLogin{UserID: userID, Address: address, Verified: verified}
+	insCols := ColDesc(ColUserID, ColEmail, ColVerified, ColUpdateDate)
+	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
+	q := `
+	INSERT INTO ` + TblEmailIDs + ` (` + insCols + `)
+		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
+		RETURNING ` + retCols
+	err := tx.QueryRow(q, userID, address, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
+	if err != nil {
+		return nil, err
+	}
+	return &vl, nil
+}
+
+func insertEmailToken(tx inserter, userID, address string, dbtB []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return nil, errorNilTx
+	}
+	dbt := model.DBToken{
+		UserID:     userID,
+		Address:    address,
+		Token:      dbtB,
+		IsUsed:     isUsed,
+		ExpiryDate: expiry,
+	}
+	insCols := ColDesc(ColUserID, ColEmail, ColToken, ColIsUsed, ColExpiryDate)
+	retCols := ColDesc(ColID, ColIssueDate)
+	q := `
+	INSERT INTO ` + TblEmailTokens + ` (` + insCols + `)
+		VALUES ($1,$2,$3,$4,$5)
+		RETURNING ` + retCols
+	err := tx.QueryRow(q, userID, address, dbtB, isUsed, expiry).
+		Scan(&dbt.ID, &dbt.IssueDate)
+	if err != nil {
+		return nil, err
+	}
+	return &dbt, nil
 }
 
 func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {

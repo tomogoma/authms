@@ -149,7 +149,7 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColPhone + ` CHAR NOT NULL REFERENCES ` + TblPhoneIDs + ` (` + ColPhone + `),
-		` + ColToken + ` BYTEA NOT NULL,
+		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
 		` + ColIssueDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
 		` + ColExpiryDate + ` TIMESTAMP NOT NULL
@@ -193,4 +193,20 @@ var AllTableDescs = []string{
 	TblDescPhoneTokens,
 	TblDescFacebookIDs,
 	TblDescRefreshTokens,
+}
+
+var AllTableNames = []string{
+	TblConfigurations,
+	TblUserTypes,
+	TblGroups,
+	TblUsers,
+	TblUserGroupsJoin,
+	TblAPIKeys,
+	TblDeviceIDs,
+	TblUserNameIDs,
+	TblEmailIDs,
+	TblPhoneIDs,
+	TblPhoneTokens,
+	TblFacebookIDs,
+	TblRefreshTokens,
 }
