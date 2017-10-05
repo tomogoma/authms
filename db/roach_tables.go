@@ -68,8 +68,8 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColName + ` CHAR UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
 		` + ColAccessLevel + ` FLOAT UNIQUE NOT NULL CHECK (` + ColAccessLevel + ` BETWEEN 0 AND 10),
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescUsers = `
@@ -86,8 +86,8 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColGroupID + ` INTEGER NOT NULL REFERENCES ` + TblGroups + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL,
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL,
 		UNIQUE (` + ColUserID + `,` + ColGroupID + `)
 	);
 	`
@@ -96,8 +96,8 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColDevID + ` CHAR UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescAPIKeys = `
@@ -114,8 +114,8 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserName + ` STRING UNIQUE NOT NULL,
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescEmailIDs = `
@@ -124,8 +124,8 @@ const (
 		` + ColEmail + ` CHAR UNIQUE NOT NULL CHECK (` + ColEmail + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescEmailTokens = `
@@ -135,8 +135,8 @@ const (
 		` + ColEmail + ` CHAR NOT NULL REFERENCES ` + TblEmailIDs + ` (` + ColEmail + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColExpiryDate + ` TIMESTAMP NOT NULL
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescPhoneIDs = `
@@ -145,8 +145,8 @@ const (
 		` + ColPhone + ` CHAR UNIQUE NOT NULL CHECK (` + ColPhone + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescPhoneTokens = `
@@ -156,8 +156,8 @@ const (
 		` + ColPhone + ` CHAR NOT NULL REFERENCES ` + TblPhoneIDs + ` (` + ColPhone + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColExpiryDate + ` TIMESTAMP NOT NULL
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescFacebookIDs = `
@@ -166,8 +166,8 @@ const (
 		` + ColFacebookID + ` CHAR UNIQUE NOT NULL CHECK(` + ColFacebookID + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescRefreshTokens = `
@@ -177,8 +177,8 @@ const (
 		` + ColAPIKeyID + ` INTEGER NOT NULL REFERENCES ` + TblAPIKeys + ` (` + ColID + `),
 		` + ColToken + ` BYTEA NOT NULL,
 		` + ColIsRevoked + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColExpiryDate + ` TIMESTAMP NOT NULL
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 )
