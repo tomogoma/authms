@@ -8,6 +8,7 @@ import (
 	"github.com/tomogoma/authms/db"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/database/cockroach"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 var isInit bool
@@ -16,10 +17,9 @@ func setup(t *testing.T) cockroach.DSN {
 	conf := testingH.ReadConfig(t)
 	conf.Database.DB = conf.Database.DB + "_test"
 	if !isInit {
-		rdb := getDB(t, conf.Database)
-		_, err := rdb.Exec("DROP DATABASE IF EXISTS " + conf.Database.DB)
+		err := delAllTables(getDB(t, conf.Database), conf.Database.DBName())
 		if err != nil {
-			t.Fatalf("Error setting up: deleting db: %v", err)
+			t.Fatalf("Error setting up: delete all tables: %v", err)
 		}
 		isInit = true
 	}
@@ -27,17 +27,22 @@ func setup(t *testing.T) cockroach.DSN {
 }
 
 func tearDown(t *testing.T, conf cockroach.DSN) {
-	rdb := getDB(t, conf)
-	if _, err := rdb.Exec("SET DATABASE=" + conf.DB); err != nil {
-		return
+	if err := delAllTables(getDB(t, conf), conf.DBName()); err != nil {
+		t.Fatalf("Error tearing down: delete all tables: %v", err)
+	}
+}
+
+func delAllTables(rdb *sql.DB, dbName string) error {
+	if _, err := rdb.Exec("SET DATABASE=" + dbName); err != nil {
+		return nil
 	}
 	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
 		_, err := rdb.Exec("DELETE FROM " + db.AllTableNames[i])
 		if err != nil {
-			t.Fatalf("Error tearing down: delete %s: %v",
-				db.AllTableNames[i], err)
+			return errors.Newf("delete %s: %v", db.AllTableNames[i], err)
 		}
 	}
+	return nil
 }
 
 func TestNewRoach(t *testing.T) {
