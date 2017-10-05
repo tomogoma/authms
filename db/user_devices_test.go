@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+func TestRoach_InsertUserDeviceAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	_, err := r.InsertUserDeviceAtomic(nil, usr.ID, "a-dev-id-0")
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
+
 func TestRoach_InsertUserDeviceAtomic(t *testing.T) {
 	conf := setup(t)
 	defer tearDown(t, conf)

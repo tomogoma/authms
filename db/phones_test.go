@@ -11,6 +11,17 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+func TestRoach_InsertUserPhoneAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	_, err := r.InsertUserPhoneAtomic(nil, usr.ID, "+254712345678", false)
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
+
 // TestRoach_InsertUserPhoneAtomic shares test cases with TestRoach_InsertUserPhone
 // because they use the same underlying implementation.
 func TestRoach_InsertUserPhoneAtomic(t *testing.T) {
@@ -104,6 +115,20 @@ func TestRoach_InsertUserPhone(t *testing.T) {
 			}
 			return
 		})
+	}
+}
+
+func TestRoach_InsertPhoneTokenAtomic_nilTx(t *testing.T) {
+	setupTime := time.Now()
+	dbt := []byte(strings.Repeat("x", 57))
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	phn := insertPhone(t, r, usr.ID)
+	_, err := r.InsertPhoneTokenAtomic(nil, usr.ID, phn.Address, dbt, false, setupTime)
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
 	}
 }
 

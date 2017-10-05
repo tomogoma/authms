@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+func TestRoach_InsertUserNameAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	_, err := r.InsertUserNameAtomic(nil, usr.ID, "a-username")
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
+
 // TestRoach_InsertUserNameAtomic shares test cases with TestRoach_InsertUserName
 // because they use the same underlying implementation.
 func TestRoach_InsertUserNameAtomic(t *testing.T) {

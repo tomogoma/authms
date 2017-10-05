@@ -6,6 +6,17 @@ import (
 	"time"
 )
 
+func TestRoach_InsertUserFbIDAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	_, err := r.InsertUserFbIDAtomic(nil, usr.ID, "an-fb-id-0", false)
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
+
 func TestRoach_InsertUserFbIDAtomic(t *testing.T) {
 	conf := setup(t)
 	defer tearDown(t, conf)

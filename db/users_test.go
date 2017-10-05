@@ -10,6 +10,20 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+func TestRoach_InsertUserAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	ut, err := r.InsertUserType("test")
+	if err != nil {
+		t.Fatalf("Error setting up: insert user type: %v", err)
+	}
+	_, err = r.InsertUserAtomic(nil, *ut, []byte("123456789"))
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
+
 func TestRoach_InsertUserAtomic(t *testing.T) {
 	conf := setup(t)
 	defer tearDown(t, conf)
@@ -28,10 +42,6 @@ func TestRoach_InsertUserAtomic(t *testing.T) {
 		{testName: "valid", ut: *ut, password: []byte("12345678"), expErr: false},
 		{testName: "bad typeID", ut: model.UserType{ID: "invalid"}, password: []byte("12345678"), expErr: true},
 		{testName: "short password", ut: *ut, password: []byte("1234567"), expErr: true},
-	}
-	_, err = r.InsertUserAtomic(nil, *ut, []byte("123456789"))
-	if err == nil {
-		t.Errorf("(nil tx) - expected an error, got nil")
 	}
 	for _, tc := range tt {
 		t.Run(tc.testName, func(t *testing.T) {
@@ -101,6 +111,17 @@ func TestRoach_UpdatePassword(t *testing.T) {
 		})
 	}
 }
+func TestRoach_UpdatePasswordAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	validPass := []byte("A g00d P@$$wo%d") //chars >= 8
+	err := r.UpdatePasswordAtomic(nil, usr.ID, validPass)
+	if err == nil {
+		t.Fatalf("nil tx - expected an error, got nil")
+	}
+}
 
 func TestRoach_UpdatePasswordAtomic(t *testing.T) {
 	conf := setup(t)
@@ -115,10 +136,6 @@ func TestRoach_UpdatePasswordAtomic(t *testing.T) {
 		}
 		return nil
 	})
-	err := r.UpdatePasswordAtomic(nil, usr.ID, validPass)
-	if err == nil {
-		t.Fatalf("nil tx - expected an error, got nil")
-	}
 }
 
 func insertUser(t *testing.T, r *db.Roach) *model.User {

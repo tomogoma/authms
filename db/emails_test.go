@@ -1,14 +1,26 @@
 package db_test
 
 import (
+	"bytes"
 	"database/sql"
+	"strings"
 	"testing"
 	"time"
-	"bytes"
-	"strings"
+
 	"github.com/tomogoma/authms/db"
 	"github.com/tomogoma/authms/model"
 )
+
+func TestRoach_InsertUserEmailAtomic_nilTx(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	_, err := r.InsertUserEmailAtomic(nil, usr.ID, "test@mailinator.com", false)
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
+}
 
 // TestRoach_InsertUserEmailAtomic shares test cases with TestRoach_InsertUserEmail
 // because they use the same underlying implementation.
@@ -103,6 +115,19 @@ func TestRoach_InsertUserEmail(t *testing.T) {
 			}
 			return
 		})
+	}
+}
+func TestRoach_InsertEmailTokenAtomic_nilTx(t *testing.T) {
+	setupTime := time.Now()
+	dbt := []byte(strings.Repeat("x", 57))
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	email := insertEmail(t, r, usr.ID)
+	_, err := r.InsertEmailTokenAtomic(nil, usr.ID, email.Address, dbt, false, setupTime)
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
 	}
 }
 
