@@ -81,6 +81,14 @@ func ColDesc(cols ...string) string {
 	return strings.TrimSuffix(desc, ",")
 }
 
+func colDescTbl(tbl string, cols ...string) string {
+	desc := ""
+	for _, col := range cols {
+		desc = desc + tbl + "." + col + ","
+	}
+	return strings.TrimSuffix(desc, ",")
+}
+
 func (r *Roach) instantiate() error {
 	r.isDBInitMutex.Lock()
 	defer r.isDBInitMutex.Unlock()

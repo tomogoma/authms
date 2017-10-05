@@ -29,3 +29,34 @@ func (r *Roach) Group(string) (*model.Group, error) {
 func (r *Roach) GroupByName(string) (*model.Group, error) {
 	return nil, errors.NewNotImplemented()
 }
+func (r *Roach) GroupByUserID(usrID string) ([]model.Group, error) {
+	cols := ColDesc(TblGroups+`.`+ColID, TblGroups+`.`+ColName,
+		TblGroups+`.`+ColCreateDate, TblGroups+`.`+ColUpdateDate)
+	q := `
+		SELECT ` + cols + `
+			FROM ` + TblUserGroupsJoin + `
+			INNER JOIN ` + TblGroups + `
+				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
+			WHERE ` + TblUserGroupsJoin + `.` + ColUserID + `=$1`
+	rows, err := r.db.Query(q, usrID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var grps []model.Group
+	for rows.Next() {
+		grp := model.Group{}
+		err := rows.Scan(&grp.ID, &grp.Name, &grp.CreateDate, &grp.UpdateDate)
+		if err != nil {
+			return nil, errors.Newf("scan result set row: %v", err)
+		}
+		grps = append(grps, grp)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Newf("iterating result set: %v", err)
+	}
+	if len(grps) == 0 {
+		return nil, errors.NewNotFound("no devices found for user")
+	}
+	return grps, nil
+}

@@ -84,10 +84,11 @@ const (
 	TblDescUsersGroupsJoin = `
 	CREATE TABLE IF NOT EXISTS ` + TblUserGroupsJoin + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
+		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColGroupID + ` INTEGER NOT NULL REFERENCES ` + TblGroups + ` (` + ColID + `),
 		` + ColCreateDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMP NOT NULL
+		` + ColUpdateDate + ` TIMESTAMP NOT NULL,
+		UNIQUE (` + ColUserID + `,` + ColGroupID + `)
 	);
 	`
 	TblDescDeviceIDs = `

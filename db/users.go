@@ -27,35 +27,113 @@ func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) 
 	return &u, nil
 }
 
+// UpdatePassword stores the new password for userID' account.
 func (r *Roach) UpdatePassword(userID string, password []byte) error {
 	return updatePassword(r.db, userID, password)
 }
 
+// UpdatePasswordAtomic stores the new password for userID' account using tx.
 func (r *Roach) UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error {
 	return updatePassword(tx, userID, password)
 }
 
+// User fetches User and password for account with id.
 func (r *Roach) User(id string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByDeviceID(devID string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByUsername(username string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByPhone(phone string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByEmail(email string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByFacebook(facebookID string) (*model.User, error) {
-	return nil, errors.NewNotImplemented()
+	return r.userWhere(TblUsers+`.`+ColID+`=$1`, id)
 }
 
+// UserByDeviceID fetches User and password for account with devID.
+func (r *Roach) UserByDeviceID(devID string) (*model.User, []byte, error) {
+	return r.userWhere(TblDeviceIDs+`.`+ColDevID+`=$1`, devID)
+}
+
+// UserByUsername fetches User and password for account with username.
+func (r *Roach) UserByUsername(username string) (*model.User, []byte, error) {
+	return r.userWhere(TblUserNameIDs+`.`+ColUserName+`=$1`, username)
+}
+
+// UserByPhone fetches User and password for account with phone.
+func (r *Roach) UserByPhone(phone string) (*model.User, []byte, error) {
+	return r.userWhere(TblPhoneIDs+`.`+ColPhone+`=$1`, phone)
+}
+
+// UserByEmail fetches User and password for account with email.
+func (r *Roach) UserByEmail(email string) (*model.User, []byte, error) {
+	return r.userWhere(TblEmailIDs+`.`+ColEmail+`=$1`, email)
+}
+
+// UserByFacebook fetches User and password for account with fbID.
+func (r *Roach) UserByFacebook(fbID string) (*model.User, error) {
+	usr, _, err := r.userWhere(TblFacebookIDs+`.`+ColFacebookID+`=$1`, fbID)
+	return usr, err
+}
+
+// AddUserToGroupAtomic associates groupID (from TblGroups) with userID if not
+// already associated, otherwise returns an error.
 func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
-	return errors.NewNotImplemented()
+	if tx == nil || reflect.ValueOf(tx).IsNil() {
+		return errorNilTx
+	}
+	cols := ColDesc(ColUserID, ColGroupID, ColUpdateDate)
+	q := `
+	INSERT INTO ` + TblUserGroupsJoin + `(` + cols + `)
+		VALUES ($1, $2, CURRENT_TIMESTAMP)
+		ON CONFLICT IGNORE
+	`
+	_, err := tx.Exec(q, userID, groupID)
+	return err
+}
+
+func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, []byte, error) {
+	cols := ColDesc(
+		colDescTbl(TblUsers, ColID, ColPassword, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblUserTypes, ColID, ColName, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblUserNameIDs, ColID, ColUserName, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblEmailIDs, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblPhoneIDs, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblFacebookIDs, ColID, ColFacebookID, ColVerified, ColCreateDate, ColUpdateDate),
+	)
+	q := `
+	SELECT ` + cols + `
+		FROM ` + TblUsers + `
+			INNER JOIN ` + TblUserTypes + `
+				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
+			LEFT JOIN ` + TblUserNameIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblUserNameIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblEmailIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblEmailIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblPhoneIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblPhoneIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblFacebookIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblFacebookIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblDeviceIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblDeviceIDs + `.` + ColDevID + `
+		WHERE ` + where
+	usr := model.User{}
+	var pass []byte
+	err := r.db.QueryRow(q, whereArgs...).Scan(
+		&usr.ID, &pass, &usr.CreateDate, &usr.UpdateDate,
+		&usr.Type.ID, &usr.Type.Name, &usr.Type.CreateDate, &usr.Type.UpdateDate,
+		&usr.UserName.ID, &usr.UserName.Value, &usr.UserName.CreateDate, &usr.UserName.UpdateDate,
+		&usr.Email.ID, &usr.Email.Address, &usr.Email.Verified, &usr.Email.CreateDate, &usr.Email.UpdateDate,
+		&usr.Phone.ID, &usr.Phone.Address, &usr.Phone.Verified, &usr.Phone.CreateDate, &usr.Phone.UpdateDate,
+		&usr.Facebook.ID, &usr.Facebook.FacebookID, &usr.Facebook.Verified, &usr.Facebook.CreateDate, &usr.Facebook.UpdateDate,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, errors.NewNotFound("User not found")
+		}
+		return nil, nil, err
+	}
+	usr.Devices, err = r.UserDevicesByUserID(usr.ID)
+	if err != nil && !r.IsNotFoundError(err) {
+		return nil, nil, errors.Newf("get device IDs for user: %v", err)
+	}
+	usr.Groups, err = r.GroupByUserID(usr.ID)
+	if err != nil && !r.IsNotFoundError(err) {
+		return nil, nil, errors.Newf("get device IDs for user: %v", err)
+	}
+	return &usr, pass, nil
 }
 
 func updatePassword(i inserter, userID string, password []byte) error {
