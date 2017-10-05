@@ -1,9 +1,17 @@
 package db_test
 
 import (
-	"time"
 	"testing"
+	"time"
+
+	"reflect"
+
+	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/db"
+	"github.com/tomogoma/authms/model"
 )
+
+var currGrpACL = float32(0.0)
 
 func TestRoach_InsertGroup(t *testing.T) {
 	conf := setup(t)
@@ -12,10 +20,10 @@ func TestRoach_InsertGroup(t *testing.T) {
 	tt := []struct {
 		testName string
 		grpName  string
-		acl      int
+		acl      float32
 		expErr   bool
 	}{
-		{testName: "valid", grpName: "firstGroupName", acl: 5, expErr: false},
+		{testName: "valid", grpName: "firstGroupName", acl: 5.565, expErr: false},
 		{testName: "valid min acl", grpName: "new group 1", acl: 0, expErr: false},
 		{testName: "valid max acl", grpName: "new group 2", acl: 10, expErr: false},
 		{testName: "exists", grpName: "firstGroupName", acl: 7, expErr: true},
@@ -57,4 +65,116 @@ func TestRoach_InsertGroup(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRoach_Group(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	expGrp := insertGroup(t, r)
+	tt := []struct {
+		name        string
+		grpID       string
+		expNotFound bool
+	}{
+		{name: "found", grpID: expGrp.ID, expNotFound: false},
+		{name: "not found", grpID: "123", expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			actGrp, err := r.Group(tc.grpID)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Fatalf("Expected not found, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if !reflect.DeepEqual(expGrp, actGrp) {
+				t.Fatalf("Group mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expGrp, actGrp)
+			}
+		})
+	}
+}
+
+func TestRoach_GroupByName(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	expGrp := insertGroup(t, r)
+	tt := []struct {
+		name        string
+		grpName     string
+		expNotFound bool
+	}{
+		{name: "found", grpName: expGrp.Name, expNotFound: false},
+		{name: "not found", grpName: "none-exist-name", expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			actGrp, err := r.GroupByName(tc.grpName)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Fatalf("Expected not found, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if !reflect.DeepEqual(expGrp, actGrp) {
+				t.Fatalf("Group mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expGrp, actGrp)
+			}
+		})
+	}
+}
+
+func TestRoach_GroupsByUserID(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	grp1 := insertGroup(t, r)
+	grp2 := insertGroup(t, r)
+	usr := insertUser(t, r)
+	expGrps := []model.Group{*grp1, *grp2}
+	addUserToGroups(t, r, usr.ID, grp1.ID, grp2.ID)
+	tt := []struct {
+		name        string
+		usrID       string
+		expNotFound bool
+	}{
+		{name: "found", usrID: usr.ID, expNotFound: false},
+		{name: "not found", usrID: "123", expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			actGrps, err := r.GroupsByUserID(tc.usrID)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Fatalf("Expected not found, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if !reflect.DeepEqual(expGrps, actGrps) {
+				t.Fatalf("Group mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expGrps, actGrps)
+			}
+		})
+	}
+}
+
+func insertGroup(t *testing.T, r *db.Roach) *model.Group {
+	grp, err := r.InsertGroup(uuid.New(), currGrpACL)
+	if err != nil {
+		t.Fatalf("Error setting up: insert group: %v", err)
+	}
+	currGrpACL += 0.1
+	return grp
 }

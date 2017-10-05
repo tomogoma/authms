@@ -1,12 +1,14 @@
 package db
 
 import (
+	"database/sql"
+
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 // InsertGroup inserts into the database returning calculated values.
-func (r *Roach) InsertGroup(name string, acl int) (*model.Group, error) {
+func (r *Roach) InsertGroup(name string, acl float32) (*model.Group, error) {
 	if err := r.InitDBIfNot(); err != nil {
 		return nil, err
 	}
@@ -23,21 +25,27 @@ func (r *Roach) InsertGroup(name string, acl int) (*model.Group, error) {
 	}
 	return &grp, nil
 }
-func (r *Roach) Group(string) (*model.Group, error) {
-	return nil, errors.NewNotImplemented()
+
+// Group fetches a group by id.
+func (r *Roach) Group(id string) (*model.Group, error) {
+	return r.groupWhere(ColID+`=$1`, id)
 }
-func (r *Roach) GroupByName(string) (*model.Group, error) {
-	return nil, errors.NewNotImplemented()
+
+// Group fetches a group by name.
+func (r *Roach) GroupByName(name string) (*model.Group, error) {
+	return r.groupWhere(ColName+`=$1`, name)
 }
-func (r *Roach) GroupByUserID(usrID string) ([]model.Group, error) {
-	cols := ColDesc(TblGroups+`.`+ColID, TblGroups+`.`+ColName,
-		TblGroups+`.`+ColCreateDate, TblGroups+`.`+ColUpdateDate)
+
+// GroupsByUserID fetches a group having id.
+func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
+	cols := colDescTbl(TblGroups, ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
 	q := `
 		SELECT ` + cols + `
 			FROM ` + TblUserGroupsJoin + `
 			INNER JOIN ` + TblGroups + `
 				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
-			WHERE ` + TblUserGroupsJoin + `.` + ColUserID + `=$1`
+			WHERE ` + TblUserGroupsJoin + `.` + ColUserID + `=$1
+	`
 	rows, err := r.db.Query(q, usrID)
 	if err != nil {
 		return nil, err
@@ -46,7 +54,7 @@ func (r *Roach) GroupByUserID(usrID string) ([]model.Group, error) {
 	var grps []model.Group
 	for rows.Next() {
 		grp := model.Group{}
-		err := rows.Scan(&grp.ID, &grp.Name, &grp.CreateDate, &grp.UpdateDate)
+		err := rows.Scan(&grp.ID, &grp.Name, &grp.AccessLevel, &grp.CreateDate, &grp.UpdateDate)
 		if err != nil {
 			return nil, errors.Newf("scan result set row: %v", err)
 		}
@@ -59,4 +67,19 @@ func (r *Roach) GroupByUserID(usrID string) ([]model.Group, error) {
 		return nil, errors.NewNotFound("no devices found for user")
 	}
 	return grps, nil
+}
+
+func (r *Roach) groupWhere(where string, whereArgs ...interface{}) (*model.Group, error) {
+	cols := ColDesc(ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
+	q := `SELECT ` + cols + ` FROM ` + TblGroups + ` WHERE ` + where
+	grp := model.Group{}
+	err := r.db.QueryRow(q, whereArgs...).
+		Scan(&grp.ID, &grp.Name, &grp.AccessLevel, &grp.CreateDate, &grp.UpdateDate)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.NewNotFound("groups not found")
+		}
+		return nil, err
+	}
+	return &grp, nil
 }

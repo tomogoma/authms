@@ -9,25 +9,37 @@ import (
 	"github.com/tomogoma/go-commons/errors"
 )
 
+// InsertUserPhone inserts phone details for userID.
 func (r *Roach) InsertUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
 	return insertUserPhone(r.db, userID, phone, verified)
 }
+
+// InsertUserPhoneAtomic inserts phone details for userID using tx.
 func (r *Roach) InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
 	return insertUserPhone(tx, userID, phone, verified)
 }
+
+// UpdateUserPhone updates phone details for userID.
 func (r *Roach) UpdateUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
 	return nil, errors.NewNotImplemented()
 }
+
+// UpdateUserPhone updates phone details for userID.
 func (r *Roach) UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
 	return nil, errors.NewNotImplemented()
 }
 
+// InsertPhoneToken persists a token for phone.
 func (r *Roach) InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
 	return insertPhoneToken(r.db, userID, phone, dbt, isUsed, expiry)
 }
+
+// InsertPhoneTokenAtomic persists a token for phone using tx.
 func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
 	return insertPhoneToken(tx, userID, phone, dbt, isUsed, expiry)
 }
+
+// PhoneTokens fetches phone tokens for userID starting with the newest.
 func (r *Roach) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
 	return nil, errors.NewNotImplemented()
 }

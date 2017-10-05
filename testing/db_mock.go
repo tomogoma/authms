@@ -106,7 +106,7 @@ func (db *DBMock) GroupByName(string) (*model.Group, error) {
 func (db *DBMock) Group(string) (*model.Group, error) {
 	return db.ExpGrp, db.ExpGrpErr
 }
-func (db *DBMock) InsertGroup(name string, acl int) (*model.Group, error) {
+func (db *DBMock) InsertGroup(name string, acl float32) (*model.Group, error) {
 	return db.ExpInsGrp, db.ExpInsGrpErr
 }
 func (db *DBMock) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {

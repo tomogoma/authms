@@ -2,8 +2,13 @@ package db_test
 
 import (
 	"database/sql"
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/db"
+	"github.com/tomogoma/authms/model"
 )
 
 func TestRoach_InsertUserDeviceAtomic_nilTx(t *testing.T) {
@@ -69,4 +74,54 @@ func TestRoach_InsertUserDeviceAtomic(t *testing.T) {
 			})
 		})
 	}
+}
+
+func TestRoach_UserDevicesByUserID(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	usrNoDevs := insertUser(t, r)
+	dev1 := insertUserDevice(t, r, usr.ID)
+	dev2 := insertUserDevice(t, r, usr.ID)
+	expDevs := []model.Device{*dev1, *dev2}
+	tt := []struct {
+		name        string
+		userID      string
+		expNotFound bool
+	}{
+		{name: "found", userID: usr.ID, expNotFound: false},
+		{name: "not found", userID: usrNoDevs.ID, expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			devs, err := r.UserDevicesByUserID(tc.userID)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Fatalf("Expected not found error, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if !reflect.DeepEqual(expDevs, devs) {
+				t.Errorf("Devices mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expDevs, devs)
+			}
+		})
+	}
+}
+
+func insertUserDevice(t *testing.T, r *db.Roach, usrID string) *model.Device {
+	var dev *model.Device
+	var err error
+	err = r.ExecuteTx(func(tx *sql.Tx) error {
+		dev, err = r.InsertUserDeviceAtomic(tx, usrID, uuid.New())
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Error setting up: insert device: %v", err)
+	}
+	return dev
 }

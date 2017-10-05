@@ -1,8 +1,13 @@
 package db_test
 
 import (
+	"reflect"
 	"testing"
 	"time"
+
+	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/db"
+	"github.com/tomogoma/authms/model"
 )
 
 func TestRoach_InsertUserType(t *testing.T) {
@@ -48,4 +53,45 @@ func TestRoach_InsertUserType(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRoach_UserTypeByName(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	expUt := insertUserType(t, r)
+	tt := []struct {
+		name        string
+		utName      string
+		expNotFound bool
+	}{
+		{name: "found", utName: expUt.Name, expNotFound: false},
+		{name: "not found", utName: "not-exist", expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			actUt, err := r.UserTypeByName(tc.utName)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Fatalf("Expected not found, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if !reflect.DeepEqual(expUt, actUt) {
+				t.Fatalf("UserType mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expUt, actUt)
+			}
+		})
+	}
+}
+
+func insertUserType(t *testing.T, r *db.Roach) *model.UserType {
+	ut, err := r.InsertUserType(uuid.New())
+	if err != nil {
+		t.Fatalf("Error setting up: insert usertype: %v", err)
+	}
+	return ut
 }

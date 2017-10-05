@@ -18,8 +18,23 @@ func (r *Roach) InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*mode
 	return insertUserName(tx, userID, username)
 }
 
+// UpdateUsername sets the new username for userID.
 func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error) {
-	return nil, errors.NewNotImplemented()
+	un := model.Username{UserID: userID, Value: username}
+	updCols := ColDesc(ColUserName, ColUpdateDate)
+	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
+	q := `
+		UPDATE ` + TblUserNameIDs + ` SET (` + updCols + `)=($1,CURRENT_TIMESTAMP)
+			WHERE ` + ColUserID + `=$2
+			RETURNING ` + retCols
+	err := r.db.QueryRow(q, username, userID).Scan(&un.ID, &un.CreateDate, &un.UpdateDate)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.NewNotFound("username with userID not found")
+		}
+		return nil, err
+	}
+	return &un, nil
 }
 
 func insertUserName(tx inserter, userID, username string) (*model.Username, error) {

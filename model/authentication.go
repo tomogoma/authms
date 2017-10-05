@@ -21,7 +21,7 @@ type AuthStore interface {
 	IsNotFoundError(error) bool
 	ExecuteTx(fn func(*sql.Tx) error) error
 
-	InsertGroup(name string, acl int) (*Group, error)
+	InsertGroup(name string, acl float32) (*Group, error)
 	Group(string) (*Group, error)
 	GroupByName(string) (*Group, error)
 
@@ -44,7 +44,6 @@ type AuthStore interface {
 
 	InsertUserName(userID, username string) (*Username, error)
 	InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*Username, error)
-	UpdateUsername(userID, username string) (*Username, error)
 
 	InsertUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
 	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
@@ -1072,7 +1071,7 @@ func (a *Authentication) insertEmailAtomic(tx *sql.Tx, usr *User, address string
 	return nil
 }
 
-func (a *Authentication) getOrCreateGroup(groupName string, acl int) (*Group, error) {
+func (a *Authentication) getOrCreateGroup(groupName string, acl float32) (*Group, error) {
 	grp, err := a.db.GroupByName(groupName)
 	if err != nil {
 		if !a.db.IsNotFoundError(err) {

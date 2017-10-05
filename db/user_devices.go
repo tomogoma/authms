@@ -27,7 +27,7 @@ func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model
 }
 
 func (r *Roach) UserDevicesByUserID(usrID string) ([]model.Device, error) {
-	cols := ColDesc(ColID, ColDevID, ColCreateDate, ColUpdateDate)
+	cols := ColDesc(ColID, ColUserID, ColDevID, ColCreateDate, ColUpdateDate)
 	q := `SELECT ` + cols + ` FROM ` + TblDeviceIDs + ` WHERE ` + ColUserID + `=$1`
 	rows, err := r.db.Query(q, usrID)
 	if err != nil {
@@ -37,7 +37,7 @@ func (r *Roach) UserDevicesByUserID(usrID string) ([]model.Device, error) {
 	var devs []model.Device
 	for rows.Next() {
 		dev := model.Device{}
-		err := rows.Scan(&dev.ID, &dev.DeviceID, &dev.CreateDate, &dev.UpdateDate)
+		err := rows.Scan(&dev.ID, &dev.UserID, &dev.DeviceID, &dev.CreateDate, &dev.UpdateDate)
 		if err != nil {
 			return nil, errors.Newf("scan result set row: %v", err)
 		}

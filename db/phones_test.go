@@ -9,6 +9,7 @@ import (
 
 	"github.com/tomogoma/authms/db"
 	"github.com/tomogoma/authms/model"
+	"reflect"
 )
 
 func TestRoach_InsertUserPhoneAtomic_nilTx(t *testing.T) {
@@ -287,6 +288,46 @@ func TestRoach_InsertPhoneToken(t *testing.T) {
 				t.Errorf("Invalid expiry: expect %v, got %v", tc.expiry, ret.ExpiryDate)
 			}
 			return
+		})
+	}
+}
+
+func TestRoach_UpdateUserPhone(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	expUsrnm := insertUsername(t, r, usr.ID)
+	expUsrnm.Value = "new-username"
+	tt := []struct {
+		name        string
+		userID      string
+		newUsrName  string
+		expNotFound bool
+	}{
+		{name: "valid", userID: usr.ID, newUsrName: expUsrnm.Value, expNotFound: false},
+		{name: "not found", userID: "123", newUsrName: expUsrnm.Value, expNotFound: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			nun, err := r.UpdateUsername(tc.userID, tc.newUsrName)
+			if tc.expNotFound {
+				if !r.IsNotFoundError(err) {
+					t.Errorf("Expected IsNotFound, got %v", err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if nun.UpdateDate.Equal(expUsrnm.CreateDate) || nun.UpdateDate.Before(expUsrnm.CreateDate) {
+				t.Errorf("Update date not set correctly before/equal to create date")
+			}
+			expUsrnm.UpdateDate = nun.UpdateDate
+			if !reflect.DeepEqual(expUsrnm, nun) {
+				t.Errorf("Username mismatch:\nExpect:\t%+v\nGot:\t%+v",
+					expUsrnm, nun)
+			}
 		})
 	}
 }

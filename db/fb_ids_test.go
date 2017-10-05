@@ -4,6 +4,10 @@ import (
 	"database/sql"
 	"testing"
 	"time"
+
+	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/db"
+	"github.com/tomogoma/authms/model"
 )
 
 func TestRoach_InsertUserFbIDAtomic_nilTx(t *testing.T) {
@@ -76,4 +80,17 @@ func TestRoach_InsertUserFbIDAtomic(t *testing.T) {
 			})
 		})
 	}
+}
+
+func insertFbID(t *testing.T, r *db.Roach, usrID string) *model.Facebook {
+	var fb *model.Facebook
+	var err error
+	err = r.ExecuteTx(func(tx *sql.Tx) error {
+		fb, err = r.InsertUserFbIDAtomic(tx, usrID, uuid.New(), true)
+		return err
+	})
+	if err != nil {
+		t.Fatalf("Error setting up: insert fb ID: %v", err)
+	}
+	return fb
 }
