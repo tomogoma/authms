@@ -7,13 +7,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
-	"time"
-
-	"reflect"
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/tomogoma/authms/config"
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -33,6 +29,7 @@ type Roach struct {
 
 type inserter interface {
 	QueryRow(query string, args ...interface{}) *sql.Row
+	Exec(query string, args ...interface{}) (sql.Result, error)
 }
 
 const (
@@ -66,17 +63,6 @@ func (r *Roach) InitDBIfNot() error {
 	return r.instantiate()
 }
 
-// UpsertSMTPConfig upserts SMTP config values into the db.
-func (r *Roach) UpsertSMTPConfig(conf interface{}) error {
-	return r.upsertConf(keySMTPConf, conf)
-}
-
-// GetSMTPConfig fetches SMTP config values from the db and unmarshals them
-// into conf. this method fails if conf is nil or not a pointer.
-func (r *Roach) GetSMTPConfig(conf interface{}) error {
-	return r.getConf(keySMTPConf, conf)
-}
-
 // ExecuteTx prepares a transaction (with retries) for execution in fn.
 // It commits the changes if fn returns nil, otherwise changes are rolled back.
 func (r *Roach) ExecuteTx(fn func(*sql.Tx) error) error {
@@ -84,196 +70,6 @@ func (r *Roach) ExecuteTx(fn func(*sql.Tx) error) error {
 		return err
 	}
 	return crdb.ExecuteTx(context.Background(), r.db, nil, fn)
-}
-
-// InsertGroup inserts into the database returning calculated values.
-func (r *Roach) InsertGroup(name string, acl int) (*model.Group, error) {
-	if err := r.InitDBIfNot(); err != nil {
-		return nil, err
-	}
-	grp := model.Group{Name: name, AccessLevel: acl}
-	insCols := ColDesc(ColName, ColAccessLevel, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblGroups + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := r.db.QueryRow(q, name, acl).Scan(&grp.ID, &grp.CreateDate, &grp.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &grp, nil
-}
-func (r *Roach) Group(string) (*model.Group, error) {
-	return nil, errors.NewNotImplemented()
-}
-func (r *Roach) GroupByName(string) (*model.Group, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-// InsertUserType inserts into the database returning calculated values.
-func (r *Roach) InsertUserType(name string) (*model.UserType, error) {
-	if err := r.InitDBIfNot(); err != nil {
-		return nil, err
-	}
-	ut := model.UserType{Name: name}
-	insCols := ColDesc(ColName, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblUserTypes + ` (` + insCols + `)
-		VALUES ($1,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := r.db.QueryRow(q, name).Scan(&ut.ID, &ut.CreateDate, &ut.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &ut, nil
-}
-func (r *Roach) UserTypeByName(string) (*model.UserType, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-// InsertUserType inserts into the database returning calculated values.
-func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	u := model.User{Type: t}
-	insCols := ColDesc(ColTypeID, ColPassword, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblUsers + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, t.ID, password).Scan(&u.ID, &u.CreateDate, &u.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &u, nil
-}
-func (r *Roach) UpdatePassword(userID string, password []byte) error {
-	return errors.NewNotImplemented()
-}
-func (r *Roach) UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error {
-	return errors.NewNotImplemented()
-}
-func (r *Roach) User(id string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByDeviceID(devID string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByUsername(username string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByPhone(phone string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByEmail(email string) (*model.User, []byte, error) {
-	return nil, nil, errors.NewNotImplemented()
-}
-func (r *Roach) UserByFacebook(facebookID string) (*model.User, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
-	return errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model.Device, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	dev := model.Device{UserID: userID, DeviceID: devID}
-	insCols := ColDesc(ColUserID, ColDevID, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblDeviceIDs + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, devID).Scan(&dev.ID, &dev.CreateDate, &dev.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &dev, nil
-}
-
-// InsertUserType inserts into the database returning calculated values.
-func (r *Roach) InsertUserName(userID, username string) (*model.Username, error) {
-	return insertUserName(r.db, userID, username)
-}
-
-// InsertUserType inserts through tx returning calculated values.
-func (r *Roach) InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*model.Username, error) {
-	return insertUserName(tx, userID, username)
-}
-
-func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return insertUserPhone(r.db, userID, phone, verified)
-}
-func (r *Roach) InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return insertUserPhone(tx, userID, phone, verified)
-}
-func (r *Roach) UpdateUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
-}
-func (r *Roach) UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return insertPhoneToken(r.db, userID, phone, dbt, isUsed, expiry)
-}
-func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return insertPhoneToken(tx, userID, phone, dbt, isUsed, expiry)
-}
-func (r *Roach) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
-	return insertUserEmail(r.db, userID, email, verified)
-}
-func (r *Roach) InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*model.VerifLogin, error) {
-	return insertUserEmail(tx, userID, email, verified)
-}
-func (r *Roach) UpdateUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
-}
-func (r *Roach) UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*model.VerifLogin, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
-}
-func (r *Roach) InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
-}
-func (r *Roach) EmailTokens(userID string, offset, count int64) ([]model.DBToken, error) {
-	return nil, errors.NewNotImplemented()
-}
-
-func (r *Roach) InsertUserFbIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*model.Facebook, error) {
-	if tx == nil {
-		return nil, errorNilTx
-	}
-	fb := model.Facebook{UserID: userID, FacebookID: fbID, Verified: verified}
-	insCols := ColDesc(ColUserID, ColFacebookID, ColVerified, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblFacebookIDs + ` (` + insCols + `)
-		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, fbID, verified).Scan(&fb.ID, &fb.CreateDate, &fb.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &fb, nil
 }
 
 // ColDesc returns a string containing cols in the given order separated by ",".
@@ -341,147 +137,11 @@ func (r *Roach) setRunningVersionCurrent() error {
 	return checkRowsAffected(res, err, 1)
 }
 
-func (r *Roach) upsertConf(key string, conf interface{}) error {
-	if err := r.InitDBIfNot(); err != nil {
-		return err
-	}
-	valB, err := json.Marshal(conf)
-	if err != nil {
-		return errors.Newf("marshal conf: %v", err)
-	}
-	cols := ColDesc(ColKey, ColValue, ColUpdateDate)
-	q := `UPSERT INTO ` + TblConfigurations + ` (` + cols + `) VALUES ($1, $2, CURRENT_TIMESTAMP)`
-	res, err := r.db.Exec(q, key, valB)
-	return checkRowsAffected(res, err, 1)
-}
-
-func (r *Roach) getConf(key string, conf interface{}) error {
-	if err := r.InitDBIfNot(); err != nil {
-		return err
-	}
-	q := `SELECT ` + ColValue + ` FROM ` + TblConfigurations + ` WHERE ` + ColKey + `=$1`
-	var confB []byte
-	if err := r.db.QueryRow(q, key).Scan(&confB); err != nil {
-		if err == sql.ErrNoRows {
-			return errors.NewNotFoundf("config not found")
-		}
-		return err
-	}
-	if err := json.Unmarshal(confB, conf); err != nil {
-		return errors.Newf("Unmarshalling config: %v", err)
-	}
-	return nil
-}
-
-func insertUserName(tx inserter, userID, username string) (*model.Username, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	un := model.Username{UserID: userID, Value: username}
-	insCols := ColDesc(ColUserID, ColUserName, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblUserNameIDs + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, username).Scan(&un.ID, &un.CreateDate, &un.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &un, nil
-}
-
-func insertUserPhone(tx inserter, userID, phone string, verified bool) (*model.VerifLogin, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	vl := model.VerifLogin{UserID: userID, Address: phone, Verified: verified}
-	insCols := ColDesc(ColUserID, ColPhone, ColVerified, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblPhoneIDs + ` (` + insCols + `)
-		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, phone, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &vl, nil
-}
-
-func insertPhoneToken(tx inserter, userID, phone string, dbtB []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	dbt := model.DBToken{
-		UserID:     userID,
-		Address:    phone,
-		Token:      dbtB,
-		IsUsed:     isUsed,
-		ExpiryDate: expiry,
-	}
-	insCols := ColDesc(ColUserID, ColPhone, ColToken, ColIsUsed, ColExpiryDate)
-	retCols := ColDesc(ColID, ColIssueDate)
-	q := `
-	INSERT INTO ` + TblPhoneTokens + ` (` + insCols + `)
-		VALUES ($1,$2,$3,$4,$5)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, phone, dbtB, isUsed, expiry).
-		Scan(&dbt.ID, &dbt.IssueDate)
-	if err != nil {
-		return nil, err
-	}
-	return &dbt, nil
-}
-
-func insertUserEmail(tx inserter, userID, address string, verified bool) (*model.VerifLogin, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	vl := model.VerifLogin{UserID: userID, Address: address, Verified: verified}
-	insCols := ColDesc(ColUserID, ColEmail, ColVerified, ColUpdateDate)
-	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblEmailIDs + ` (` + insCols + `)
-		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, address, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
-	if err != nil {
-		return nil, err
-	}
-	return &vl, nil
-}
-
-func insertEmailToken(tx inserter, userID, address string, dbtB []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return nil, errorNilTx
-	}
-	dbt := model.DBToken{
-		UserID:     userID,
-		Address:    address,
-		Token:      dbtB,
-		IsUsed:     isUsed,
-		ExpiryDate: expiry,
-	}
-	insCols := ColDesc(ColUserID, ColEmail, ColToken, ColIsUsed, ColExpiryDate)
-	retCols := ColDesc(ColID, ColIssueDate)
-	q := `
-	INSERT INTO ` + TblEmailTokens + ` (` + insCols + `)
-		VALUES ($1,$2,$3,$4,$5)
-		RETURNING ` + retCols
-	err := tx.QueryRow(q, userID, address, dbtB, isUsed, expiry).
-		Scan(&dbt.ID, &dbt.IssueDate)
-	if err != nil {
-		return nil, err
-	}
-	return &dbt, nil
-}
-
-func checkRowsAffected(rslt sql.Result, err error, expAffected int64) error {
+func checkRowsAffected(r sql.Result, err error, expAffected int64) error {
 	if err != nil {
 		return err
 	}
-	c, err := rslt.RowsAffected()
+	c, err := r.RowsAffected()
 	if err != nil {
 		return err
 	}

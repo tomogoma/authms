@@ -1,8 +1,10 @@
 package db
 
 const (
+	// Database definition version
 	Version = 1
 
+	// Table names
 	TblConfigurations = "configurations"
 	TblAPIKeys        = "apiKeys"
 	TblUserTypes      = "userTypes"
@@ -18,6 +20,7 @@ const (
 	TblFacebookIDs    = "facebookIDs"
 	TblRefreshTokens  = "refreshTokens"
 
+	// DB Table Columns
 	ColID          = "ID"
 	ColPassword    = "password"
 	ColCreateDate  = "createDate"
@@ -43,6 +46,7 @@ const (
 	ColIsRevoked   = "isRevoked"
 	ColAPIKeyID    = "apiKeyID"
 
+	// CREATE TABLE DESCRIPTIONS
 	TblDescConfigurations = `
 	CREATE TABLE IF NOT EXISTS ` + TblConfigurations + ` (
 		` + ColKey + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColKey + ` != ''),
@@ -128,7 +132,7 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColEmail + ` CHAR NOT NULL REFERENCES ` + TblEmailIDs + ` (` + ColEmail + `),
-		` + ColToken + ` BYTEA NOT NULL,
+		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
 		` + ColIssueDate + ` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
 		` + ColExpiryDate + ` TIMESTAMP NOT NULL
@@ -178,6 +182,8 @@ const (
 	`
 )
 
+// AllTableDescs lists all CREATE TABLE DESCRIPTIONS in order of dependency
+// (tables with foreign key references listed after parent table descriptions).
 var AllTableDescs = []string{
 	TblDescConfigurations,
 	TblDescUserTypes,
@@ -195,6 +201,8 @@ var AllTableDescs = []string{
 	TblDescRefreshTokens,
 }
 
+// AllTableNames lists all table names in order of dependency
+// (tables with foreign key references listed after parent table descriptions).
 var AllTableNames = []string{
 	TblConfigurations,
 	TblUserTypes,
@@ -205,6 +213,7 @@ var AllTableNames = []string{
 	TblDeviceIDs,
 	TblUserNameIDs,
 	TblEmailIDs,
+	TblEmailTokens,
 	TblPhoneIDs,
 	TblPhoneTokens,
 	TblFacebookIDs,
