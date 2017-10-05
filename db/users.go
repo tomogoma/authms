@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 	"reflect"
+
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -58,7 +59,10 @@ func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
 }
 
 func updatePassword(i inserter, userID string, password []byte) error {
-	q := `UPDATE ` + TblUsers + ` SET ` + ColPassword + `=$1 WHERE ` + ColUserID + `=$2`
+	if i == nil || reflect.ValueOf(i).IsNil() {
+		return errorNilTx
+	}
+	q := `UPDATE ` + TblUsers + ` SET ` + ColPassword + `=$1 WHERE ` + ColID + `=$2`
 	res, err := i.Exec(q, password, userID)
 	return checkRowsAffected(res, err, 1)
 }

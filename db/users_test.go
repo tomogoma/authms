@@ -22,14 +22,21 @@ func TestRoach_InsertUserAtomic(t *testing.T) {
 		testName string
 		ut       model.UserType
 		password []byte
+		nilTx    bool
 		expErr   bool
 	}{
 		{testName: "valid", ut: *ut, password: []byte("12345678"), expErr: false},
 		{testName: "bad typeID", ut: model.UserType{ID: "invalid"}, password: []byte("12345678"), expErr: true},
 		{testName: "short password", ut: *ut, password: []byte("1234567"), expErr: true},
 	}
+	_, err = r.InsertUserAtomic(nil, *ut, []byte("123456789"))
+	if err == nil {
+		t.Errorf("(nil tx) - expected an error, got nil")
+	}
 	for _, tc := range tt {
 		t.Run(tc.testName, func(t *testing.T) {
+			if tc.nilTx {
+			}
 			r.ExecuteTx(func(tx *sql.Tx) error {
 				ret, err := r.InsertUserAtomic(tx, tc.ut, tc.password)
 				if tc.expErr {
@@ -60,6 +67,57 @@ func TestRoach_InsertUserAtomic(t *testing.T) {
 				return nil
 			})
 		})
+	}
+}
+
+func TestRoach_UpdatePassword(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	validPass := []byte("A g00d P@$$wo%d") //chars >= 8
+	tt := []struct {
+		name     string
+		userID   string
+		password []byte
+		expErr   bool
+	}{
+		{name: "valid", userID: usr.ID, password: validPass, expErr: false},
+		{name: "non-exist userID", userID: "not-exist", password: validPass, expErr: true},
+		{name: "short password", userID: usr.ID, password: []byte("7 chars"), expErr: true},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			err := r.UpdatePassword(tc.userID, tc.password)
+			if tc.expErr {
+				if err == nil {
+					t.Fatalf("Expected an error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got an error: %v", err)
+			}
+		})
+	}
+}
+
+func TestRoach_UpdatePasswordAtomic(t *testing.T) {
+	conf := setup(t)
+	defer tearDown(t, conf)
+	r := newRoach(t, conf)
+	usr := insertUser(t, r)
+	validPass := []byte("A g00d P@$$wo%d") //chars >= 8
+	r.ExecuteTx(func(tx *sql.Tx) error {
+		err := r.UpdatePasswordAtomic(tx, usr.ID, validPass)
+		if err != nil {
+			t.Fatalf("Got an error: %v", err)
+		}
+		return nil
+	})
+	err := r.UpdatePasswordAtomic(nil, usr.ID, validPass)
+	if err == nil {
+		t.Fatalf("nil tx - expected an error, got nil")
 	}
 }
 
