@@ -6,12 +6,11 @@ import (
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/service"
 	"github.com/tomogoma/go-commons/errors"
-	"golang.org/x/crypto/bcrypt"
 )
 
 type APIKeyStoreMock struct {
 	errors.NotFoundErrCheck
-	expKeys   [][]byte
+	expKeys   []model.APIKey
 	expAPIKey *model.APIKey
 	expErr    error
 }
@@ -25,10 +24,10 @@ func (kg *KeyGeneratorMock) SecureRandomBytes(length int) ([]byte, error) {
 	return kg.expKey, kg.expErr
 }
 
-func (db *APIKeyStoreMock) GetAPIKeys(userID string) ([][]byte, error) {
+func (db *APIKeyStoreMock) APIKeysByUserID(userID string, offset, count int64) ([]model.APIKey, error) {
 	return db.expKeys, db.expErr
 }
-func (db *APIKeyStoreMock) SaveAPIKey(userID string, key []byte) (*model.APIKey, error) {
+func (db *APIKeyStoreMock) InsertAPIKey(userID, key string) (*model.APIKey, error) {
 	return db.expAPIKey, db.expErr
 }
 
@@ -99,14 +98,14 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "valid",
 			userID: "johndoe",
 			kg:     &KeyGeneratorMock{expKey: []byte(validKey)},
-			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr: false,
 		},
 		{
 			name:     "missing userID",
 			userID:   "",
 			kg:       &KeyGeneratorMock{expKey: []byte(validKey)},
-			db:       &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:       &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr:   true,
 			expClErr: true,
 		},
@@ -114,7 +113,7 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "key gen report error",
 			userID: "johndoe",
 			kg:     &KeyGeneratorMock{expErr: errors.Newf("an error")},
-			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid"}},
+			db:     &APIKeyStoreMock{expAPIKey: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr: true,
 		},
 		{
@@ -152,10 +151,6 @@ func TestGuard_NewAPIKey(t *testing.T) {
 
 func TestGuard_APIKeyValid(t *testing.T) {
 	validKey := "some-api-key"
-	validKeyH, err := bcrypt.GenerateFromPassword([]byte(validKey), bcrypt.DefaultCost)
-	if err != nil {
-		t.Fatalf("Error setting up: hash test key: %v", err)
-	}
 	tt := []struct {
 		name            string
 		userID          string
@@ -170,10 +165,10 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "valid (db)",
 			userID: "johndoe",
 			key:    validKey,
-			db: &APIKeyStoreMock{expKeys: [][]byte{
-				[]byte("first-api-key"),
-				validKeyH,
-				[]byte("last-api-key"),
+			db: &APIKeyStoreMock{expKeys: []model.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
 			}},
 			expErr: false,
 		},
@@ -182,10 +177,10 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			userID:    "johndoe",
 			key:       "the-master-key",
 			masterKey: "the-master-key",
-			db: &APIKeyStoreMock{expKeys: [][]byte{
-				[]byte("first-api-key"),
-				validKeyH,
-				[]byte("last-api-key"),
+			db: &APIKeyStoreMock{expKeys: []model.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
 			}},
 			expErr: false,
 		},
@@ -193,10 +188,10 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "missing userID",
 			userID: "",
 			key:    validKey,
-			db: &APIKeyStoreMock{expKeys: [][]byte{
-				[]byte("first-api-key"),
-				validKeyH,
-				[]byte("last-api-key"),
+			db: &APIKeyStoreMock{expKeys: []model.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
 			}},
 			expErr:          true,
 			expForbidden:    false,
@@ -206,10 +201,10 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "missing key",
 			userID: "johndoe",
 			key:    "",
-			db: &APIKeyStoreMock{expKeys: [][]byte{
-				[]byte("first-api-key"),
-				validKeyH,
-				[]byte("last-api-key"),
+			db: &APIKeyStoreMock{expKeys: []model.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
 			}},
 			expErr:          true,
 			expForbidden:    false,
@@ -219,10 +214,10 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "invalid key",
 			userID: "johndoe",
 			key:    "some-invalid-key",
-			db: &APIKeyStoreMock{expKeys: [][]byte{
-				[]byte("first-api-key"),
-				validKeyH,
-				[]byte("last-api-key"),
+			db: &APIKeyStoreMock{expKeys: []model.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
 			}},
 			expErr:          true,
 			expForbidden:    true,

@@ -17,7 +17,7 @@ func setup(t *testing.T) cockroach.DSN {
 	conf := testingH.ReadConfig(t)
 	conf.Database.DB = conf.Database.DB + "_test"
 	if !isInit {
-		err := delAllTables(getDB(t, conf.Database), conf.Database.DBName())
+		err := dropAllTables(getDB(t, conf.Database), conf.Database.DBName())
 		if err != nil {
 			t.Fatalf("Error setting up: delete all tables: %v", err)
 		}
@@ -40,6 +40,19 @@ func delAllTables(rdb *sql.DB, dbName string) error {
 		_, err := rdb.Exec("DELETE FROM " + db.AllTableNames[i])
 		if err != nil {
 			return errors.Newf("delete %s: %v", db.AllTableNames[i], err)
+		}
+	}
+	return nil
+}
+
+func dropAllTables(rdb *sql.DB, dbName string) error {
+	if _, err := rdb.Exec("SET DATABASE=" + dbName); err != nil {
+		return nil
+	}
+	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
+		_, err := rdb.Exec("DROP TABLE IF EXISTS " + db.AllTableNames[i])
+		if err != nil {
+			return errors.Newf("drop %s: %v", db.AllTableNames[i], err)
 		}
 	}
 	return nil

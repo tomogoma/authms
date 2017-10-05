@@ -40,7 +40,6 @@ const (
 	ColExpiryDate  = "expiryDate"
 	ColKey         = "key"
 	ColValue       = "value"
-	ColAPIKey      = "apiKey"
 	ColTypeID      = "typeID"
 	ColDevID       = "deviceID"
 	ColIsRevoked   = "isRevoked"
@@ -104,7 +103,7 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblAPIKeys + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColAPIKey + ` BYTEA NOT NULL CHECK ( LENGTH(` + ColAPIKey + `) >= 56 ),
+		` + ColKey + ` CHAR NOT NULL CHECK ( LENGTH(` + ColKey + `) >= 56 ),
 		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);

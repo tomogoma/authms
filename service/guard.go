@@ -1,19 +1,16 @@
 package service
 
 import (
-	"time"
-
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
-	"github.com/tomogoma/go-commons/errors"
-	"golang.org/x/crypto/bcrypt"
 	"github.com/tomogoma/authms/model"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 type APIKeyStore interface {
 	IsNotFoundError(error) bool
-	GetAPIKeys(userID string) ([][]byte, error)
-	SaveAPIKey(userID string, key []byte) (*model.APIKey, error)
+	InsertAPIKey(userID, key string) (*model.APIKey, error)
+	APIKeysByUserID(userID string, offset, count int64) ([]model.APIKey, error)
 }
 
 type KeyGenerator interface {
@@ -62,27 +59,26 @@ func NewGuard(db APIKeyStore, opts ...Option) (*Guard, error) {
 	return g, nil
 }
 
-func (s *Guard) APIKeyValid(userID, key string) error {
-	if userID == "" || key == "" {
-		return errors.NewUnauthorizedf(invalidAPIKeyErrorf, key, userID)
+func (s *Guard) APIKeyValid(userID, keyStr string) error {
+	if userID == "" || keyStr == "" {
+		return errors.NewUnauthorizedf(invalidAPIKeyErrorf, keyStr, userID)
 	}
-	if key == s.masterKey {
+	if keyStr == s.masterKey {
 		return nil
 	}
-	keysHB, err := s.db.GetAPIKeys(userID)
+	dbKeys, err := s.db.APIKeysByUserID(userID, 0, 10)
 	if err != nil {
 		if s.db.IsNotFoundError(err) {
-			return errors.NewForbiddenf(invalidAPIKeyErrorf, key, userID)
+			return errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 		}
 		return errors.Newf("get API Key: %v", err)
 	}
-	for _, keyHB := range keysHB {
-		err = bcrypt.CompareHashAndPassword(keyHB, []byte(key))
-		if err == nil {
+	for _, dbKey := range dbKeys {
+		if dbKey.APIKey == keyStr {
 			return nil
 		}
 	}
-	return errors.NewForbiddenf(invalidAPIKeyErrorf, key, userID)
+	return errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 }
 
 func (s *Guard) NewAPIKey(userID string) (*model.APIKey, error) {
@@ -93,14 +89,9 @@ func (s *Guard) NewAPIKey(userID string) (*model.APIKey, error) {
 	if err != nil {
 		return nil, errors.Newf("generate key: %v", err)
 	}
-	keyH, err := bcrypt.GenerateFromPassword(key, bcrypt.DefaultCost)
-	if err != nil {
-		return nil, errors.Newf("hash key for storage: %v", err)
-	}
-	k, err := s.db.SaveAPIKey(userID, keyH)
+	k, err := s.db.InsertAPIKey(userID, string(key))
 	if err != nil {
 		return nil, errors.Newf("store key: %v", err)
 	}
-	k.APIKey = string(key)
 	return k, nil
 }
