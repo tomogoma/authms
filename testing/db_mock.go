@@ -48,6 +48,11 @@ type DBMock struct {
 	ExpUsrBPhnPass   []byte
 	ExpUsrBMailPass  []byte
 
+	ExpInsAPIK        *model.APIKey
+	ExpInsAPIKErr     error
+	ExpAPIKsBUsrID    []model.APIKey
+	ExpAPIKsBUsrIDErr error
+
 	ExpAddUsrTGrpAtmcErr error
 
 	ExpInsDevAtm    *model.Device
@@ -121,6 +126,13 @@ func (db *DBMock) InsertUserType(name string) (*model.UserType, error) {
 }
 func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
 	return db.ExpInsUsrAtm, db.ExpInsUsrAtmErr
+}
+
+func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]model.APIKey, error) {
+	return db.ExpAPIKsBUsrID, db.ExpAPIKsBUsrIDErr
+}
+func (db *DBMock) InsertAPIKey(userID, key string) (*model.APIKey, error) {
+	return db.ExpInsAPIK, db.ExpInsAPIKErr
 }
 
 func (db *DBMock) UpdateUsername(userID, username string) (*model.Username, error) {
