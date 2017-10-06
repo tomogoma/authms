@@ -3,7 +3,6 @@ package service_test
 import (
 	"testing"
 
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/service"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/errors"
@@ -76,14 +75,14 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "valid",
 			userID: "johndoe",
 			kg:     &testingH.GeneratorMock{ExpSRBs: []byte(validKey)},
-			db:     &testingH.DBMock{ExpInsAPIK: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
+			db:     &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr: false,
 		},
 		{
 			name:     "missing userID",
 			userID:   "",
 			kg:       &testingH.GeneratorMock{ExpSRBs: []byte(validKey)},
-			db:       &testingH.DBMock{ExpInsAPIK: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
+			db:       &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr:   true,
 			expClErr: true,
 		},
@@ -91,7 +90,7 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "key gen report error",
 			userID: "johndoe",
 			kg:     &testingH.GeneratorMock{ExpSRBsErr: errors.Newf("an error")},
-			db:     &testingH.DBMock{ExpInsAPIK: &model.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
+			db:     &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "johndoe", ID: "apiid", APIKey: validKey}},
 			expErr: true,
 		},
 		{
@@ -143,7 +142,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "valid (db)",
 			userID: "johndoe",
 			key:    validKey,
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []model.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -155,7 +154,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			userID:    "johndoe",
 			key:       "the-master-key",
 			masterKey: "the-master-key",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []model.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -166,7 +165,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "missing userID",
 			userID: "",
 			key:    validKey,
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []model.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -179,7 +178,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "missing key",
 			userID: "johndoe",
 			key:    "",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []model.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -192,7 +191,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:   "invalid key",
 			userID: "johndoe",
 			key:    "some-invalid-key",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []model.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},

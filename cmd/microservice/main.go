@@ -1,4 +1,4 @@
-package main
+package microservice
 
 import (
 	"flag"
@@ -21,8 +21,8 @@ import (
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/server/http"
-	"github.com/tomogoma/authms/server/rpc"
+	"github.com/tomogoma/authms/handler/http"
+	"github.com/tomogoma/authms/handler/rpc"
 	"github.com/tomogoma/authms/sms/africas_talking"
 	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/store"

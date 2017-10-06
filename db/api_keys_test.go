@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/tomogoma/authms/db"
-	"github.com/tomogoma/authms/model"
+	"github.com/tomogoma/authms/service"
 )
 
 func TestRoach_InsertAPIKey(t *testing.T) {
@@ -72,7 +72,7 @@ func TestRoach_APIKeysByUserID(t *testing.T) {
 	usrNoKeys := insertUser(t, r)
 	key1 := insertAPIKey(t, r, usr.ID)
 	key2 := insertAPIKey(t, r, usr.ID)
-	expKeys := []model.APIKey{*key2, *key1}
+	expKeys := []service.APIKey{*key2, *key1}
 	tt := []struct {
 		name        string
 		userID      string
@@ -101,7 +101,7 @@ func TestRoach_APIKeysByUserID(t *testing.T) {
 	}
 }
 
-func insertAPIKey(t *testing.T, r *db.Roach, usrID string) *model.APIKey {
+func insertAPIKey(t *testing.T, r *db.Roach, usrID string) *service.APIKey {
 	k, err := r.InsertAPIKey(usrID, strings.Repeat("x", 56))
 	if err != nil {
 		t.Fatalf("Error setting up: insert API key: %v", err)

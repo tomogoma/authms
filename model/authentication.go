@@ -89,14 +89,6 @@ type Mailer interface {
 	SendEmail(email SendMail) error
 }
 
-type APIKey struct {
-	ID         string
-	UserID     string
-	APIKey     string
-	CreateDate time.Time
-	UpdateDate time.Time
-}
-
 // Authentication has the methods for performing auth. Use NewAuthentication()
 // to construct.
 type Authentication struct {
@@ -260,7 +252,7 @@ func (a *Authentication) RegisterSelfByLockedPhone(userType, devID, number strin
 	)
 }
 
-func (a *Authentication) RegisterOther(newLoginType, JWT, userType, id, groupID string) (*User, error) {
+func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID string) (*User, error) {
 	adminGrp, err := a.getOrCreateGroup(GroupAdmin, AccessLevelAdmin)
 	if err != nil {
 		return nil, err
@@ -288,51 +280,39 @@ func (a *Authentication) RegisterOther(newLoginType, JWT, userType, id, groupID 
 	return a.registerOther(userType, id, groupID, regF)
 }
 
-// UpdateUsername updates a user account's username.
-func (a *Authentication) UpdateUsername(JWT, newUsrName string) (*Username, error) {
-	// TODO allow admin to update
+// UpdateIdentifier updates a user account's visible identifier to newID for
+// loginType.
+func (a *Authentication) UpdateIdentifier(JWT, loginType, newId string) (*User, error) {
 	clm := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clm); err != nil {
 		return nil, err
 	}
-	_, _, err := a.db.UserByUsername(newUsrName)
-	if err = a.usrIdentifierAvail(loginTypeUsername, err); err != nil {
-		return nil, err
-	}
-	uname, err := a.db.InsertUserName(clm.UsrID, newUsrName)
-	if err != nil {
-		return nil, errors.Newf("user by phone: %v", err)
-	}
-	return uname, nil
-}
 
-// UpdateUsername updates a user account's phone.
-func (a *Authentication) UpdatePhone(JWT, newNum string) (*VerifLogin, error) {
-	// TODO allow admin to update
-	clm := new(JWTClaim)
-	if _, err := a.jwter.Validate(JWT, clm); err != nil {
-		return nil, err
-	}
-	newNum, err := formatValidPhone(newNum)
+	usr, _, err := a.db.User(clm.UsrID)
 	if err != nil {
-		return nil, err
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.Newf("not found user by JWT provided userID: %v", err)
+		}
+		return nil, errors.Newf("get user: %v", err)
 	}
-	_, _, err = a.db.UserByPhone(newNum)
-	if err = a.usrIdentifierAvail(loginTypePhone, err); err != nil {
-		return nil, err
+
+	switch loginType {
+	case loginTypeUsername:
+		var usrnm *Username
+		usrnm, err = a.updateUsername(usr.ID, newId)
+		usr.UserName = *usrnm
+	case loginTypePhone:
+		var phn *VerifLogin
+		phn, err = a.updatePhone(usr.ID, newId)
+		usr.Phone = *phn
+	case loginTypeEmail:
+		err = errors.NewNotImplemented()
+	case loginTypeFacebook:
+		err = errors.NewNotImplemented()
+	default:
+		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
-	phone, err := a.db.InsertUserPhone(clm.UsrID, newNum, false)
-	if err != nil {
-		return nil, errors.Newf("update phone: %v", err)
-	}
-	if a.smserNilable == nil {
-		return phone, nil
-	}
-	_, err = a.genAndSendTokens(nil, ActionVerify, loginTypePhone, newNum, clm.UsrID)
-	if err != nil {
-		return nil, err
-	}
-	return phone, nil
+	return usr, err
 }
 
 // UpdatePassword updates a user account's password.
@@ -410,7 +390,7 @@ func (a *Authentication) SetPassword(loginType, userID string, dbt, pass []byte)
 // address. loginType determines determines whether toAddr is a phone or an email.
 // subsequent calls to VerifyDBT() or VerifyAndExtendDBT() with the correct code
 // completes the verification.
-func (a *Authentication) SendVerCode(loginType, JWT, toAddr string) (string, error) {
+func (a *Authentication) SendVerCode(JWT, loginType, toAddr string) (string, error) {
 	clms := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clms); err != nil {
 		return "", err
@@ -819,6 +799,42 @@ func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbToken string, usr
 	}
 	usr.Facebook = *fb
 	return nil
+}
+
+func (a *Authentication) updateUsername(usrID, newUsrName string) (*Username, error) {
+	_, _, err := a.db.UserByUsername(newUsrName)
+	if err = a.usrIdentifierAvail(loginTypeUsername, err); err != nil {
+		return nil, err
+	}
+	// TODO
+	//uname, err := a.db.UpdateUserName(clm.UsrID, newUsrName)
+	//if err != nil {
+	//	return nil, errors.Newf("user by phone: %v", err)
+	//}
+	return nil, errors.NewNotImplemented()
+}
+
+func (a *Authentication) updatePhone(usrID, newNum string) (*VerifLogin, error) {
+	newNum, err := formatValidPhone(newNum)
+	if err != nil {
+		return nil, err
+	}
+	_, _, err = a.db.UserByPhone(newNum)
+	if err = a.usrIdentifierAvail(loginTypePhone, err); err != nil {
+		return nil, err
+	}
+	phone, err := a.db.UpdateUserPhone(usrID, newNum, false)
+	if err != nil {
+		return nil, errors.Newf("update phone: %v", err)
+	}
+	if a.smserNilable == nil {
+		return phone, nil
+	}
+	_, err = a.genAndSendTokens(nil, ActionVerify, loginTypePhone, newNum, usrID)
+	if err != nil {
+		return nil, err
+	}
+	return phone, nil
 }
 
 func (a *Authentication) genPasswordWithHash() (password []byte, passwordH []byte, err error) {

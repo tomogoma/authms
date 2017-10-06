@@ -1,20 +1,29 @@
 package service
 
 import (
+	"time"
+
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 type APIKeyStore interface {
 	IsNotFoundError(error) bool
-	InsertAPIKey(userID, key string) (*model.APIKey, error)
-	APIKeysByUserID(userID string, offset, count int64) ([]model.APIKey, error)
+	InsertAPIKey(userID, key string) (*APIKey, error)
+	APIKeysByUserID(userID string, offset, count int64) ([]APIKey, error)
 }
 
 type KeyGenerator interface {
 	SecureRandomBytes(length int) ([]byte, error)
+}
+
+type APIKey struct {
+	ID         string
+	UserID     string
+	APIKey     string
+	CreateDate time.Time
+	UpdateDate time.Time
 }
 
 type Guard struct {
@@ -81,7 +90,7 @@ func (s *Guard) APIKeyValid(userID, keyStr string) error {
 	return errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 }
 
-func (s *Guard) NewAPIKey(userID string) (*model.APIKey, error) {
+func (s *Guard) NewAPIKey(userID string) (*APIKey, error) {
 	if userID == "" {
 		return nil, errors.NewClient("userID was empty")
 	}
