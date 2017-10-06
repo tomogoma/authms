@@ -168,7 +168,7 @@ func TestRoach_UpdateUserEmailAtomic_nilTx(t *testing.T) {
 	r := newRoach(t, conf)
 	usr := insertUser(t, r)
 	mail := insertEmail(t, r, usr.ID)
-	_, err := r.UpdateUserPhoneAtomic(nil, usr.ID, mail.ID, true)
+	_, err := r.UpdateUserEmailAtomic(nil, usr.ID, mail.ID, true)
 	if err == nil {
 		t.Fatalf("Expected an error, got nil")
 	}
