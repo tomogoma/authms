@@ -66,11 +66,6 @@ type AuthStore interface {
 	InsertUserFbIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*Facebook, error)
 }
 
-type Guard interface {
-	APIKeyValid(userID, key string) error
-	NewAPIKey(userID string) (*APIKey, error)
-}
-
 type SecureRandomByteser interface {
 	SecureRandomBytes(length int) ([]byte, error)
 }
@@ -107,7 +102,6 @@ type APIKey struct {
 type Authentication struct {
 	// mandatory parameters
 	db            AuthStore
-	guard         Guard
 	jwter         JWTEr
 	passGen       SecureRandomByteser
 	numGen        SecureRandomByteser
@@ -126,6 +120,8 @@ type Authentication struct {
 	// tail values optional depending on need/type for communication
 	loginTpActionTplts map[string]map[string]*template.Template
 }
+
+type regFunc func(tx *sql.Tx, actionType, id string, usr *User) error
 
 const (
 	GroupSuper  = "super"
@@ -177,14 +173,11 @@ var (
 
 // NewAuthentication constructs an Authentication structs or returns an error
 // if invalid parameters were provided.
-func NewAuthentication(db AuthStore, g Guard, j JWTEr, opts ...Option) (*Authentication, error) {
+func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, error) {
 	if db == nil || reflect.ValueOf(db).IsNil() {
 		return nil, errors.New("AuthStore was nil")
 	}
-	if g == nil || reflect.ValueOf(j).IsNil() {
-		return nil, errors.New("Guard was nil")
-	}
-	if j == nil || reflect.ValueOf(g).IsNil() {
+	if j == nil || reflect.ValueOf(j).IsNil() {
 		return nil, errors.New("JWTEr was nil")
 	}
 
@@ -203,7 +196,6 @@ func NewAuthentication(db AuthStore, g Guard, j JWTEr, opts ...Option) (*Authent
 
 	return &Authentication{
 		db:                   db,
-		guard:                g,
 		jwter:                j,
 		passGen:              c.passGen,
 		numGen:               c.numGen,
@@ -222,153 +214,82 @@ func NewAuthentication(db AuthStore, g Guard, j JWTEr, opts ...Option) (*Authent
 	}, nil
 }
 
-// RegisterSelfByUsername registers a new user account using username/password combination.
-func (a *Authentication) RegisterSelfByUsername(clID, apiKey, userType, username, password string) (*User, error) {
+// RegisterSelf registers a new user account using id secret combination.
+// It should not be possible to register using this method if WithDevLockedToUser()
+// was given a true value.
+func (a *Authentication) RegisterSelf(loginType, userType, id string, secret []byte) (*User, error) {
+
 	if a.lockDevToUser {
 		return nil, errorNoneDeviceReg
 	}
-	return a.registerSelf(clID, apiKey, userType, password, func(tx *sql.Tx, usr *User) error {
-		if username == "" {
-			return errors.NewClient("username cannot be empty")
+
+	var regF regFunc
+	switch loginType {
+	case loginTypeUsername:
+		regF = a.regUsername
+	case loginTypeEmail:
+		regF = a.regEmail
+	case loginTypePhone:
+		regF = a.regPhone
+	case loginTypeFacebook:
+		if a.fbNilable == nil {
+			return nil, errorFbNotAvail
 		}
-		_, _, err := a.db.UserByUsername(username)
-		if err = a.usrIdentifierAvail(loginTypeUsername, err); err != nil {
-			return err
-		}
-		uname, err := a.db.InsertUserNameAtomic(tx, usr.ID, username)
+		var err error
+		secret, err = a.passGen.SecureRandomBytes(genPassLen)
 		if err != nil {
-			return errors.Newf("insert username: %v", err)
+			return nil, errors.Newf("generate password: %v", err)
 		}
-		usr.UserName = *uname
-		return nil
-	})
+		regF = a.regFacebook
+	default:
+		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
+	}
+
+	return a.registerSelf(userType, id, secret, regF)
 }
 
 // RegisterSelfByLockedPhone registers a new user account using phone/deviceID/password combination.
-func (a *Authentication) RegisterSelfByLockedPhone(clID, apiKey, userType, devID, number, password string) (*User, error) {
-	return a.registerSelf(clID, apiKey, userType, password, func(tx *sql.Tx, usr *User) error {
-		_, _, err := a.db.UserByDeviceID(devID)
-		if err := a.usrIdentifierAvail(loginTypePhone, err); err != nil {
-			return err
-		}
-		dev, err := a.db.InsertUserDeviceAtomic(tx, usr.ID, devID)
-		if err != nil {
-			return errors.Newf("insert device: %v", err)
-		}
-		usr.Devices = []Device{*dev}
-		if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
-			return err
-		}
-		if a.smserNilable == nil {
-			return nil
-		}
-		_, err = a.genAndSendTokens(tx, ActionVerify, loginTypePhone, number, usr.ID)
-		return err
-	})
+func (a *Authentication) RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*User, error) {
+	return a.registerSelf(userType, number, password,
+		func(tx *sql.Tx, actionType, number string, usr *User) error {
+			if err := a.regDevice(tx, actionType, devID, usr); err != nil {
+				return err
+			}
+			return a.regPhone(tx, actionType, number, usr)
+		},
+	)
 }
 
-// RegisterSelfByPhone registers a new user account using phone/password combination.
-func (a *Authentication) RegisterSelfByPhone(clID, apiKey, userType, number, password string) (*User, error) {
-	if a.lockDevToUser {
-		return nil, errorNoneDeviceReg
-	}
-	return a.registerSelf(clID, apiKey, userType, password, func(tx *sql.Tx, usr *User) error {
-		if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
-			return err
-		}
-		if a.smserNilable == nil {
-			return nil
-		}
-		_, err := a.genAndSendTokens(tx, ActionVerify, loginTypePhone, number, usr.ID)
-		return err
-	})
-}
-
-// RegisterSelfByEmail registers a new user account using email/password combination.
-func (a *Authentication) RegisterSelfByEmail(clID, apiKey, userType, address, password string) (*User, error) {
-	if a.lockDevToUser {
-		return nil, errorNoneDeviceReg
-	}
-	return a.registerSelf(clID, apiKey, userType, password, func(tx *sql.Tx, usr *User) error {
-		if err := a.insertEmailAtomic(tx, usr, address); err != nil {
-			return err
-		}
-		if a.mailerNilable == nil {
-			return nil
-		}
-		_, err := a.genAndSendTokens(tx, ActionVerify, loginTypeEmail, address, usr.ID)
-		return err
-	})
-}
-
-// RegisterSelfByFacebook registers a new user account using facebook OAuth2 for auth.
-func (a *Authentication) RegisterSelfByFacebook(clID, apiKey, userType, fbToken string) (*User, error) {
-	if a.lockDevToUser {
-		return nil, errorNoneDeviceReg
-	}
-	if a.fbNilable == nil {
-		return nil, errorFbNotAvail
-	}
-	passwordB, err := a.passGen.SecureRandomBytes(genPassLen)
+func (a *Authentication) RegisterOther(newLoginType, JWT, userType, id, groupID string) (*User, error) {
+	adminGrp, err := a.getOrCreateGroup(GroupAdmin, AccessLevelAdmin)
 	if err != nil {
-		return nil, errors.Newf("generate password: %v", err)
+		return nil, err
 	}
-	return a.registerSelf(clID, apiKey, userType, string(passwordB), func(tx *sql.Tx, usr *User) error {
-		if fbToken == "" {
-			return errors.NewClient("facebook token cannot be empty")
-		}
-		fbID, err := a.validateFbToken(fbToken)
-		if err != nil {
-			return err
-		}
-		_, err = a.db.UserByFacebook(fbID)
-		if err = a.usrIdentifierAvail(loginTypeFacebook, err); err != nil {
-			return err
-		}
-		fb, err := a.db.InsertUserFbIDAtomic(tx, usr.ID, fbID, true)
-		if err != nil {
-			return errors.Newf("insert facebook: %v", err)
-		}
-		usr.Facebook = *fb
-		return nil
-	})
-}
+	if _, err := a.validateJWTInGroup(JWT, *adminGrp); err != nil {
+		return nil, err
+	}
 
-// CreateByPhone registers an account on behalf of a new user. The new user will
-// receive a phone invitation to complete account creation using SetPassword().
-func (a *Authentication) CreateByPhone(clientID, apiKey, JWT, userType, number, groupID string) (*User, error) {
-	if a.smserNilable == nil {
-		return nil, errors.NewNotImplementedf("SMS notification (to created user) not available")
-	}
-	return a.createUser(clientID, apiKey, JWT, userType, groupID, func(tx *sql.Tx, usr *User) error {
-		if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
-			return err
+	var regF regFunc
+	switch newLoginType {
+	case loginTypePhone:
+		if a.smserNilable == nil {
+			return nil, errors.NewNotImplementedf("SMS notification (to created user) not available")
 		}
-		_, err := a.genAndSendTokens(tx, ActionInvite, loginTypePhone, number, usr.ID)
-		return err
-	})
-}
+		regF = a.regPhone
+	case loginTypeEmail:
+		if a.mailerNilable == nil {
+			return nil, errors.NewNotImplementedf("email notification (to created user) not available")
+		}
+		regF = a.regEmail
+	default:
+		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, newLoginType)
+	}
 
-// CreateByEmail registers an account on behalf of a new user. The new user will
-// receive an email invitation to complete account creation using SetPassword().
-func (a *Authentication) CreateByEmail(clientID, apiKey, JWT, userType, address, groupID string) (*User, error) {
-	if a.mailerNilable == nil {
-		return nil, errors.NewNotImplementedf("email notification (to created user) not available")
-	}
-	return a.createUser(clientID, apiKey, JWT, userType, groupID, func(tx *sql.Tx, usr *User) error {
-		if err := a.insertEmailAtomic(tx, usr, address); err != nil {
-			return err
-		}
-		_, err := a.genAndSendTokens(tx, ActionInvite, loginTypeEmail, address, usr.ID)
-		return err
-	})
+	return a.registerOther(userType, id, groupID, regF)
 }
 
 // UpdateUsername updates a user account's username.
-func (a *Authentication) UpdateUsername(clientID, apiKey, JWT, newUsrName string) (*Username, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
+func (a *Authentication) UpdateUsername(JWT, newUsrName string) (*Username, error) {
 	// TODO allow admin to update
 	clm := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clm); err != nil {
@@ -386,11 +307,7 @@ func (a *Authentication) UpdateUsername(clientID, apiKey, JWT, newUsrName string
 }
 
 // UpdateUsername updates a user account's phone.
-func (a *Authentication) UpdatePhone(clientID, apiKey, JWT, newNum string) (*VerifLogin, error) {
-
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
+func (a *Authentication) UpdatePhone(JWT, newNum string) (*VerifLogin, error) {
 	// TODO allow admin to update
 	clm := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clm); err != nil {
@@ -419,12 +336,7 @@ func (a *Authentication) UpdatePhone(clientID, apiKey, JWT, newNum string) (*Ver
 }
 
 // UpdatePassword updates a user account's password.
-func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, newPass string) error {
-
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return err
-	}
-
+func (a *Authentication) UpdatePassword(JWT string, old, newPass []byte) error {
 	clm := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clm); err != nil {
 		return err
@@ -434,7 +346,7 @@ func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, newPass stri
 		return errors.Newf("get user: %v", err)
 	}
 
-	if err = passwordValid(oldPassH, []byte(old)); err != nil {
+	if err = passwordValid(oldPassH, old); err != nil {
 		return err
 	}
 	newPassH, err := hashIfValid(newPass)
@@ -451,12 +363,7 @@ func (a *Authentication) UpdatePassword(clientID, apiKey, JWT, old, newPass stri
 // SetPassword updates a user account's password following a SendPassResetCode()
 // request. dbt is the token initially sent to the user for verification.
 // loginType should be similar to the one used during SendPassResetCode().
-func (a *Authentication) SetPassword(clientID, apiKey, loginType, userID, dbt, pass string) (*VerifLogin, error) {
-
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-
+func (a *Authentication) SetPassword(loginType, userID string, dbt, pass []byte) (*VerifLogin, error) {
 	var tkn *DBToken
 	var err error
 	var updtVerifiedFunc func(*sql.Tx, string, string, bool) (*VerifLogin, error)
@@ -503,11 +410,7 @@ func (a *Authentication) SetPassword(clientID, apiKey, loginType, userID, dbt, p
 // address. loginType determines determines whether toAddr is a phone or an email.
 // subsequent calls to VerifyDBT() or VerifyAndExtendDBT() with the correct code
 // completes the verification.
-func (a *Authentication) SendVerCode(clientID, apiKey, loginType, JWT, toAddr string) (string, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return "", err
-	}
-
+func (a *Authentication) SendVerCode(loginType, JWT, toAddr string) (string, error) {
 	clms := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clms); err != nil {
 		return "", err
@@ -565,10 +468,7 @@ func (a *Authentication) SendVerCode(clientID, apiKey, loginType, JWT, toAddr st
 // loginType determines whether toAddr is a phone or an email.
 // subsequent calls to SetPassword() with the correct code completes the
 // password reset.
-func (a *Authentication) SendPassResetCode(clientID, apiKey, loginType, toAddr string) (string, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return "", err
-	}
+func (a *Authentication) SendPassResetCode(loginType, toAddr string) (string, error) {
 	var err error
 	var usr *User
 	var isMessengerAvail bool
@@ -602,10 +502,7 @@ func (a *Authentication) SendPassResetCode(clientID, apiKey, loginType, toAddr s
 // that can be used to perform actions that would otherwise not be possible on
 // the user's account without a password or a JWT for a limited period of time.
 // See VerifyDBT() for details on verification.
-func (a *Authentication) VerifyAndExtendDBT(clID, apiKey, lt, usrID, dbt string) (string, error) {
-	if err := a.guard.APIKeyValid(clID, apiKey); err != nil {
-		return "", err
-	}
+func (a *Authentication) VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error) {
 	lv, err := a.verifyDBT(lt, usrID, dbt)
 	if err != nil {
 		return "", err
@@ -620,20 +517,13 @@ func (a *Authentication) VerifyAndExtendDBT(clID, apiKey, lt, usrID, dbt string)
 // VerifyDBT sets a user's address as verified after successful SendVerCode()
 // and subsequent entry of the code by the user.
 // loginType should be similar to the one used during SendVerCode().
-func (a *Authentication) VerifyDBT(clientID, apiKey, loginType, userID, dbt string) (*VerifLogin, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
+func (a *Authentication) VerifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
 	return a.verifyDBT(loginType, userID, dbt)
 }
 
 // Login validates a user's credentials and returns the user's information
 // together with a JWT for subsequent requests to this and other micro-services.
-func (a *Authentication) Login(clientID, apiKey, loginType, identifier, password string) (*User, error) {
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-
+func (a *Authentication) Login(loginType, identifier string, password []byte) (*User, error) {
 	var usr *User
 	var passHB []byte
 	var err error
@@ -661,7 +551,7 @@ func (a *Authentication) Login(clientID, apiKey, loginType, identifier, password
 		return nil, errors.Newf("get user by %s: %v", loginType, err)
 	}
 
-	if err := passwordValid(passHB, []byte(password)); err != nil {
+	if err := passwordValid(passHB, password); err != nil {
 		return nil, err
 	}
 
@@ -683,7 +573,7 @@ func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) er
 	return nil
 }
 
-func (a *Authentication) verifyDBT(loginType, userID, dbt string) (*VerifLogin, error) {
+func (a *Authentication) verifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
 
 	var tokensFetchFunc func(string, int64, int64) ([]DBToken, error)
 	var updateLoginFunc func(string, string, bool) (*VerifLogin, error)
@@ -768,12 +658,8 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 	return obfuscateFunc(toAddr), nil
 }
 
-func (a *Authentication) registerSelf(clID, apiKey, userType,
-	password string, f func(tx *sql.Tx, usr *User) error) (*User, error) {
+func (a *Authentication) registerSelf(userType string, id string, password []byte, f regFunc) (*User, error) {
 
-	if err := a.guard.APIKeyValid(clID, apiKey); err != nil {
-		return nil, err
-	}
 	if !a.allowSelfReg {
 		return nil, errors.NewForbidden("registration closed from the public")
 	}
@@ -804,7 +690,7 @@ func (a *Authentication) registerSelf(clID, apiKey, userType,
 		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, grp.ID); err != nil {
 			return errors.Newf("add user to group: %v", err)
 		}
-		if err := f(tx, usr); err != nil {
+		if err := f(tx, ActionVerify, id, usr); err != nil {
 			return err
 		}
 		return nil
@@ -819,19 +705,7 @@ func (a *Authentication) registerSelf(clID, apiKey, userType,
 	return usr, nil
 }
 
-func (a *Authentication) createUser(clientID, apiKey, JWT, userType,
-	groupID string, f func(tx *sql.Tx, usr *User) error) (*User, error) {
-
-	if err := a.guard.APIKeyValid(clientID, apiKey); err != nil {
-		return nil, err
-	}
-	adminGrp, err := a.getOrCreateGroup(GroupAdmin, AccessLevelAdmin)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := a.validateJWTInGroup(JWT, *adminGrp); err != nil {
-		return nil, err
-	}
+func (a *Authentication) registerOther(userType, id, groupID string, f regFunc) (*User, error) {
 
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
@@ -861,7 +735,7 @@ func (a *Authentication) createUser(clientID, apiKey, JWT, userType,
 		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, usrGroup.ID); err != nil {
 			return errors.Newf("add user to group: %v", err)
 		}
-		if err := f(tx, usr); err != nil {
+		if err := f(tx, ActionInvite, id, usr); err != nil {
 			return err
 		}
 		return nil
@@ -874,6 +748,77 @@ func (a *Authentication) createUser(clientID, apiKey, JWT, userType,
 	usr.Type = *ut
 
 	return usr, nil
+}
+
+func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, usr *User) error {
+	if username == "" {
+		return errors.NewClient("username cannot be empty")
+	}
+	_, _, err := a.db.UserByUsername(username)
+	if err = a.usrIdentifierAvail(loginTypeUsername, err); err != nil {
+		return err
+	}
+	uname, err := a.db.InsertUserNameAtomic(tx, usr.ID, username)
+	if err != nil {
+		return errors.Newf("insert username: %v", err)
+	}
+	usr.UserName = *uname
+	return nil
+}
+
+func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *User) error {
+	_, _, err := a.db.UserByDeviceID(devID)
+	if err := a.usrIdentifierAvail(loginTypePhone, err); err != nil {
+		return err
+	}
+	dev, err := a.db.InsertUserDeviceAtomic(tx, usr.ID, devID)
+	if err != nil {
+		return errors.Newf("insert device: %v", err)
+	}
+	usr.Devices = []Device{*dev}
+	return nil
+}
+
+func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *User) error {
+	if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
+		return err
+	}
+	if a.smserNilable == nil {
+		return nil
+	}
+	_, err := a.genAndSendTokens(tx, actionType, loginTypePhone, number, usr.ID)
+	return err
+}
+
+func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *User) error {
+	if err := a.insertEmailAtomic(tx, usr, address); err != nil {
+		return err
+	}
+	if a.mailerNilable == nil {
+		return nil
+	}
+	_, err := a.genAndSendTokens(tx, actionType, loginTypeEmail, address, usr.ID)
+	return err
+}
+
+func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbToken string, usr *User) error {
+	if fbToken == "" {
+		return errors.NewClient("facebook token cannot be empty")
+	}
+	fbID, err := a.validateFbToken(fbToken)
+	if err != nil {
+		return err
+	}
+	_, err = a.db.UserByFacebook(fbID)
+	if err = a.usrIdentifierAvail(loginTypeFacebook, err); err != nil {
+		return err
+	}
+	fb, err := a.db.InsertUserFbIDAtomic(tx, usr.ID, fbID, true)
+	if err != nil {
+		return errors.Newf("insert facebook: %v", err)
+	}
+	usr.Facebook = *fb
+	return nil
 }
 
 func (a *Authentication) genPasswordWithHash() (password []byte, passwordH []byte, err error) {
@@ -908,7 +853,7 @@ func (a *Authentication) genAndInsertCode(tx *sql.Tx, action, loginType, forUsrI
 }
 
 func (a *Authentication) hashAndInsertToken(tx *sql.Tx, action, loginType, forUsrID, loginID string, code []byte) error {
-	codeH, err := hash([]byte(code))
+	codeH, err := hash(code)
 	if err != nil {
 		return errors.Newf("hash for storage: %v", err)
 	}
@@ -999,10 +944,10 @@ func (a *Authentication) sendSMS(toPhone string, t *template.Template, data inte
 	return nil
 }
 
-func (a *Authentication) dbTokenValid(userID, dbtStr string,
+func (a *Authentication) dbTokenValid(userID string, checkDBT []byte,
 	f func(userID string, offset, count int64) ([]DBToken, error)) (*DBToken, error) {
 
-	if dbtStr == "" {
+	if len(checkDBT) == 0 {
 		return nil, errors.NewUnauthorized("confirmation token cannot be empty")
 	}
 	if userID == "" {
@@ -1022,7 +967,7 @@ resumeFunc:
 		}
 		offset = offset + count
 		for _, dbt = range codes {
-			err = bcrypt.CompareHashAndPassword(dbt.Token, []byte(dbtStr))
+			err = bcrypt.CompareHashAndPassword(dbt.Token, checkDBT)
 			if err != nil {
 				continue
 			}
@@ -1161,11 +1106,11 @@ func hash(password []byte) ([]byte, error) {
 	return passH, nil
 }
 
-func hashIfValid(password string) ([]byte, error) {
+func hashIfValid(password []byte) ([]byte, error) {
 	if len(password) < minPassLen {
 		return nil, errors.NewClientf("password must be at least %d characters", minPassLen)
 	}
-	return hash([]byte(password))
+	return hash(password)
 }
 
 func inGroups(needle Group, haystack []Group) bool {

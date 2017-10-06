@@ -31,13 +31,6 @@ func TestNewAuthentication(t *testing.T) {
 			expErr: true,
 		},
 		{
-			name:   "nil guard",
-			db:     &testingH.DBMock{},
-			guard:  nil,
-			jwter:  &testingH.JWTMock{},
-			expErr: true,
-		},
-		{
 			name:   "nil jwter",
 			db:     &testingH.DBMock{},
 			guard:  &testingH.GuardMock{},
@@ -47,7 +40,7 @@ func TestNewAuthentication(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			a, err := model.NewAuthentication(tc.db, tc.guard, tc.jwter, tc.opts...)
+			a, err := model.NewAuthentication(tc.db, tc.jwter, tc.opts...)
 			if tc.expErr {
 				if err == nil {
 					t.Fatalf("Expected an error, got nil")
