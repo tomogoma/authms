@@ -24,7 +24,7 @@ func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error)
 	updCols := ColDesc(ColUserName, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-		UPDATE ` + TblUserNameIDs + ` SET (` + updCols + `)=($1,CURRENT_TIMESTAMP)
+		UPDATE ` + TblUserNames + ` SET (` + updCols + `)=($1,CURRENT_TIMESTAMP)
 			WHERE ` + ColUserID + `=$2
 			RETURNING ` + retCols
 	err := r.db.QueryRow(q, username, userID).Scan(&un.ID, &un.CreateDate, &un.UpdateDate)
@@ -45,7 +45,7 @@ func insertUserName(tx inserter, userID, username string) (*model.Username, erro
 	insCols := ColDesc(ColUserID, ColUserName, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	INSERT INTO ` + TblUserNameIDs + ` (` + insCols + `)
+	INSERT INTO ` + TblUserNames + ` (` + insCols + `)
 		VALUES ($1,$2,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
 	err := tx.QueryRow(q, userID, username).Scan(&un.ID, &un.CreateDate, &un.UpdateDate)

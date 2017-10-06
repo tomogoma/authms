@@ -50,17 +50,17 @@ func (r *Roach) UserByDeviceID(devID string) (*model.User, []byte, error) {
 
 // UserByUsername fetches User and password for account with username.
 func (r *Roach) UserByUsername(username string) (*model.User, []byte, error) {
-	return r.userWhere(TblUserNameIDs+`.`+ColUserName+`=$1`, username)
+	return r.userWhere(TblUserNames+`.`+ColUserName+`=$1`, username)
 }
 
 // UserByPhone fetches User and password for account with phone.
 func (r *Roach) UserByPhone(phone string) (*model.User, []byte, error) {
-	return r.userWhere(TblPhoneIDs+`.`+ColPhone+`=$1`, phone)
+	return r.userWhere(TblPhones+`.`+ColPhone+`=$1`, phone)
 }
 
 // UserByEmail fetches User and password for account with email.
 func (r *Roach) UserByEmail(email string) (*model.User, []byte, error) {
-	return r.userWhere(TblEmailIDs+`.`+ColEmail+`=$1`, email)
+	return r.userWhere(TblEmails+`.`+ColEmail+`=$1`, email)
 }
 
 // UserByFacebook fetches User and password for account with fbID.
@@ -89,9 +89,9 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 	cols := ColDesc(
 		colDescTbl(TblUsers, ColID, ColPassword, ColCreateDate, ColUpdateDate),
 		colDescTbl(TblUserTypes, ColID, ColName, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblUserNameIDs, ColID, ColUserName, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblEmailIDs, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblPhoneIDs, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblUserNames, ColID, ColUserName, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblEmails, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblPhones, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
 		colDescTbl(TblFacebookIDs, ColID, ColFacebookID, ColVerified, ColCreateDate, ColUpdateDate),
 	)
 	q := `
@@ -99,12 +99,12 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 		FROM ` + TblUsers + `
 			INNER JOIN ` + TblUserTypes + `
 				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
-			LEFT JOIN ` + TblUserNameIDs + `
-				ON ` + TblUsers + `.` + ColID + `=` + TblUserNameIDs + `.` + ColUserID + `
-			LEFT JOIN ` + TblEmailIDs + `
-				ON ` + TblUsers + `.` + ColID + `=` + TblEmailIDs + `.` + ColUserID + `
-			LEFT JOIN ` + TblPhoneIDs + `
-				ON ` + TblUsers + `.` + ColID + `=` + TblPhoneIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblUserNames + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblUserNames + `.` + ColUserID + `
+			LEFT JOIN ` + TblEmails + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblEmails + `.` + ColUserID + `
+			LEFT JOIN ` + TblPhones + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblPhones + `.` + ColUserID + `
 			LEFT JOIN ` + TblFacebookIDs + `
 				ON ` + TblUsers + `.` + ColID + `=` + TblFacebookIDs + `.` + ColUserID + `
 			LEFT JOIN ` + TblDeviceIDs + `

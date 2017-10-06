@@ -79,7 +79,7 @@ func insertUserEmail(tx inserter, userID, address string, verified bool) (*model
 	insCols := ColDesc(ColUserID, ColEmail, ColVerified, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	INSERT INTO ` + TblEmailIDs + ` (` + insCols + `)
+	INSERT INTO ` + TblEmails + ` (` + insCols + `)
 		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
 	err := tx.QueryRow(q, userID, address, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
@@ -97,7 +97,7 @@ func updateUserEmail(tx inserter, userID, address string, verified bool) (*model
 	updCols := ColDesc(ColEmail, ColVerified, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	UPDATE ` + TblEmailIDs + `
+	UPDATE ` + TblEmails + `
 		SET (` + updCols + `)=($1,$2,CURRENT_TIMESTAMP)
 		WHERE ` + ColUserID + `=$3
 		RETURNING ` + retCols

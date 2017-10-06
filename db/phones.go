@@ -79,7 +79,7 @@ func insertUserPhone(tx inserter, userID, phone string, verified bool) (*model.V
 	insCols := ColDesc(ColUserID, ColPhone, ColVerified, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	INSERT INTO ` + TblPhoneIDs + ` (` + insCols + `)
+	INSERT INTO ` + TblPhones + ` (` + insCols + `)
 		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
 	err := tx.QueryRow(q, userID, phone, verified).Scan(&vl.ID, &vl.CreateDate, &vl.UpdateDate)
@@ -97,7 +97,7 @@ func updateUserPhone(tx inserter, userID, phone string, verified bool) (*model.V
 	updCols := ColDesc(ColPhone, ColVerified, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
-	UPDATE ` + TblPhoneIDs + `
+	UPDATE ` + TblPhones + `
 		SET (` + updCols + `)=($1,$2,CURRENT_TIMESTAMP)
 		WHERE ` + ColUserID + `=$3
 		RETURNING ` + retCols

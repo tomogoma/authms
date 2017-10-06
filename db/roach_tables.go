@@ -6,16 +6,16 @@ const (
 
 	// Table names
 	TblConfigurations = "configurations"
-	TblAPIKeys        = "apiKeys"
 	TblUserTypes      = "userTypes"
 	TblGroups         = "groups"
 	TblUsers          = "users"
 	TblUserGroupsJoin = "userGroupsJoin"
+	TblAPIKeys        = "apiKeys"
 	TblDeviceIDs      = "deviceIDs"
-	TblUserNameIDs    = "userNameIDs"
-	TblEmailIDs       = "emailIDs"
+	TblUserNames      = "userNames"
+	TblEmails         = "emails"
 	TblEmailTokens    = "emailTokens"
-	TblPhoneIDs       = "phoneIDs"
+	TblPhones         = "phones"
 	TblPhoneTokens    = "phoneTokens"
 	TblFacebookIDs    = "facebookIDs"
 	TblRefreshTokens  = "refreshTokens"
@@ -90,15 +90,6 @@ const (
 		UNIQUE (` + ColUserID + `,` + ColGroupID + `)
 	);
 	`
-	TblDescDeviceIDs = `
-	CREATE TABLE IF NOT EXISTS ` + TblDeviceIDs + ` (
-		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColDevID + ` CHAR UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
-		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
-	);
-	`
 	TblDescAPIKeys = `
 	CREATE TABLE IF NOT EXISTS ` + TblAPIKeys + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
@@ -108,8 +99,17 @@ const (
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
-	TblDescUserNameIDs = `
-	CREATE TABLE IF NOT EXISTS ` + TblUserNameIDs + ` (
+	TblDescDeviceIDs = `
+	CREATE TABLE IF NOT EXISTS ` + TblDeviceIDs + ` (
+		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
+		` + ColDevID + ` CHAR UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
+		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
+	);
+	`
+	TblDescUserNames = `
+	CREATE TABLE IF NOT EXISTS ` + TblUserNames + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserName + ` STRING UNIQUE NOT NULL,
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
@@ -117,8 +117,8 @@ const (
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
-	TblDescEmailIDs = `
-	CREATE TABLE IF NOT EXISTS ` + TblEmailIDs + ` (
+	TblDescEmails = `
+	CREATE TABLE IF NOT EXISTS ` + TblEmails + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColEmail + ` CHAR UNIQUE NOT NULL CHECK (` + ColEmail + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
@@ -131,15 +131,15 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblEmailTokens + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColEmail + ` CHAR NOT NULL REFERENCES ` + TblEmailIDs + ` (` + ColEmail + `),
+		` + ColEmail + ` CHAR NOT NULL REFERENCES ` + TblEmails + ` (` + ColEmail + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
 		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
 		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
-	TblDescPhoneIDs = `
-	CREATE TABLE IF NOT EXISTS ` + TblPhoneIDs + ` (
+	TblDescPhones = `
+	CREATE TABLE IF NOT EXISTS ` + TblPhones + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColPhone + ` CHAR UNIQUE NOT NULL CHECK (` + ColPhone + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
@@ -152,7 +152,7 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblPhoneTokens + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColPhone + ` CHAR NOT NULL REFERENCES ` + TblPhoneIDs + ` (` + ColPhone + `),
+		` + ColPhone + ` CHAR NOT NULL REFERENCES ` + TblPhones + ` (` + ColPhone + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
 		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
@@ -192,10 +192,10 @@ var AllTableDescs = []string{
 	TblDescUsersGroupsJoin,
 	TblDescAPIKeys,
 	TblDescDeviceIDs,
-	TblDescUserNameIDs,
-	TblDescEmailIDs,
+	TblDescUserNames,
+	TblDescEmails,
 	TblDescEmailTokens,
-	TblDescPhoneIDs,
+	TblDescPhones,
 	TblDescPhoneTokens,
 	TblDescFacebookIDs,
 	TblDescRefreshTokens,
@@ -211,10 +211,10 @@ var AllTableNames = []string{
 	TblUserGroupsJoin,
 	TblAPIKeys,
 	TblDeviceIDs,
-	TblUserNameIDs,
-	TblEmailIDs,
+	TblUserNames,
+	TblEmails,
 	TblEmailTokens,
-	TblPhoneIDs,
+	TblPhones,
 	TblPhoneTokens,
 	TblFacebookIDs,
 	TblRefreshTokens,
