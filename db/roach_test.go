@@ -17,9 +17,13 @@ func setup(t *testing.T) cockroach.DSN {
 	conf := testingH.ReadConfig(t)
 	conf.Database.DB = conf.Database.DB + "_test"
 	if !isInit {
-		err := dropAllTables(getDB(t, conf.Database), conf.Database.DBName())
+		rdb := getDB(t, conf.Database)
+		err := dropAllTables(rdb, conf.Database.DBName())
 		if err != nil {
-			t.Fatalf("Error setting up: delete all tables: %v", err)
+			_, err := rdb.Exec("DROP DATABASE IF EXISTS " + conf.Database.DBName())
+			if err != nil {
+				t.Fatalf("Error setting up: drop prev db: %v", err)
+			}
 		}
 		isInit = true
 	}
