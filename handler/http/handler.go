@@ -184,20 +184,27 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		JWT := r.URL.Query().Get(keyToken)
 		usr, err = s.auth.RegisterOther(req.LT, JWT, req.UserType, req.Identifier, req.GroupID)
 	}
+	req.Secret = "" // prevent logging passwords.
 	s.respondOn(w, r, req, usr, http.StatusCreated, err)
 }
 
 func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
-	id, secret, found := r.BasicAuth()
-	if !found {
+	req := struct {
+		LT         string `json:"loginType"`
+		Identifier string `json:"identifier"`
+		Found      bool   `json:"isBasicAuthFound"`
+	}{}
+	vars := mux.Vars(r)
+	req.LT = vars[keyLoginType]
+	var secret string // separate from req to prevent logging passwords.
+	req.Identifier, secret, req.Found = r.BasicAuth()
+	if !req.Found {
 		err := errors.NewUnauthorized("missing BasicAuth details")
-		s.handleError(w, r, nil, err)
+		s.handleError(w, r, req, err)
 		return
 	}
-	vars := mux.Vars(r)
-	lt := vars[keyLoginType]
-	authUsr, err := s.auth.Login(lt, id, []byte(secret))
-	s.respondOn(w, r, nil, authUsr, http.StatusOK, err)
+	authUsr, err := s.auth.Login(req.LT, req.Identifier, []byte(secret))
+	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
 }
 
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
