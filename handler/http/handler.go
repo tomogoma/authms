@@ -55,7 +55,7 @@ const (
 
 	keyLoginType = "loginType"
 	keySelfReg   = "selfReg"
-	keyAPIKey    = "X-APIKey"
+	keyAPIKey    = "x-api-key"
 	keyToken     = "token"
 	keyDBT       = "dbt"
 	keyExtend    = "extend"
@@ -64,6 +64,8 @@ const (
 
 	ctxtKeyBody = contextKey("id")
 	ctxKeyLog   = contextKey("log")
+
+	valTrue = "true"
 )
 
 func NewHandler(a Auth, g Guard) (http.Handler, error) {
@@ -82,21 +84,27 @@ func (s handler) handleRoute(r *mux.Router) error {
 	if r == nil {
 		return errors.New("Router was nil")
 	}
+
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
-		HandlerFunc(s.guardRoute(s.readReqBody(s.handleVerifyCode)))
+		HandlerFunc(prepLogger(s.guardRoute(s.handleVerifyCode)))
+
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
-		HandlerFunc(s.guardRoute(s.readReqBody(s.handleRegistration)))
+		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
+
 	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyAddress + "}").
 		Methods(http.MethodGet).
-		HandlerFunc(s.guardRoute(s.readReqBody(s.handleSendVerifCode)))
+		HandlerFunc(prepLogger(s.guardRoute(s.handleSendVerifCode)))
+
 	r.PathPrefix("/{" + keyLoginType + "}/login").
 		Methods(http.MethodPost).
-		HandlerFunc(s.guardRoute(s.readReqBody(s.handleLogin)))
+		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleLogin))))
+
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
-		HandlerFunc(s.guardRoute(s.readReqBody(s.handleUpdate)))
+		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
+
 	return nil
 }
 
@@ -126,7 +134,7 @@ func (s *handler) guardRoute(next http.HandlerFunc) http.HandlerFunc {
 }
 
 func (s *handler) readReqBody(next http.HandlerFunc) http.HandlerFunc {
-	return prepLogger(func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, r *http.Request) {
 		defer r.Body.Close()
 		dataB, err := ioutil.ReadAll(r.Body)
 		if err != nil {
@@ -136,7 +144,7 @@ func (s *handler) readReqBody(next http.HandlerFunc) http.HandlerFunc {
 		}
 		ctx := context.WithValue(r.Context(), ctxtKeyBody, dataB)
 		next.ServeHTTP(w, r.WithContext(ctx))
-	})
+	}
 }
 
 // unmarshalJSONOrRespondError returns true if json is extracted from
@@ -157,27 +165,27 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
-		UserType   string
-		Identifier string
-		Secret     string
-		GroupID    string
-		lt         string
+		UserType   string `json:"userType"`
+		Identifier string `json:"identifier"`
+		Secret     string `json:"secret"`
+		GroupID    string `json:"groupID"`
+		LT         string `json:"loginType"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
 	vars := mux.Vars(r)
-	req.lt = vars[keyLoginType]
+	req.LT = vars[keyLoginType]
 	var usr *model.User
 	var err error
 	switch strings.ToLower(r.URL.Query().Get(keySelfReg)) {
 	case "phone":
-		usr, err = s.auth.RegisterSelf(req.lt, req.UserType, req.Identifier, []byte(req.Secret))
-	case "true":
-		usr, err = s.auth.RegisterSelfByLockedPhone(req.lt, req.UserType, req.Identifier, []byte(req.Secret))
+		usr, err = s.auth.RegisterSelf(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
+	case valTrue:
+		usr, err = s.auth.RegisterSelfByLockedPhone(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
 	default:
 		JWT := r.URL.Query().Get(keyToken)
-		usr, err = s.auth.RegisterOther(req.lt, JWT, req.UserType, req.Identifier, req.GroupID)
+		usr, err = s.auth.RegisterOther(req.LT, JWT, req.UserType, req.Identifier, req.GroupID)
 	}
 	s.respondOn(w, r, req, usr, http.StatusCreated, err)
 }
@@ -198,32 +206,32 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
-		Identifier string
-		lt         string
-		JWT        string
+		Identifier string `json:"identifier"`
+		LT         string `json:"loginType"`
+		JWT        string `json:"token"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
 	vars := mux.Vars(r)
-	req.lt = vars[keyLoginType]
+	req.LT = vars[keyLoginType]
 	req.JWT = r.URL.Query().Get(keyToken)
-	usr, err := s.auth.UpdateIdentifier(req.JWT, req.lt, req.Identifier)
+	usr, err := s.auth.UpdateIdentifier(req.JWT, req.LT, req.Identifier)
 	s.respondOn(w, r, req, usr, http.StatusOK, err)
 }
 
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	req := struct {
-		lt     string
-		toAddr string
-		JWT    string
+		LT     string `json:"loginType"`
+		ToAddr string `json:"address"`
+		JWT    string `json:"token"`
 	}{
-		lt:     vars[keyLoginType],
-		toAddr: vars[keyAddress],
+		LT:     vars[keyLoginType],
+		ToAddr: vars[keyAddress],
 		JWT:    r.URL.Query().Get(keyToken),
 	}
-	resp, err := s.auth.SendVerCode(req.JWT, req.lt, req.toAddr)
+	resp, err := s.auth.SendVerCode(req.JWT, req.LT, req.ToAddr)
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 
@@ -231,10 +239,10 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	q := r.URL.Query()
 	req := struct {
-		UserID string
-		LT     string
-		DBT    string
-		Extend string
+		UserID string `json:"userID"`
+		LT     string `json:"loginType"`
+		DBT    string `json:"dbt"`
+		Extend string `json:"extend"`
 	}{
 		UserID: vars[keyUserID],
 		LT:     q.Get(keyLoginType),
@@ -243,7 +251,7 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	}
 	var resp interface{}
 	var err error
-	if strings.EqualFold(req.Extend, "true") {
+	if strings.EqualFold(req.Extend, valTrue) {
 		resp, err = s.auth.VerifyAndExtendDBT(req.LT, req.UserID, []byte(req.DBT))
 	} else {
 		resp, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
@@ -252,7 +260,9 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
-	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).WithField(logging.FieldRequest, reqData)
+	reqDataB, _ := json.Marshal(reqData)
+	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).
+		WithField(logging.FieldRequest, string(reqDataB))
 	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
 		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
 			log.Warnf("Forbidden: %v", err)
