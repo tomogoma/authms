@@ -11,6 +11,9 @@ import (
 
 // InsertUserPhone inserts phone details for userID.
 func (r *Roach) InsertUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return insertUserPhone(r.db, userID, phone, verified)
 }
 
@@ -21,6 +24,9 @@ func (r *Roach) InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified
 
 // UpdateUserPhone updates phone details for userID.
 func (r *Roach) UpdateUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return updateUserPhone(r.db, userID, phone, verified)
 }
 
@@ -31,6 +37,9 @@ func (r *Roach) UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified
 
 // InsertPhoneToken persists a token for phone.
 func (r *Roach) InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return insertPhoneToken(r.db, userID, phone, dbt, isUsed, expiry)
 }
 
@@ -41,6 +50,9 @@ func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []b
 
 // PhoneTokens fetches phone tokens for userID starting with the none-used, newest.
 func (r *Roach) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := ColDesc(ColID, ColUserID, ColPhone, ColToken, ColIsUsed, ColIssueDate, ColExpiryDate)
 	q := `
 		SELECT ` + cols + ` FROM ` + TblPhoneTokens + `

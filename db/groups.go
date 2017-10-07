@@ -38,6 +38,9 @@ func (r *Roach) GroupByName(name string) (*model.Group, error) {
 
 // GroupsByUserID fetches a group having id.
 func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := colDescTbl(TblGroups, ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
 	q := `
 		SELECT ` + cols + `
@@ -70,6 +73,9 @@ func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
 }
 
 func (r *Roach) groupWhere(where string, whereArgs ...interface{}) (*model.Group, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := ColDesc(ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
 	q := `SELECT ` + cols + ` FROM ` + TblGroups + ` WHERE ` + where
 	grp := model.Group{}

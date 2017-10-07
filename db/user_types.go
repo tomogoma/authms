@@ -27,6 +27,9 @@ func (r *Roach) InsertUserType(name string) (*model.UserType, error) {
 }
 
 func (r *Roach) UserTypeByName(name string) (*model.UserType, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	ut := model.UserType{Name: name}
 	cols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `SELECT ` + cols + ` FROM ` + TblUserTypes + ` WHERE ` + ColName + `=$1`

@@ -10,6 +10,9 @@ import (
 
 // InsertUserType inserts into the database returning calculated values.
 func (r *Roach) InsertUserName(userID, username string) (*model.Username, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return insertUserName(r.db, userID, username)
 }
 
@@ -20,6 +23,9 @@ func (r *Roach) InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*mode
 
 // UpdateUsername sets the new username for userID.
 func (r *Roach) UpdateUsername(userID, username string) (*model.Username, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	un := model.Username{UserID: userID, Value: username}
 	updCols := ColDesc(ColUserName, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)

@@ -11,6 +11,9 @@ import (
 
 // InsertUserType inserts into the database returning calculated values.
 func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	if tx == nil || reflect.ValueOf(tx).IsNil() {
 		return nil, errorNilTx
 	}
@@ -30,6 +33,9 @@ func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) 
 
 // UpdatePassword stores the new password for userID' account.
 func (r *Roach) UpdatePassword(userID string, password []byte) error {
+	if err := r.InitDBIfNot(); err != nil {
+		return err
+	}
 	return updatePassword(r.db, userID, password)
 }
 
@@ -86,6 +92,9 @@ func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
 }
 
 func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, []byte, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, nil, err
+	}
 	cols := ColDesc(
 		colDescTbl(TblUsers, ColID, ColPassword, ColCreateDate, ColUpdateDate),
 		colDescTbl(TblUserTypes, ColID, ColName, ColCreateDate, ColUpdateDate),

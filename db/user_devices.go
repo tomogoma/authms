@@ -27,6 +27,9 @@ func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model
 }
 
 func (r *Roach) UserDevicesByUserID(usrID string) ([]model.Device, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := ColDesc(ColID, ColUserID, ColDevID, ColCreateDate, ColUpdateDate)
 	q := `SELECT ` + cols + ` FROM ` + TblDeviceIDs + ` WHERE ` + ColUserID + `=$1`
 	rows, err := r.db.Query(q, usrID)

@@ -7,6 +7,9 @@ import (
 
 // InsertAPIKey inserts an API key for the userID.
 func (r *Roach) InsertAPIKey(userID, key string) (*api.Key, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	k := api.Key{UserID: userID, APIKey: key}
 	insCols := ColDesc(ColUserID, ColKey, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
@@ -23,6 +26,9 @@ func (r *Roach) InsertAPIKey(userID, key string) (*api.Key, error) {
 
 // APIKeysByUserID returns API keys for the provided userID starting with the newest.
 func (r *Roach) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := ColDesc(ColID, ColUserID, ColKey, ColCreateDate, ColUpdateDate)
 	q := `
 	SELECT ` + cols + `

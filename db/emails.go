@@ -11,6 +11,9 @@ import (
 
 // InsertUserPhone inserts email details for userID.
 func (r *Roach) InsertUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return insertUserEmail(r.db, userID, email, verified)
 }
 
@@ -21,6 +24,9 @@ func (r *Roach) InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified
 
 // UpdateUserEmail updates email details for userID.
 func (r *Roach) UpdateUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return updateUserEmail(r.db, userID, email, verified)
 }
 
@@ -31,6 +37,9 @@ func (r *Roach) UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified
 
 // InsertEmailToken persists a token for email.
 func (r *Roach) InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	return insertEmailToken(r.db, userID, email, dbt, isUsed, expiry)
 }
 
@@ -41,6 +50,9 @@ func (r *Roach) InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []b
 
 // EmailTokens fetches email tokens for userID starting with the newest.
 func (r *Roach) EmailTokens(userID string, offset, count int64) ([]model.DBToken, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
 	cols := ColDesc(ColID, ColUserID, ColEmail, ColToken, ColIsUsed, ColIssueDate, ColExpiryDate)
 	q := `
 		SELECT ` + cols + ` FROM ` + TblEmailTokens + `
