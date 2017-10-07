@@ -29,8 +29,8 @@ type Auth interface {
 	UpdateIdentifier(JWT, loginType, newId string) (*model.User, error)
 	UpdatePassword(JWT string, old, newPass []byte) error
 	SetPassword(loginType, userID string, dbt, pass []byte) (*model.VerifLogin, error)
-	SendVerCode(JWT, loginType, toAddr string) (string, error)
-	SendPassResetCode(loginType, toAddr string) (string, error)
+	SendVerCode(JWT, loginType, toAddr string) (*model.DBTStatus, error)
+	SendPassResetCode(loginType, toAddr string) (*model.DBTStatus, error)
 	VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error)
 	VerifyDBT(loginType, userID string, dbt []byte) (*model.VerifLogin, error)
 	Login(loginType, identifier string, password []byte) (*model.User, error)

@@ -167,7 +167,7 @@ func WithPhoneInviteTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
-		c.loginTpActionTplts[loginTypePhone][ActionInvite] = t
+		c.loginTpActionTplts[LoginTypePhone][ActionInvite] = t
 		return nil
 	}
 }
@@ -183,7 +183,7 @@ func WithPhoneResetPassTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
-		c.loginTpActionTplts[loginTypePhone][ActionResetPass] = t
+		c.loginTpActionTplts[LoginTypePhone][ActionResetPass] = t
 		return nil
 	}
 }
@@ -199,7 +199,7 @@ func WithPhoneVerifyTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
-		c.loginTpActionTplts[loginTypePhone][ActionVerify] = t
+		c.loginTpActionTplts[LoginTypePhone][ActionVerify] = t
 		return nil
 	}
 }
@@ -215,7 +215,7 @@ func WithEmailInviteTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided phone invite template was nil")
 		}
-		c.loginTpActionTplts[loginTypeEmail][ActionInvite] = t
+		c.loginTpActionTplts[LoginTypeEmail][ActionInvite] = t
 		return nil
 	}
 }
@@ -231,7 +231,7 @@ func WithEmailResetPassTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided email reset pass template was nil")
 		}
-		c.loginTpActionTplts[loginTypeEmail][ActionResetPass] = t
+		c.loginTpActionTplts[LoginTypeEmail][ActionResetPass] = t
 		return nil
 	}
 }
@@ -247,7 +247,7 @@ func WithEmailVerifyTplt(t *template.Template, parseErr error) Option {
 		if t == nil || reflect.ValueOf(t).IsNil() {
 			return errors.New("provided email verify template was nil")
 		}
-		c.loginTpActionTplts[loginTypeEmail][ActionVerify] = t
+		c.loginTpActionTplts[LoginTypeEmail][ActionVerify] = t
 		return nil
 	}
 }
@@ -276,8 +276,8 @@ func (c *authenticationConfig) initializeValues() {
 	c.allowSelfReg = true
 	c.lockDevToUser = false
 	c.loginTpActionTplts = map[string]map[string]*template.Template{
-		loginTypePhone: make(map[string]*template.Template),
-		loginTypeEmail: make(map[string]*template.Template),
+		LoginTypePhone: make(map[string]*template.Template),
+		LoginTypeEmail: make(map[string]*template.Template),
 	}
 }
 
@@ -311,7 +311,7 @@ func (c *authenticationConfig) fillDefaults() error {
 		)
 	}
 	if c.smserNilable != nil {
-		phoneTpls := c.loginTpActionTplts[loginTypePhone]
+		phoneTpls := c.loginTpActionTplts[LoginTypePhone]
 		if _, ok := phoneTpls[ActionInvite]; !ok {
 			defaultOpts = append(
 				defaultOpts,
@@ -332,7 +332,7 @@ func (c *authenticationConfig) fillDefaults() error {
 		}
 	}
 	if c.mailerNilable != nil {
-		emailTPls := c.loginTpActionTplts[loginTypeEmail]
+		emailTPls := c.loginTpActionTplts[LoginTypeEmail]
 		if _, ok := emailTPls[ActionInvite]; !ok {
 			defaultOpts = append(
 				defaultOpts,

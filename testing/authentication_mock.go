@@ -31,14 +31,14 @@ type AuthenticationMock struct {
 	ExpVerDBTVerLogin *model.VerifLogin
 	ExpVerDBTErr      error
 
-	ExpSndVerCodeObfuscAddr string
-	ExpSndVerCodeErr        error
+	ExpSndVerCodeDBTStts *model.DBTStatus
+	ExpSndVerCodeErr     error
 
-	ExpSndPassRstObfuscAddr string
-	ExpSndPassRstErr        error
+	ExpSndPassRstDBTStts *model.DBTStatus
+	ExpSndPassRstErr     error
 
-	ExpVerExtDBTObfuscAddr string
-	ExpVerExtDBTErr        error
+	ExpVerExtDBT    string
+	ExpVerExtDBTErr error
 
 	ExpUpdPassErr error
 }
@@ -67,16 +67,16 @@ func (a *AuthenticationMock) SetPassword(loginType, userID string, dbt, pass []b
 	return a.ExpSetPassVerLogin, a.ExpSetPassErr
 }
 
-func (a *AuthenticationMock) SendVerCode(JWT, loginType, toAddr string) (string, error) {
-	return a.ExpSndVerCodeObfuscAddr, a.ExpSndVerCodeErr
+func (a *AuthenticationMock) SendVerCode(JWT, loginType, toAddr string) (*model.DBTStatus, error) {
+	return a.ExpSndVerCodeDBTStts, a.ExpSndVerCodeErr
 }
 
-func (a *AuthenticationMock) SendPassResetCode(loginType, toAddr string) (string, error) {
-	return a.ExpSndPassRstObfuscAddr, a.ExpSndPassRstErr
+func (a *AuthenticationMock) SendPassResetCode(loginType, toAddr string) (*model.DBTStatus, error) {
+	return a.ExpSndPassRstDBTStts, a.ExpSndPassRstErr
 }
 
 func (a *AuthenticationMock) VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error) {
-	return a.ExpVerExtDBTObfuscAddr, a.ExpVerExtDBTErr
+	return a.ExpVerExtDBT, a.ExpVerExtDBTErr
 }
 
 func (a *AuthenticationMock) VerifyDBT(loginType, userID string, dbt []byte) (*model.VerifLogin, error) {
