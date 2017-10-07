@@ -12,15 +12,18 @@ import (
 	"github.com/dropbox/godropbox/errors"
 	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
+	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/sirupsen/logrus"
+	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
 	"github.com/tomogoma/authms/facebook"
 	"github.com/tomogoma/authms/handler/http"
+	"github.com/tomogoma/authms/handler/rpc"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/authms/api"
+	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/authms/sms/africas_talking"
 	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
@@ -77,10 +80,10 @@ func main() {
 	a, err := model.NewAuthentication(rdb, tg, authOpts...)
 	logFatalOnError(err, "Instantiate Auth Model")
 
-	//serverRPCQuitCh := make(chan error)
-	//rpcSrv, err := rpc.NewHandler(config.CanonicalName, a)
-	//logFatalOnError(err, "Instantate RPC handler")
-	//go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
+	serverRPCQuitCh := make(chan error)
+	rpcSrv, err := rpc.NewHandler(config.CanonicalName, a)
+	logFatalOnError(err, "Instantate RPC handler")
+	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
 	g, err := api.NewGuard(rdb, api.WithMasterKey(conf.Service.MasterAPIKey))
 	logFatalOnError(err, "Instantate API access guard")
@@ -92,8 +95,8 @@ func main() {
 	select {
 	case err = <-serverHttpQuitCh:
 		logFatalOnError(err, "Serve HTTP")
-		//case err = <-serverRPCQuitCh:
-		//	logFatalOnError(err, "Serve RPC")
+	case err = <-serverRPCQuitCh:
+		logFatalOnError(err, "Serve RPC")
 	}
 }
 
@@ -174,17 +177,17 @@ func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
 	return s, nil
 }
 
-//func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
-//service := micro.NewService(
-//	micro.Name(config.CanonicalRPCName),
-//	micro.Version(conf.LoadBalanceVersion),
-//	micro.RegisterInterval(conf.RegisterInterval),
-//	micro.WrapHandler(rpcSrv.Wrapper),
-//)
-//authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
-//err := service.Run()
-//quitCh <- err
-//}
+func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
+	service := micro.NewService(
+		micro.Name(config.CanonicalRPCName),
+		micro.Version(conf.LoadBalanceVersion),
+		micro.RegisterInterval(conf.RegisterInterval),
+		micro.WrapHandler(rpcSrv.Wrapper),
+	)
+	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
+	err := service.Run()
+	quitCh <- err
+}
 
 type RouteHandler interface {
 	HandleRoute(r *mux.Router) error
