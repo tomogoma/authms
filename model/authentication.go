@@ -116,6 +116,7 @@ type Authentication struct {
 	loginTpActionTplts map[string]map[string]*template.Template
 }
 
+type regConditions func(id string) (string, error)
 type regFunc func(tx *sql.Tx, actionType, id string, usr *User) error
 
 const (
@@ -149,9 +150,10 @@ const (
 	ActionExtendTkn = "extend/token"
 
 	LoginTypeUsername = "usernames"
-	LoginTypeEmail    = "phones"
-	LoginTypePhone    = "emails"
+	LoginTypeEmail    = "emails"
+	LoginTypePhone    = "phones"
 	LoginTypeFacebook = "facebook"
+	LoginTypeDev      = "devices"
 )
 
 var (
@@ -219,12 +221,16 @@ func (a *Authentication) RegisterSelf(loginType, userType, id string, secret []b
 	}
 
 	var regF regFunc
+	var regCondF regConditions
 	switch loginType {
 	case LoginTypeUsername:
+		regCondF = a.regUsernameConditions
 		regF = a.regUsername
 	case LoginTypeEmail:
+		regCondF = a.regEmailConditions
 		regF = a.regEmail
 	case LoginTypePhone:
+		regCondF = a.regPhoneConditions
 		regF = a.regPhone
 	case LoginTypeFacebook:
 		if a.fbNilable == nil {
@@ -235,17 +241,24 @@ func (a *Authentication) RegisterSelf(loginType, userType, id string, secret []b
 		if err != nil {
 			return nil, errors.Newf("generate password: %v", err)
 		}
+		regCondF = a.regFacebookConditions
 		regF = a.regFacebook
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
-	return a.registerSelf(userType, id, secret, regF)
+	return a.registerSelf(userType, id, secret, regCondF, regF)
 }
 
 // RegisterSelfByLockedPhone registers a new user account using phone/deviceID/password combination.
 func (a *Authentication) RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*User, error) {
 	return a.registerSelf(userType, number, password,
+		func(number string) (string, error) {
+			if _, err := a.regDevConditions(devID); err != nil {
+				return "", err
+			}
+			return a.regPhoneConditions(number)
+		},
 		func(tx *sql.Tx, actionType, number string, usr *User) error {
 			if err := a.regDevice(tx, actionType, devID, usr); err != nil {
 				return err
@@ -264,23 +277,26 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 		return nil, err
 	}
 
+	var regCondF regConditions
 	var regF regFunc
 	switch newLoginType {
 	case LoginTypePhone:
 		if a.smserNilable == nil {
 			return nil, errors.NewNotImplementedf("SMS notification (to created user) not available")
 		}
+		regCondF = a.regPhoneConditions
 		regF = a.regPhone
 	case LoginTypeEmail:
 		if a.mailerNilable == nil {
 			return nil, errors.NewNotImplementedf("email notification (to created user) not available")
 		}
+		regCondF = a.regEmailConditions
 		regF = a.regEmail
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, newLoginType)
 	}
 
-	return a.registerOther(userType, id, groupID, regF)
+	return a.registerOther(userType, id, groupID, regCondF, regF)
 }
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
@@ -663,7 +679,7 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 	}, nil
 }
 
-func (a *Authentication) registerSelf(userType string, id string, password []byte, f regFunc) (*User, error) {
+func (a *Authentication) registerSelf(userType string, id string, password []byte, rcf regConditions, rf regFunc) (*User, error) {
 
 	if !a.allowSelfReg {
 		return nil, errors.NewForbidden("registration closed from the public")
@@ -673,15 +689,21 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
 	}
 
+	passH, err := hashIfValid(password)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err = rcf(id)
+	if err != nil {
+		return nil, err
+	}
+
 	grp, err := a.getOrCreateGroup(GroupPublic, AccessLevelPublic)
 	if err != nil {
 		return nil, err
 	}
 	ut, err := a.getOrCreateUserType(userType)
-	if err != nil {
-		return nil, err
-	}
-	passH, err := hashIfValid(password)
 	if err != nil {
 		return nil, err
 	}
@@ -695,7 +717,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, grp.ID); err != nil {
 			return errors.Newf("add user to group: %v", err)
 		}
-		if err := f(tx, ActionVerify, id, usr); err != nil {
+		if err := rf(tx, ActionVerify, id, usr); err != nil {
 			return err
 		}
 		return nil
@@ -710,7 +732,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 	return usr, nil
 }
 
-func (a *Authentication) registerOther(userType, id, groupID string, f regFunc) (*User, error) {
+func (a *Authentication) registerOther(userType, id, groupID string, rcf regConditions, f regFunc) (*User, error) {
 
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
@@ -722,6 +744,11 @@ func (a *Authentication) registerOther(userType, id, groupID string, f regFunc) 
 		}
 		return nil, errors.Newf("get group by ID: %v", err)
 	}
+	id, err = rcf(id)
+	if err != nil {
+		return nil, err
+	}
+
 	ut, err := a.getOrCreateUserType(userType)
 	if err != nil {
 		return nil, err
@@ -755,14 +782,15 @@ func (a *Authentication) registerOther(userType, id, groupID string, f regFunc) 
 	return usr, nil
 }
 
-func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, usr *User) error {
+func (a *Authentication) regUsernameConditions(username string) (string, error) {
 	if username == "" {
-		return errors.NewClient("username cannot be empty")
+		return "", errors.NewClient("username cannot be empty")
 	}
 	_, _, err := a.db.UserByUsername(username)
-	if err = a.usrIdentifierAvail(LoginTypeUsername, err); err != nil {
-		return err
-	}
+	return username, a.usrIdentifierAvail(LoginTypeUsername, err)
+}
+
+func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, usr *User) error {
 	uname, err := a.db.InsertUserNameAtomic(tx, usr.ID, username)
 	if err != nil {
 		return errors.Newf("insert username: %v", err)
@@ -771,11 +799,12 @@ func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, us
 	return nil
 }
 
-func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *User) error {
+func (a *Authentication) regDevConditions(devID string) (string, error) {
 	_, _, err := a.db.UserByDeviceID(devID)
-	if err := a.usrIdentifierAvail(LoginTypePhone, err); err != nil {
-		return err
-	}
+	return devID, a.usrIdentifierAvail(LoginTypeDev, err)
+}
+
+func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *User) error {
 	dev, err := a.db.InsertUserDeviceAtomic(tx, usr.ID, devID)
 	if err != nil {
 		return errors.Newf("insert device: %v", err)
@@ -784,40 +813,64 @@ func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *Us
 	return nil
 }
 
-func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *User) error {
-	if err := a.insertPhoneAtomic(tx, usr, number); err != nil {
-		return err
+func (a *Authentication) regPhoneConditions(number string) (string, error) {
+	number, err := formatValidPhone(number)
+	if err != nil {
+		return "", err
 	}
+	_, _, err = a.db.UserByPhone(number)
+	return number, a.usrIdentifierAvail(LoginTypePhone, err)
+}
+
+func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *User) error {
+	phone, err := a.db.InsertUserPhoneAtomic(tx, usr.ID, number, false)
+	if err != nil {
+		return errors.Newf("insert phone: %v", err)
+	}
+	usr.Phone = *phone
+	return nil
 	if a.smserNilable == nil {
 		return nil
 	}
-	_, err := a.genAndSendTokens(tx, actionType, LoginTypePhone, number, usr.ID)
+	_, err = a.genAndSendTokens(tx, actionType, LoginTypePhone, number, usr.ID)
 	return err
+}
+
+func (a *Authentication) regEmailConditions(email string) (string, error) {
+	if email == "" {
+		return "", errors.NewClient("email address cannot be empty")
+	}
+	_, _, err := a.db.UserByEmail(email)
+	return email, a.usrIdentifierAvail(LoginTypeEmail, err)
 }
 
 func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *User) error {
-	if err := a.insertEmailAtomic(tx, usr, address); err != nil {
-		return err
+	email, err := a.db.InsertUserEmailAtomic(tx, usr.ID, address, false)
+	if err != nil {
+		return errors.Newf("insert email: %v", err)
 	}
+	usr.Email = *email
+	return nil
 	if a.mailerNilable == nil {
 		return nil
 	}
-	_, err := a.genAndSendTokens(tx, actionType, LoginTypeEmail, address, usr.ID)
+	_, err = a.genAndSendTokens(tx, actionType, LoginTypeEmail, address, usr.ID)
 	return err
 }
 
-func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbToken string, usr *User) error {
+func (a *Authentication) regFacebookConditions(fbToken string) (string, error) {
 	if fbToken == "" {
-		return errors.NewClient("facebook token cannot be empty")
+		return "", errors.NewClient("facebook token cannot be empty")
 	}
 	fbID, err := a.validateFbToken(fbToken)
 	if err != nil {
-		return err
+		return "", err
 	}
 	_, err = a.db.UserByFacebook(fbID)
-	if err = a.usrIdentifierAvail(LoginTypeFacebook, err); err != nil {
-		return err
-	}
+	return fbID, a.usrIdentifierAvail(LoginTypeFacebook, err)
+}
+
+func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbID string, usr *User) error {
 	fb, err := a.db.InsertUserFbIDAtomic(tx, usr.ID, fbID, true)
 	if err != nil {
 		return errors.Newf("insert facebook: %v", err)
@@ -1006,39 +1059,6 @@ resumeFunc:
 		return nil, errors.NewAuth("token has expired")
 	}
 	return &dbt, nil
-}
-
-func (a *Authentication) insertPhoneAtomic(tx *sql.Tx, usr *User, number string) error {
-	number, err := formatValidPhone(number)
-	if err != nil {
-		return err
-	}
-	_, _, err = a.db.UserByPhone(number)
-	if err = a.usrIdentifierAvail(LoginTypePhone, err); err != nil {
-		return err
-	}
-	phone, err := a.db.InsertUserPhoneAtomic(tx, usr.ID, number, false)
-	if err != nil {
-		return errors.Newf("insert phone: %v", err)
-	}
-	usr.Phone = *phone
-	return nil
-}
-
-func (a *Authentication) insertEmailAtomic(tx *sql.Tx, usr *User, address string) error {
-	if address == "" {
-		return errors.NewClient("email address cannot be empty")
-	}
-	_, _, err := a.db.UserByEmail(address)
-	if err = a.usrIdentifierAvail(LoginTypeEmail, err); err != nil {
-		return err
-	}
-	email, err := a.db.InsertUserEmailAtomic(tx, usr.ID, address, false)
-	if err != nil {
-		return errors.Newf("insert email: %v", err)
-	}
-	usr.Email = *email
-	return nil
 }
 
 func (a *Authentication) getOrCreateGroup(groupName string, acl float32) (*Group, error) {
