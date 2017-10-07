@@ -17,6 +17,9 @@ serviceConfig:
   # registerInterval is the interval for sending alive pulses to the
   # service registry.
   registerInterval: 5s
+  # masterAPIKey is the default API Key to use when none is in the system. This
+  # should be deleted once the system is set up
+  masterAPIKey:
 
 # database contains configuration values for accessing CockroachDB as the
 # persistent store for the micro-service.

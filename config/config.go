@@ -44,6 +44,7 @@ const (
 type ServiceConfig struct {
 	RegisterInterval   time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
 	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
+	MasterAPIKey       string        `json:"masterAPIKey,omitempty" yaml:"masterAPIKey"`
 }
 
 type TwilioConfig struct {

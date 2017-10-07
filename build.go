@@ -72,7 +72,7 @@ PHONE_VERIFY_TPL="` + config.DefaultPhoneVerifyTpl + `"
 }
 
 func build(goos, goarch, goarm string) error {
-	args := []string{"build", "./cmd/microservice", "-o", "bin/app"}
+	args := []string{"build", "-o", "bin/app", "./cmd/microservice"}
 	cmd := exec.Command("go", args...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout

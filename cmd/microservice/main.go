@@ -1,4 +1,4 @@
-package microservice
+package main
 
 import (
 	"flag"
@@ -7,28 +7,26 @@ import (
 
 	"io/ioutil"
 
-	"time"
+	http2 "net/http"
 
 	"github.com/dropbox/godropbox/errors"
 	"github.com/gorilla/mux"
 	"github.com/limetext/log4go"
-	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/config"
+	"github.com/tomogoma/authms/db"
 	"github.com/tomogoma/authms/facebook"
-	"github.com/tomogoma/authms/generator"
+	"github.com/tomogoma/authms/handler/http"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/authms/handler/http"
-	"github.com/tomogoma/authms/handler/rpc"
+	"github.com/tomogoma/authms/service"
 	"github.com/tomogoma/authms/sms/africas_talking"
+	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
-	"github.com/tomogoma/authms/store"
+	"github.com/tomogoma/authms/smtp"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
-	"github.com/tomogoma/authms/sms/messagebird"
 )
 
 type defLogWriter struct {
@@ -49,52 +47,53 @@ func main() {
 	err := configH.ReadYamlConfig(*confFile, &conf)
 	logFatalOnError(err, "Read config file")
 
-	pg, err := generator.NewRandom(generator.AllChars)
-	logFatalOnError(err, "Initiate password generator")
-
-	db, err := store.NewRoach(conf.Database, pg)
-	logFatalOnError(err, "Instantiate DB helper")
-
-	err = db.InitDBConnIfNotInitted()
+	rdb := db.NewRoach(
+		db.WithDSN(conf.Database.FormatDSN()),
+		db.WithDBName(conf.Database.DBName()),
+	)
+	err = rdb.InitDBIfNot()
 	logWarnOnError(err, "Initiate DB connection")
 
-	tg, err := token.NewJWTHandler(conf.Token)
+	JWTKey, err := ioutil.ReadFile(conf.Token.TokenKeyFile)
+	logFatalOnError(err, "Read JWT key file")
+	tg, err := token.NewJWTHandler(JWTKey)
 	logFatalOnError(err, "Instantiate token handler (generator)")
 
 	authOpts, err := oAuthOptions(conf.Authentication)
 	logWarnOnError(err, "Set up OAuth options")
 
-	if conf.SMS.MessageFmt != "" {
-		authOpts = append(authOpts, model.WithSMSFormat(conf.SMS.MessageFmt))
-	}
-	if conf.SMS.SMSCodeValidity > 1*time.Minute {
-		authOpts = append(authOpts, model.WithSMSValidity(conf.SMS.SMSCodeValidity))
-	}
-
 	s, err := smsAPI(conf.SMS)
 	logWarnOnError(err, "Instantiate SMS API")
 	if s != nil {
-		authOpts = append(authOpts, model.WithSMSer(s))
+		authOpts = append(authOpts, model.WithSMSCl(s))
 	}
 
-	a, err := model.New(tg, db, authOpts...)
+	emailCl, err := smtp.New(rdb)
+	logWarnOnError(err, "Instantiate email API")
+	if emailCl != nil {
+		authOpts = append(authOpts, model.WithEmailCl(emailCl))
+	}
+
+	a, err := model.NewAuthentication(rdb, tg, authOpts...)
 	logFatalOnError(err, "Instantiate Auth Model")
 
-	serverRPCQuitCh := make(chan error)
-	serverHttpQuitCh := make(chan error)
-	rpcSrv, err := rpc.NewHandler(config.CanonicalName, a)
-	logFatalOnError(err, "Instantate RPC handler")
-	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
+	//serverRPCQuitCh := make(chan error)
+	//rpcSrv, err := rpc.NewHandler(config.CanonicalName, a)
+	//logFatalOnError(err, "Instantate RPC handler")
+	//go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
-	httpHandler, err := http.NewHandler(a)
+	g, err := service.NewGuard(rdb, service.WithMasterKey(conf.Service.MasterAPIKey))
+	logFatalOnError(err, "Instantate API access guard")
+	serverHttpQuitCh := make(chan error)
+	httpHandler, err := http.NewHandler(a, g)
 	logFatalOnError(err, "Instantiate HTTP handler")
 	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
 
 	select {
 	case err = <-serverHttpQuitCh:
 		logFatalOnError(err, "Serve HTTP")
-	case err = <-serverRPCQuitCh:
-		logFatalOnError(err, "Serve RPC")
+		//case err = <-serverRPCQuitCh:
+		//	logFatalOnError(err, "Serve RPC")
 	}
 }
 
@@ -121,7 +120,7 @@ func oAuthOptions(conf config.Auth) ([]model.Option, error) {
 		if err != nil {
 			return authOpts, errors.Newf("facebook client: %v", err)
 		}
-		authOpts = append(authOpts, model.WithFB(fb))
+		authOpts = append(authOpts, model.WithFacebookCl(fb))
 	}
 	return authOpts, nil
 }
@@ -175,34 +174,30 @@ func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
 	return s, nil
 }
 
-func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
-	service := micro.NewService(
-		micro.Name(config.CanonicalRPCName),
-		micro.Version(conf.LoadBalanceVersion),
-		micro.RegisterInterval(conf.RegisterInterval),
-		micro.WrapHandler(rpcSrv.Wrapper),
-	)
-	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
-	err := service.Run()
-	quitCh <- err
-}
+//func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
+//service := micro.NewService(
+//	micro.Name(config.CanonicalRPCName),
+//	micro.Version(conf.LoadBalanceVersion),
+//	micro.RegisterInterval(conf.RegisterInterval),
+//	micro.WrapHandler(rpcSrv.Wrapper),
+//)
+//authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
+//err := service.Run()
+//quitCh <- err
+//}
 
 type RouteHandler interface {
 	HandleRoute(r *mux.Router) error
 }
 
-func serveHttp(conf config.ServiceConfig, rh RouteHandler, quitCh chan error) {
-	r := mux.NewRouter()
-	if err := rh.HandleRoute(r); err != nil {
-		quitCh <- errors.Newf("unable to handle route: %v", err)
-	}
-	service := web.NewService(
-		web.Handler(r),
+func serveHttp(conf config.ServiceConfig, h http2.Handler, quitCh chan error) {
+	srvc := web.NewService(
+		web.Handler(h),
 		web.Name(config.CanonicalWebName),
 		web.Version(conf.LoadBalanceVersion),
 		web.RegisterInterval(conf.RegisterInterval),
 	)
-	quitCh <- service.Run()
+	quitCh <- srvc.Run()
 }
 
 func readFile(path string) (string, error) {
