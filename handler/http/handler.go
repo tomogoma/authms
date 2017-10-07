@@ -65,7 +65,8 @@ const (
 	ctxtKeyBody = contextKey("id")
 	ctxKeyLog   = contextKey("log")
 
-	valTrue = "true"
+	valTrue   = "true"
+	valDevice = "device"
 )
 
 func NewHandler(a Auth, g Guard) (http.Handler, error) {
@@ -81,10 +82,6 @@ func NewHandler(a Auth, g Guard) (http.Handler, error) {
 }
 
 func (s handler) handleRoute(r *mux.Router) error {
-	if r == nil {
-		return errors.New("Router was nil")
-	}
-
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(prepLogger(s.guardRoute(s.handleVerifyCode)))
@@ -179,9 +176,9 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	var usr *model.User
 	var err error
 	switch strings.ToLower(r.URL.Query().Get(keySelfReg)) {
-	case "phone":
-		usr, err = s.auth.RegisterSelf(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
 	case valTrue:
+		usr, err = s.auth.RegisterSelf(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
+	case valDevice:
 		usr, err = s.auth.RegisterSelfByLockedPhone(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
 	default:
 		JWT := r.URL.Query().Get(keyToken)

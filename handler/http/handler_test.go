@@ -6,53 +6,16 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/tomogoma/authms/model"
+	"os"
+
+	"github.com/sirupsen/logrus"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/errors"
 )
 
-type AuthMock struct {
-	errors.NotImplErrCheck
-	errors.AuthErrCheck
-	errors.ClErrCheck
-	expUser       *model.User
-	expErr        error
-	expVerLogin   *model.VerifLogin
-	expObfuscAddr string
-}
-
-func (a *AuthMock) RegisterSelf(loginType, userType, id string, secret []byte) (*model.User, error) {
-	return a.expUser, a.expErr
-}
-func (a *AuthMock) RegisterSelfByLockedPhone(userType, devID, number string, secret []byte) (*model.User, error) {
-	return a.expUser, a.expErr
-}
-func (a *AuthMock) RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error) {
-	return a.expUser, a.expErr
-}
-func (a *AuthMock) UpdateIdentifier(JWT, loginType, newId string) (*model.User, error) {
-	return a.expUser, a.expErr
-}
-func (a *AuthMock) UpdatePassword(JWT string, old, newPass []byte) error {
-	return a.expErr
-}
-func (a *AuthMock) SetPassword(loginType, userID string, dbt, pass []byte) (*model.VerifLogin, error) {
-	return a.expVerLogin, a.expErr
-}
-func (a *AuthMock) SendVerCode(JWT, loginType, toAddr string) (string, error) {
-	return a.expObfuscAddr, a.expErr
-}
-func (a *AuthMock) SendPassResetCode(loginType, toAddr string) (string, error) {
-	return a.expObfuscAddr, a.expErr
-}
-func (a *AuthMock) VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error) {
-	return a.expObfuscAddr, a.expErr
-}
-func (a *AuthMock) VerifyDBT(loginType, userID string, dbt []byte) (*model.VerifLogin, error) {
-	return a.expVerLogin, a.expErr
-}
-func (a *AuthMock) Login(loginType, identifier string, password []byte) (*model.User, error) {
-	return a.expUser, a.expErr
+func init() {
+	// TODO test log outputs maybe?
+	logrus.SetOutput(os.Stdout)
 }
 
 func TestNewHandler(t *testing.T) {
@@ -62,8 +25,9 @@ func TestNewHandler(t *testing.T) {
 		guard  Guard
 		expErr bool
 	}{
-		{name: "valid deps", auth: &AuthMock{}, guard: &testingH.GuardMock{}, expErr: false},
-		{name: "nil auth", auth: nil, expErr: true},
+		{name: "valid deps", auth: &testingH.AuthenticationMock{}, guard: &testingH.GuardMock{}, expErr: false},
+		{name: "nil auth", auth: nil, guard: &testingH.GuardMock{}, expErr: true},
+		{name: "nil guard", auth: &testingH.AuthenticationMock{}, guard: nil, expErr: true},
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
@@ -89,70 +53,226 @@ func TestHandler_handleRoute(t *testing.T) {
 		name          string
 		reqURLSuffix  string
 		reqMethod     string
+		reqBody       string
+		reqWBasicAuth bool
 		expStatusCode int
 		auth          Auth
 		guard         Guard
 	}{
+		// valuse starting and ending with "_" are place holders for variables
+		// e.g. _loginType_ is a place holder for "any (valid) login type"
 		{
 			name:          "register",
-			auth:          &AuthMock{},
+			auth:          &testingH.AuthenticationMock{},
 			guard:         &testingH.GuardMock{},
-			reqURLSuffix:  "/loginType/register",
+			reqURLSuffix:  "/_loginType_/register",
 			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
 			expStatusCode: http.StatusCreated,
 		},
 		{
+			name:          "register guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/_loginType_/register",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "register bad body",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/register",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{bad json]",
+			expStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:          "register self error",
+			auth:          &testingH.AuthenticationMock{ExpRegSelfErr: errors.Newf("auth reg self error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/register?selfReg=true",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "register self (lock phone) error",
+			auth:          &testingH.AuthenticationMock{ExpRegSelfBLPErr: errors.Newf("auth reg self by locked phone error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/register?selfReg=device",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "register other error",
+			auth:          &testingH.AuthenticationMock{ExpRegOtherErr: errors.Newf("auth reg other error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/register",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
 			name:          "login",
-			auth:          &AuthMock{},
+			auth:          &testingH.AuthenticationMock{},
 			guard:         &testingH.GuardMock{},
-			reqURLSuffix:  "/login-type/login",
+			reqURLSuffix:  "/_loginType_/login",
 			reqMethod:     http.MethodPost,
+			reqWBasicAuth: true,
+			reqBody:       "{}",
 			expStatusCode: http.StatusOK,
 		},
 		{
-			name:          "send ver code",
-			auth:          &AuthMock{},
-			guard:         &testingH.GuardMock{},
-			reqURLSuffix:  "/login-type/verify/address",
-			reqMethod:     http.MethodGet,
-			expStatusCode: http.StatusOK,
+			name:          "login guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/_loginType_/login",
+			reqMethod:     http.MethodPost,
+			reqWBasicAuth: true,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
 		},
 		{
-			name:          "verify code",
-			auth:          &AuthMock{},
+			name:          "login no basic auth",
+			auth:          &testingH.AuthenticationMock{},
 			guard:         &testingH.GuardMock{},
-			reqURLSuffix:  "/users/userid/verify/a-dbt-token",
-			reqMethod:     http.MethodGet,
-			expStatusCode: http.StatusOK,
+			reqURLSuffix:  "/_loginType_/login",
+			reqMethod:     http.MethodPost,
+			reqWBasicAuth: false,
+			reqBody:       "{}",
+			expStatusCode: http.StatusUnauthorized,
+		},
+		{
+			name:          "login error",
+			auth:          &testingH.AuthenticationMock{ExpLoginErr: errors.Newf("auth login error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/login",
+			reqMethod:     http.MethodPost,
+			reqWBasicAuth: true,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
 		},
 		{
 			name:          "update",
-			auth:          &AuthMock{},
+			auth:          &testingH.AuthenticationMock{},
 			guard:         &testingH.GuardMock{},
-			reqURLSuffix:  "/login-type/update",
+			reqURLSuffix:  "/_loginType_/update",
 			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
 			expStatusCode: http.StatusOK,
+		},
+		{
+			name:          "update guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/_loginType_/update",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "update bad body",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/update",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{bad json]",
+			expStatusCode: http.StatusBadRequest,
+		},
+		{
+			name:          "update auth error",
+			auth:          &testingH.AuthenticationMock{ExpUpdIDerErr: errors.Newf("auth update identifier error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/update",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "send ver code",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/verify/address",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusOK,
+		},
+		{
+			name:          "send ver code guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/_loginType_/verify/address",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "send ver code auth error",
+			auth:          &testingH.AuthenticationMock{ExpSndVerCodeErr: errors.Newf("auth send ver code error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/_loginType_/verify/address",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "verify code",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/users/_userID_/verify/_dbToken_",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusOK,
+		},
+		{
+			name:          "verify code guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/users/_userID_/verify/_dbToken_",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "verify code ver dbt err",
+			auth:          &testingH.AuthenticationMock{ExpVerDBTErr: errors.Newf("auth ver DBT error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/users/_userID_/verify/_dbToken_",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "verify code ver and extend dbt err",
+			auth:          &testingH.AuthenticationMock{ExpVerExtDBTErr: errors.Newf("auth ver and extend DBT error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/users/_userID_/verify/_dbToken_?extend=true",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
 		},
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
+
 			h := newHandler(t, tc.auth, tc.guard)
 			srvr := httptest.NewServer(h)
 			defer srvr.Close()
+
 			req, err := http.NewRequest(
 				tc.reqMethod,
 				srvr.URL+tc.reqURLSuffix,
-				bytes.NewReader([]byte("{}")),
+				bytes.NewReader([]byte(tc.reqBody)),
 			)
 			if err != nil {
 				t.Fatalf("Error setting up, new request: %v", err)
 			}
-			req.SetBasicAuth("uname", "password")
+			if tc.reqWBasicAuth {
+				req.SetBasicAuth("uname", "password")
+			}
+
 			cl := &http.Client{}
 			resp, err := cl.Do(req)
 			if err != nil {
 				t.Fatalf("Do request error: %v", err)
 			}
+
 			if resp.StatusCode != tc.expStatusCode {
 				t.Errorf("Expected status code %d, got %s",
 					tc.expStatusCode, resp.Status)
