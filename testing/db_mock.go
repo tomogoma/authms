@@ -4,29 +4,25 @@ import (
 	"database/sql"
 	"time"
 
-	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/api"
+	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 type DBMock struct {
 	errors.NotFoundErrCheck
 
-	ExpInsGrp    *model.Group
 	ExpInsGrpErr error
 	ExpGrpBNm    *model.Group
 	ExpGrpBNmErr error
 	ExpGrp       *model.Group
 	ExpGrpErr    error
 
-	ExpInsUsrTyp    *model.UserType
 	ExpInsUsrTypErr error
 	ExpUsrTypBNm    *model.UserType
 	ExpUsrTypBNmErr error
 
-	ExpInsUsr       *model.User
 	ExpInsUsrErr    error
-	ExpInsUsrAtm    *model.User
 	ExpInsUsrAtmErr error
 	ExpUsr          *model.User
 	ExpUsrErr       error
@@ -49,56 +45,43 @@ type DBMock struct {
 	ExpUsrBPhnPass   []byte
 	ExpUsrBMailPass  []byte
 
-	ExpInsAPIK        *api.Key
 	ExpInsAPIKErr     error
 	ExpAPIKsBUsrID    []api.Key
 	ExpAPIKsBUsrIDErr error
 
 	ExpAddUsrTGrpAtmcErr error
 
-	ExpInsDevAtm    *model.Device
 	ExpInsDevAtmErr error
 
-	ExpInsUsrNm       *model.Username
 	ExpInsUsrNmErr    error
-	ExpInsUsrNmAtm    *model.Username
 	ExpInsUsrNmAtmErr error
 	ExpUpdUsrNm       *model.Username
 	ExpUpdUsrNmErr    error
 
-	ExpInsUsrPhn       *model.VerifLogin
 	ExpInsUsrPhnErr    error
-	ExpInsUsrPhnAtm    *model.VerifLogin
 	ExpInsUsrPhnAtmErr error
 	ExpUpdUsrPhn       *model.VerifLogin
 	ExpUpdUsrPhnErr    error
 	ExpUpdUsrPhnAtm    *model.VerifLogin
 	ExpUpdUsrPhnAtmErr error
 
-	ExpInsPhnTkn       *model.DBToken
 	ExpInsPhnTknErr    error
-	ExpInsPhnTknAtm    *model.DBToken
 	ExpInsPhnTknAtmErr error
 	ExpPhnTkns         []model.DBToken
 	ExpPhnTknsErr      error
 
-	ExpInsUsrMail       *model.VerifLogin
 	ExpInsUsrMailErr    error
-	ExpInsUsrMailAtm    *model.VerifLogin
 	ExpInsUsrMailAtmErr error
 	ExpUpdUsrMail       *model.VerifLogin
 	ExpUpdUsrMailErr    error
 	ExpUpdUsrMailAtm    *model.VerifLogin
 	ExpUpdUsrMailAtmErr error
 
-	ExpInsMailTkn       *model.DBToken
 	ExpInsMailTknErr    error
-	ExpInsMailTknAtm    *model.DBToken
 	ExpInsMailTknAtmErr error
 	ExpMailTkns         []model.DBToken
 	ExpMailTknsErr      error
 
-	ExpInsFbAtm    *model.Facebook
 	ExpInsFbAtmErr error
 }
 
@@ -107,42 +90,75 @@ func (db *DBMock) ExecuteTx(fn func(*sql.Tx) error) error {
 }
 
 func (db *DBMock) GroupByName(string) (*model.Group, error) {
+	if db.ExpGrpBNm == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpGrpBNm, db.ExpGrpBNmErr
 }
 func (db *DBMock) Group(string) (*model.Group, error) {
+	if db.ExpGrp == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpGrp, db.ExpGrpErr
 }
 func (db *DBMock) InsertGroup(name string, acl float32) (*model.Group, error) {
-	return db.ExpInsGrp, db.ExpInsGrpErr
+	if db.ExpInsGrpErr != nil {
+		return nil, db.ExpInsGrpErr
+	}
+	return &model.Group{ID: currentID(), Name: name, AccessLevel: acl}, db.ExpInsGrpErr
 }
 func (db *DBMock) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
 	return db.ExpAddUsrTGrpAtmcErr
 }
 
 func (db *DBMock) UserTypeByName(string) (*model.UserType, error) {
+	if db.ExpUsrTypBNm == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrTypBNm, db.ExpUsrTypBNmErr
 }
 func (db *DBMock) InsertUserType(name string) (*model.UserType, error) {
-	return db.ExpInsUsrTyp, db.ExpInsUsrTypErr
+	if db.ExpInsUsrTypErr != nil {
+		return nil, db.ExpInsUsrTypErr
+	}
+	return &model.UserType{ID: currentID(), Name: name}, db.ExpInsUsrTypErr
 }
 func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
-	return db.ExpInsUsrAtm, db.ExpInsUsrAtmErr
+	if db.ExpInsUsrAtmErr != nil {
+		return nil, db.ExpInsUsrAtmErr
+	}
+	return &model.User{ID: currentID(), Type: t}, db.ExpInsUsrAtmErr
 }
 
 func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
+	if db.ExpAPIKsBUsrID == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpAPIKsBUsrID, db.ExpAPIKsBUsrIDErr
 }
 func (db *DBMock) InsertAPIKey(userID, key string) (*api.Key, error) {
-	return db.ExpInsAPIK, db.ExpInsAPIKErr
+	if db.ExpInsAPIKErr != nil {
+		return nil, db.ExpInsAPIKErr
+	}
+	return &api.Key{ID: currentID(), UserID: userID, APIKey: key}, db.ExpInsAPIKErr
 }
 
 func (db *DBMock) UpdateUsername(userID, username string) (*model.Username, error) {
+	if db.ExpUpdUsrNm == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUpdUsrNm, db.ExpUpdUsrNmErr
 }
 func (db *DBMock) UpdateUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
+	if db.ExpUpdUsrPhn == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUpdUsrPhn, db.ExpUpdUsrPhnErr
 }
 func (db *DBMock) UpdateUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
+	if db.ExpUpdUsrMail == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUpdUsrMail, db.ExpUpdUsrMailErr
 }
 
@@ -153,71 +169,137 @@ func (db *DBMock) UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byt
 	return db.ExpupdPassAtmErr
 }
 func (db *DBMock) UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
+	if db.ExpUpdUsrPhnAtm == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUpdUsrPhnAtm, db.ExpUpdUsrPhnAtmErr
 }
 func (db *DBMock) UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*model.VerifLogin, error) {
+	if db.ExpUpdUsrMailAtm == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUpdUsrMailAtm, db.ExpUpdUsrMailAtmErr
 }
 
 func (db *DBMock) InsertUserPhone(userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return db.ExpInsUsrPhn, db.ExpInsUsrPhnErr
+	if db.ExpInsUsrPhnErr != nil {
+		return nil, db.ExpInsUsrPhnErr
+	}
+	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: phone, Verified: verified}, db.ExpInsUsrPhnErr
 }
 func (db *DBMock) InsertUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
-	return db.ExpInsUsrMail, db.ExpInsUsrMailErr
+	if db.ExpInsUsrMailErr != nil {
+		return nil, db.ExpInsUsrMailErr
+	}
+	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: email, Verified: verified}, db.ExpInsUsrMailErr
 }
 func (db *DBMock) InsertUserName(userID, username string) (*model.Username, error) {
-	return db.ExpInsUsrNm, db.ExpInsUsrNmErr
+	if db.ExpInsUsrNmErr != nil {
+		return nil, db.ExpInsUsrNmErr
+	}
+	return &model.Username{ID: currentID(), UserID: userID, Value: username}, db.ExpInsUsrNmErr
 }
 func (db *DBMock) InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*model.VerifLogin, error) {
-	return db.ExpInsUsrPhnAtm, db.ExpInsUsrPhnAtmErr
+	if db.ExpInsUsrPhnAtmErr != nil {
+		return nil, db.ExpInsUsrPhnAtmErr
+	}
+	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: phone, Verified: verified}, db.ExpInsUsrPhnAtmErr
 }
 func (db *DBMock) InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*model.VerifLogin, error) {
-	return db.ExpInsUsrMailAtm, db.ExpInsUsrMailAtmErr
+	if db.ExpInsUsrMailAtmErr != nil {
+		return nil, db.ExpInsUsrMailAtmErr
+	}
+	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: email, Verified: verified}, db.ExpInsUsrMailAtmErr
 }
 func (db *DBMock) InsertUserNameAtomic(tx *sql.Tx, userID, username string) (*model.Username, error) {
-	return db.ExpInsUsrNmAtm, db.ExpInsUsrNmAtmErr
+	if db.ExpInsUsrNmAtmErr != nil {
+		return nil, db.ExpInsUsrNmAtmErr
+	}
+	return &model.Username{ID: currentID(), UserID: userID, Value: username}, db.ExpInsUsrNmAtmErr
 }
 func (db *DBMock) InsertUserFbIDAtomic(tx *sql.Tx, userID, fbID string, verified bool) (*model.Facebook, error) {
-	return db.ExpInsFbAtm, db.ExpInsFbAtmErr
+	if db.ExpInsFbAtmErr != nil {
+		return nil, db.ExpInsFbAtmErr
+	}
+	return &model.Facebook{ID: currentID(), UserID: userID, FacebookID: fbID, Verified: verified}, db.ExpInsFbAtmErr
 }
 func (db *DBMock) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model.Device, error) {
-	return db.ExpInsDevAtm, db.ExpInsDevAtmErr
+	if db.ExpInsDevAtmErr != nil {
+		return nil, db.ExpInsDevAtmErr
+	}
+	return &model.Device{ID: currentID(), UserID: userID, DeviceID: devID}, db.ExpInsDevAtmErr
 }
 
 func (db *DBMock) InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return db.ExpInsPhnTkn, db.ExpInsPhnTknErr
+	if db.ExpInsPhnTknErr != nil {
+		return nil, db.ExpInsPhnTknErr
+	}
+	return &model.DBToken{ID: currentID(), UserID: userID, Address: phone, Token: dbt}, db.ExpInsPhnTknErr
 }
 func (db *DBMock) InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return db.ExpInsMailTkn, db.ExpInsMailTknErr
+	if db.ExpInsMailTknErr != nil {
+		return nil, db.ExpInsMailTknErr
+	}
+	return &model.DBToken{ID: currentID(), UserID: userID, Address: email, Token: dbt}, db.ExpInsMailTknErr
 }
 func (db *DBMock) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return db.ExpInsPhnTknAtm, db.ExpInsPhnTknAtmErr
+	if db.ExpInsPhnTknAtmErr != nil {
+		return nil, db.ExpInsPhnTknAtmErr
+	}
+	return &model.DBToken{ID: currentID(), UserID: userID, Address: phone, Token: dbt}, db.ExpInsPhnTknAtmErr
 }
 func (db *DBMock) InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*model.DBToken, error) {
-	return db.ExpInsMailTknAtm, db.ExpInsMailTknAtmErr
+	if db.ExpInsMailTknAtmErr != nil {
+		return nil, db.ExpInsMailTknAtmErr
+	}
+	return &model.DBToken{ID: currentID(), UserID: userID, Address: email, Token: dbt}, db.ExpInsMailTknAtmErr
 }
 func (db *DBMock) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
+	if len(db.ExpPhnTkns) == 0 {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpPhnTkns, db.ExpPhnTknsErr
 }
 func (db *DBMock) EmailTokens(userID string, offset, count int64) ([]model.DBToken, error) {
+	if len(db.ExpMailTkns) == 0 {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpMailTkns, db.ExpMailTknsErr
 }
 
 func (db *DBMock) User(id string) (*model.User, []byte, error) {
+	if db.ExpUsr == nil {
+		return nil, nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsr, db.ExpUsrPass, db.ExpUsrErr
 }
 func (db *DBMock) UserByPhone(phone string) (*model.User, []byte, error) {
+	if db.ExpUsrBPhn == nil {
+		return nil, nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrBPhn, db.ExpUsrBPhnPass, db.ExpUsrBPhnErr
 }
 func (db *DBMock) UserByEmail(email string) (*model.User, []byte, error) {
+	if db.ExpUsrBMail == nil {
+		return nil, nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrBMail, db.ExpUsrBMailPass, db.ExpUsrBMailErr
 }
 func (db *DBMock) UserByUsername(username string) (*model.User, []byte, error) {
+	if db.ExpUsrBUsrNm == nil {
+		return nil, nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrBUsrNm, db.ExpUsrBUsrNmPass, db.ExpUsrBUsrNmErr
 }
 func (db *DBMock) UserByFacebook(facebookID string) (*model.User, error) {
+	if db.ExpUsrBFb == nil {
+		return nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrBFb, db.ExpUsrBFbErr
 }
 func (db *DBMock) UserByDeviceID(devID string) (*model.User, []byte, error) {
+	if db.ExpUsrBDev == nil {
+		return nil, nil, errors.NewNotFound("not found")
+	}
 	return db.ExpUsrBDev, db.ExpUsrBDevPass, db.ExpUsrBDevErr
 }
