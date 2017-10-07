@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/authms/service"
+	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -49,9 +49,9 @@ type DBMock struct {
 	ExpUsrBPhnPass   []byte
 	ExpUsrBMailPass  []byte
 
-	ExpInsAPIK        *service.APIKey
+	ExpInsAPIK        *api.Key
 	ExpInsAPIKErr     error
-	ExpAPIKsBUsrID    []service.APIKey
+	ExpAPIKsBUsrID    []api.Key
 	ExpAPIKsBUsrIDErr error
 
 	ExpAddUsrTGrpAtmcErr error
@@ -129,10 +129,10 @@ func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte
 	return db.ExpInsUsrAtm, db.ExpInsUsrAtmErr
 }
 
-func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]service.APIKey, error) {
+func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
 	return db.ExpAPIKsBUsrID, db.ExpAPIKsBUsrIDErr
 }
-func (db *DBMock) InsertAPIKey(userID, key string) (*service.APIKey, error) {
+func (db *DBMock) InsertAPIKey(userID, key string) (*api.Key, error) {
 	return db.ExpInsAPIK, db.ExpInsAPIKErr
 }
 

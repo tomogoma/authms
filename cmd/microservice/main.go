@@ -20,7 +20,7 @@ import (
 	"github.com/tomogoma/authms/handler/http"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/authms/service"
+	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/sms/africas_talking"
 	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
@@ -82,7 +82,7 @@ func main() {
 	//logFatalOnError(err, "Instantate RPC handler")
 	//go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
-	g, err := service.NewGuard(rdb, service.WithMasterKey(conf.Service.MasterAPIKey))
+	g, err := api.NewGuard(rdb, api.WithMasterKey(conf.Service.MasterAPIKey))
 	logFatalOnError(err, "Instantate API access guard")
 	serverHttpQuitCh := make(chan error)
 	httpHandler, err := http.NewHandler(a, g)

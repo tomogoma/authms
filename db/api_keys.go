@@ -1,13 +1,13 @@
 package db
 
 import (
-	"github.com/tomogoma/authms/service"
+	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 // InsertAPIKey inserts an API key for the userID.
-func (r *Roach) InsertAPIKey(userID, key string) (*service.APIKey, error) {
-	k := service.APIKey{UserID: userID, APIKey: key}
+func (r *Roach) InsertAPIKey(userID, key string) (*api.Key, error) {
+	k := api.Key{UserID: userID, APIKey: key}
 	insCols := ColDesc(ColUserID, ColKey, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
@@ -22,7 +22,7 @@ func (r *Roach) InsertAPIKey(userID, key string) (*service.APIKey, error) {
 }
 
 // APIKeysByUserID returns API keys for the provided userID starting with the newest.
-func (r *Roach) APIKeysByUserID(userID string, offset, count int64) ([]service.APIKey, error) {
+func (r *Roach) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
 	cols := ColDesc(ColID, ColUserID, ColKey, ColCreateDate, ColUpdateDate)
 	q := `
 	SELECT ` + cols + `
@@ -35,9 +35,9 @@ func (r *Roach) APIKeysByUserID(userID string, offset, count int64) ([]service.A
 		return nil, err
 	}
 	defer rows.Close()
-	var ks []service.APIKey
+	var ks []api.Key
 	for rows.Next() {
-		k := service.APIKey{}
+		k := api.Key{}
 		err := rows.Scan(&k.ID, &k.UserID, &k.APIKey, &k.CreateDate, &k.UpdateDate)
 		if err != nil {
 			return nil, errors.Newf("scan result set row: %v", err)

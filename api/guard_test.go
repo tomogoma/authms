@@ -1,9 +1,9 @@
-package service_test
+package api_test
 
 import (
 	"testing"
 
-	"github.com/tomogoma/authms/service"
+	"github.com/tomogoma/authms/api"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -11,8 +11,8 @@ import (
 func TestNewGuard(t *testing.T) {
 	tt := []struct {
 		name      string
-		db        service.APIKeyStore
-		kg        service.KeyGenerator
+		db        api.KeyStore
+		kg        api.KeyGenerator
 		masterKey string
 		expErr    bool
 	}{
@@ -40,10 +40,10 @@ func TestNewGuard(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			g, err := service.NewGuard(
+			g, err := api.NewGuard(
 				tc.db,
-				service.WithKeyGenerator(tc.kg),
-				service.WithMasterKey(tc.masterKey),
+				api.WithKeyGenerator(tc.kg),
+				api.WithMasterKey(tc.masterKey),
 			)
 			if tc.expErr {
 				if err == nil {
@@ -52,10 +52,10 @@ func TestNewGuard(t *testing.T) {
 				return
 			}
 			if err != nil {
-				t.Fatalf("service.NewGuard(): %v", err)
+				t.Fatalf("api.NewGuard(): %v", err)
 			}
 			if g == nil {
-				t.Fatalf("service.NewGuard returned nil *service.Guard")
+				t.Fatalf("api.NewGuard returned nil *api.Guard")
 			}
 		})
 	}
@@ -75,14 +75,14 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "valid",
 			userID: "12345",
 			kg:     &testingH.GeneratorMock{ExpSRBs: []byte(validKey)},
-			db:     &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "12345", ID: "apiid", APIKey: validKey}},
+			db:     &testingH.DBMock{ExpInsAPIK: &api.Key{UserID: "12345", ID: "apiid", APIKey: validKey}},
 			expErr: false,
 		},
 		{
 			name:     "missing userID",
 			userID:   "",
 			kg:       &testingH.GeneratorMock{ExpSRBs: []byte(validKey)},
-			db:       &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "12345", ID: "apiid", APIKey: validKey}},
+			db:       &testingH.DBMock{ExpInsAPIK: &api.Key{UserID: "12345", ID: "apiid", APIKey: validKey}},
 			expErr:   true,
 			expClErr: true,
 		},
@@ -90,7 +90,7 @@ func TestGuard_NewAPIKey(t *testing.T) {
 			name:   "key gen report error",
 			userID: "12345",
 			kg:     &testingH.GeneratorMock{ExpSRBsErr: errors.Newf("an error")},
-			db:     &testingH.DBMock{ExpInsAPIK: &service.APIKey{UserID: "12345", ID: "apiid", APIKey: validKey}},
+			db:     &testingH.DBMock{ExpInsAPIK: &api.Key{UserID: "12345", ID: "apiid", APIKey: validKey}},
 			expErr: true,
 		},
 		{
@@ -110,13 +110,13 @@ func TestGuard_NewAPIKey(t *testing.T) {
 					t.Fatalf("Error: %v", err)
 				}
 				if tc.expClErr != g.IsClientError(err) {
-					t.Errorf("Expect service.Guard#IsClientError %t, got %t",
+					t.Errorf("Expect api.Guard#IsClientError %t, got %t",
 						tc.expClErr, g.IsClientError(err))
 				}
 				return
 			}
 			if ak == nil {
-				t.Fatalf("yielded nil *service.APIKey")
+				t.Fatalf("yielded nil *api.Key")
 			}
 			if ak.APIKey != validKey {
 				t.Errorf("API Key mismatch: expect '%s' got '%s'",
@@ -142,7 +142,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "valid (db)",
 			expUsrID: "12345",
 			key:      "12345." + validKey,
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -154,7 +154,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			key:       "the-master-key",
 			masterKey: "the-master-key",
 			expUsrID:  "master",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -165,7 +165,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "empty",
 			key:      "",
 			expUsrID: "",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -178,7 +178,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "separator only",
 			key:      ".",
 			expUsrID: "",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -191,7 +191,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "missing separator + userID",
 			key:      "" + validKey,
 			expUsrID: "",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -204,7 +204,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "missing separator + key",
 			key:      "12345" + "",
 			expUsrID: "",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -217,7 +217,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			name:     "invalid key",
 			key:      "12345." + "some-invalid-key",
 			expUsrID: "12345",
-			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []api.Key{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
 				{APIKey: "last-api-key"},
@@ -255,11 +255,11 @@ func TestGuard_APIKeyValid(t *testing.T) {
 					t.Fatalf("Expected an error, got nil")
 				}
 				if tc.expUnauthorized != g.IsUnauthorizedError(err) {
-					t.Errorf("Expect service.Guard#IsUnauthorizedError %t, got %t",
+					t.Errorf("Expect api.Guard#IsUnauthorizedError %t, got %t",
 						tc.expUnauthorized, g.IsUnauthorizedError(err))
 				}
 				if tc.expForbidden != g.IsForbiddenError(err) {
-					t.Errorf("Expect service.Guard#IsForbiddenError %t, got %t",
+					t.Errorf("Expect api.Guard#IsForbiddenError %t, got %t",
 						tc.expForbidden, g.IsForbiddenError(err))
 				}
 				return
@@ -271,14 +271,14 @@ func TestGuard_APIKeyValid(t *testing.T) {
 	}
 }
 
-func newGuard(t *testing.T, master string, kg service.KeyGenerator, db service.APIKeyStore) *service.Guard {
-	g, err := service.NewGuard(
+func newGuard(t *testing.T, master string, kg api.KeyGenerator, db api.KeyStore) *api.Guard {
+	g, err := api.NewGuard(
 		db,
-		service.WithKeyGenerator(kg),
-		service.WithMasterKey(master),
+		api.WithKeyGenerator(kg),
+		api.WithMasterKey(master),
 	)
 	if err != nil {
-		t.Fatalf("service.NewGuard(): %v", err)
+		t.Fatalf("api.NewGuard(): %v", err)
 	}
 	return g
 }

@@ -1,4 +1,4 @@
-package service
+package api
 
 import (
 	"time"
@@ -10,17 +10,17 @@ import (
 	"github.com/tomogoma/go-commons/errors"
 )
 
-type APIKeyStore interface {
+type KeyStore interface {
 	IsNotFoundError(error) bool
-	InsertAPIKey(userID, key string) (*APIKey, error)
-	APIKeysByUserID(userID string, offset, count int64) ([]APIKey, error)
+	InsertAPIKey(userID, key string) (*Key, error)
+	APIKeysByUserID(userID string, offset, count int64) ([]Key, error)
 }
 
 type KeyGenerator interface {
 	SecureRandomBytes(length int) ([]byte, error)
 }
 
-type APIKey struct {
+type Key struct {
 	ID         string
 	UserID     string
 	APIKey     string
@@ -31,7 +31,7 @@ type APIKey struct {
 type Guard struct {
 	errors.ClErrCheck
 	errors.AuthErrCheck
-	db        APIKeyStore
+	db        KeyStore
 	gen       KeyGenerator
 	masterKey string
 }
@@ -52,9 +52,9 @@ func WithKeyGenerator(kg KeyGenerator) Option {
 
 var invalidAPIKeyErrorf = "invalid API key (%s) for %s"
 
-func NewGuard(db APIKeyStore, opts ...Option) (*Guard, error) {
+func NewGuard(db KeyStore, opts ...Option) (*Guard, error) {
 	if db == nil {
-		return nil, errors.New("APIKeyStore was nil")
+		return nil, errors.New("KeyStore was nil")
 	}
 	g := &Guard{db: db}
 	for _, f := range opts {
@@ -95,7 +95,7 @@ func (s *Guard) APIKeyValid(key string) (string, error) {
 	return userID, errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 }
 
-func (s *Guard) NewAPIKey(userID string) (*APIKey, error) {
+func (s *Guard) NewAPIKey(userID string) (*Key, error) {
 	if userID == "" {
 		return nil, errors.NewClient("userID was empty")
 	}
