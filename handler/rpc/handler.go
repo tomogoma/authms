@@ -1,13 +1,9 @@
 package rpc
 
 import (
-	"errors"
 	"net/http"
-
 	"strconv"
-
 	"time"
-
 	"github.com/micro/go-micro/server"
 	"github.com/pborman/uuid"
 	"github.com/sirupsen/logrus"
@@ -15,6 +11,7 @@ import (
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"golang.org/x/net/context"
+	"github.com/tomogoma/go-commons/errors"
 )
 
 type Handler struct {
@@ -68,29 +65,32 @@ func (s *Handler) Register(c context.Context, req *authms.RegisterRequest, resp 
 	if req.User.UserName != "" {
 		_, err = s.auth.RegisterSelf(model.LoginTypeUsername, model.UserTypeIndividual, req.User.UserName, []byte(req.User.Password))
 		if err != nil {
-			s.respondOnUser(c, usr, resp, http.StatusCreated, err)
+			return s.respondOnUser(c, usr, resp, http.StatusCreated, err)
 		}
 		usr, err = s.auth.Login(model.LoginTypeUsername, req.User.UserName, []byte(req.User.Password))
 	} else if req.User.Phone != nil {
 		_, err = s.auth.RegisterSelf(model.LoginTypePhone, model.UserTypeIndividual, req.User.Phone.Value, []byte(req.User.Password))
 		if err != nil {
-			s.respondOnUser(c, usr, resp, http.StatusCreated, err)
+			return s.respondOnUser(c, usr, resp, http.StatusCreated, err)
 		}
 		usr, err = s.auth.Login(model.LoginTypePhone, req.User.Phone.Value, []byte(req.User.Password))
 	} else if req.User.Email != nil {
 		_, err = s.auth.RegisterSelf(model.LoginTypeEmail, model.UserTypeIndividual, req.User.Email.Value, []byte(req.User.Password))
 		if err != nil {
-			s.respondOnUser(c, usr, resp, http.StatusCreated, err)
+			return s.respondOnUser(c, usr, resp, http.StatusCreated, err)
 		}
 		usr, err = s.auth.Login(model.LoginTypeEmail, req.User.Email.Value, []byte(req.User.Password))
 	} else if req.User.OAuths != nil {
 		if fb := req.User.OAuths["facebook"]; fb != nil {
 			usr, err = s.auth.RegisterSelf(model.LoginTypeFacebook, model.UserTypeIndividual, fb.AppToken, nil)
 			if err != nil {
-				s.respondOnUser(c, usr, resp, http.StatusCreated, err)
+				return s.respondOnUser(c, usr, resp, http.StatusCreated, err)
 			}
 			usr, err = s.auth.Login(model.LoginTypeFacebook, fb.AppToken, nil)
 		}
+	} else {
+		err := errors.NewClient("no login type found")
+		return s.respondOnUser(c, nil, resp, http.StatusCreated, err)
 	}
 	return s.respondOnUser(c, usr, resp, http.StatusCreated, err)
 }
@@ -181,10 +181,6 @@ func (s *Handler) respondOnSMS(ctx context.Context, st *model.DBTStatus, addr st
 }
 
 func (s *Handler) respondOnUser(ctx context.Context, usr *model.User, resp *authms.Response, code int32, err error) error {
-	var usrID int64
-	if err == nil {
-		usrID, err = strconv.ParseInt(usr.ID, 10, 64)
-	}
 	if err != nil {
 		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
 		if s.auth.IsAuthError(err) {
@@ -206,6 +202,22 @@ func (s *Handler) respondOnUser(ctx context.Context, usr *model.User, resp *auth
 			return nil
 		}
 		log.Errorf("Internal error: %v", err)
+		resp.Detail = internalErrorMessage
+		resp.Code = http.StatusInternalServerError
+		return nil
+	}
+	if usr == nil {
+		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
+		log.Errorf("Internal error: nil User and error while responding on user")
+		resp.Detail = internalErrorMessage
+		resp.Code = http.StatusInternalServerError
+		return nil
+	}
+	var usrID int64
+	usrID, err = strconv.ParseInt(usr.ID, 10, 64)
+	if err != nil {
+		log := ctx.Value(ctxKeyLog).(*logrus.Entry)
+		log.Errorf("Internal error: userID not a number: %v", err)
 		resp.Detail = internalErrorMessage
 		resp.Code = http.StatusInternalServerError
 		return nil
