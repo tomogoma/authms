@@ -3,6 +3,8 @@ package service
 import (
 	"time"
 
+	"strings"
+
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/go-commons/errors"
@@ -48,7 +50,7 @@ func WithKeyGenerator(kg KeyGenerator) Option {
 	}
 }
 
-var invalidAPIKeyErrorf = "invalid api key ('%s') for '%s'"
+var invalidAPIKeyErrorf = "invalid API key (%s) for %s"
 
 func NewGuard(db APIKeyStore, opts ...Option) (*Guard, error) {
 	if db == nil {
@@ -68,13 +70,16 @@ func NewGuard(db APIKeyStore, opts ...Option) (*Guard, error) {
 	return g, nil
 }
 
-func (s *Guard) APIKeyValid(userID, keyStr string) error {
-	if userID == "" || keyStr == "" {
-		return errors.NewUnauthorizedf(invalidAPIKeyErrorf, keyStr, userID)
-	}
-	if keyStr == s.masterKey {
+func (s *Guard) APIKeyValid(key string) error {
+	if key != "" && key == s.masterKey {
 		return nil
 	}
+	pair := strings.SplitN(key, ".", 2)
+	if len(pair) < 2 || pair[0] == "" || pair[1] == "" {
+		return errors.NewUnauthorizedf("invalid API key %+v", pair)
+	}
+	userID := pair[0]
+	keyStr := pair[1]
 	dbKeys, err := s.db.APIKeysByUserID(userID, 0, 10)
 	if err != nil {
 		if s.db.IsNotFoundError(err) {

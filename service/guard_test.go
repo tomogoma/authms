@@ -130,7 +130,6 @@ func TestGuard_APIKeyValid(t *testing.T) {
 	validKey := "some-api-key"
 	tt := []struct {
 		name            string
-		userID          string
 		key             string
 		db              *testingH.DBMock
 		masterKey       string
@@ -139,9 +138,8 @@ func TestGuard_APIKeyValid(t *testing.T) {
 		expUnauthorized bool
 	}{
 		{
-			name:   "valid (db)",
-			userID: "johndoe",
-			key:    validKey,
+			name: "valid (db)",
+			key:  "johndoe." + validKey,
 			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
@@ -151,7 +149,6 @@ func TestGuard_APIKeyValid(t *testing.T) {
 		},
 		{
 			name:      "valid (master)",
-			userID:    "johndoe",
 			key:       "the-master-key",
 			masterKey: "the-master-key",
 			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
@@ -162,9 +159,8 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			expErr: false,
 		},
 		{
-			name:   "missing userID",
-			userID: "",
-			key:    validKey,
+			name: "empty",
+			key:  "",
 			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
@@ -175,9 +171,8 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			expUnauthorized: true,
 		},
 		{
-			name:   "missing key",
-			userID: "johndoe",
-			key:    "",
+			name: "separator only",
+			key:  ".",
 			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
@@ -188,9 +183,32 @@ func TestGuard_APIKeyValid(t *testing.T) {
 			expUnauthorized: true,
 		},
 		{
-			name:   "invalid key",
-			userID: "johndoe",
-			key:    "some-invalid-key",
+			name: "missing separator + userID",
+			key:  "" + validKey,
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
+			}},
+			expErr:          true,
+			expForbidden:    false,
+			expUnauthorized: true,
+		},
+		{
+			name: "missing separator + key",
+			key:  "johndoe" + "",
+			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
+				{APIKey: "first-api-key"},
+				{APIKey: validKey},
+				{APIKey: "last-api-key"},
+			}},
+			expErr:          true,
+			expForbidden:    false,
+			expUnauthorized: true,
+		},
+		{
+			name: "invalid key",
+			key:  "johndoe." + "some-invalid-key",
 			db: &testingH.DBMock{ExpAPIKsBUsrID: []service.APIKey{
 				{APIKey: "first-api-key"},
 				{APIKey: validKey},
@@ -202,8 +220,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 		},
 		{
 			name:            "none found",
-			userID:          "johndoe",
-			key:             validKey,
+			key:             "johndoe." + validKey,
 			db:              &testingH.DBMock{ExpAPIKsBUsrIDErr: errors.NewNotFound("no keys for johndoe")},
 			expErr:          true,
 			expForbidden:    true,
@@ -211,8 +228,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 		},
 		{
 			name:   "db report error",
-			userID: "johndoe",
-			key:    "some-invalid-key",
+			key:    "johndoe." + "some-invalid-key",
 			db:     &testingH.DBMock{ExpAPIKsBUsrIDErr: errors.New("some errors")},
 			expErr: true,
 		},
@@ -220,7 +236,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 			g := newGuard(t, tc.masterKey, &testingH.GeneratorMock{}, tc.db)
-			err := g.APIKeyValid(tc.userID, tc.key)
+			err := g.APIKeyValid(tc.key)
 			if tc.expErr {
 				if err == nil {
 					t.Fatalf("Expected an error, got nil")
