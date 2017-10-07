@@ -13,7 +13,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/authms/service"
 	"github.com/tomogoma/go-commons/errors"
 )
 
@@ -38,8 +37,7 @@ type Auth interface {
 }
 
 type Guard interface {
-	APIKeyValid(key string) error
-	NewAPIKey(userID string) (*service.APIKey, error)
+	APIKeyValid(key string) (string, error)
 }
 
 type handler struct {
@@ -81,7 +79,7 @@ func NewHandler(a Auth, g Guard) (http.Handler, error) {
 	return r, nil
 }
 
-func (s handler) handleRoute(r *mux.Router) error {
+func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(prepLogger(s.guardRoute(s.handleVerifyCode)))
@@ -101,8 +99,6 @@ func (s handler) handleRoute(r *mux.Router) error {
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
 		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
-
-	return nil
 }
 
 func prepLogger(next http.HandlerFunc) http.HandlerFunc {
@@ -122,11 +118,15 @@ func prepLogger(next http.HandlerFunc) http.HandlerFunc {
 func (s *handler) guardRoute(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		APIKey := r.Header.Get(keyAPIKey)
-		if err := s.guard.APIKeyValid(APIKey); err != nil {
-			s.handleError(w, r, APIKey, err)
+		clUsrID, err := s.guard.APIKeyValid(APIKey)
+		log := r.Context().Value(ctxKeyLog).(*logrus.Entry).
+			WithField(logging.FieldClientAppUserID, clUsrID)
+		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
+		if err != nil {
+			s.handleError(w, r.WithContext(ctx), nil, err)
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 }
 

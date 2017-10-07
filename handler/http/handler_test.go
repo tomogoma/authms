@@ -82,7 +82,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "register bad body",
 			auth:          &testingH.AuthenticationMock{},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/register",
 			reqMethod:     http.MethodPut,
 			reqBody:       "{bad json]",
@@ -91,7 +91,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "register self error",
 			auth:          &testingH.AuthenticationMock{ExpRegSelfErr: errors.Newf("auth reg self error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/register?selfReg=true",
 			reqMethod:     http.MethodPut,
 			reqBody:       "{}",
@@ -100,7 +100,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "register self (lock phone) error",
 			auth:          &testingH.AuthenticationMock{ExpRegSelfBLPErr: errors.Newf("auth reg self by locked phone error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/register?selfReg=device",
 			reqMethod:     http.MethodPut,
 			reqBody:       "{}",
@@ -109,7 +109,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "register other error",
 			auth:          &testingH.AuthenticationMock{ExpRegOtherErr: errors.Newf("auth reg other error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/register",
 			reqMethod:     http.MethodPut,
 			reqBody:       "{}",
@@ -138,7 +138,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "login no basic auth",
 			auth:          &testingH.AuthenticationMock{},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/login",
 			reqMethod:     http.MethodPost,
 			reqWBasicAuth: false,
@@ -148,7 +148,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "login error",
 			auth:          &testingH.AuthenticationMock{ExpLoginErr: errors.Newf("auth login error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/login",
 			reqMethod:     http.MethodPost,
 			reqWBasicAuth: true,
@@ -176,7 +176,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "update bad body",
 			auth:          &testingH.AuthenticationMock{},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/update",
 			reqMethod:     http.MethodPost,
 			reqBody:       "{bad json]",
@@ -185,7 +185,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "update auth error",
 			auth:          &testingH.AuthenticationMock{ExpUpdIDerErr: errors.Newf("auth update identifier error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/update",
 			reqMethod:     http.MethodPost,
 			reqBody:       "{}",
@@ -210,7 +210,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "send ver code auth error",
 			auth:          &testingH.AuthenticationMock{ExpSndVerCodeErr: errors.Newf("auth send ver code error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/_loginType_/verify/address",
 			reqMethod:     http.MethodGet,
 			expStatusCode: http.StatusInternalServerError,
@@ -234,7 +234,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "verify code ver dbt err",
 			auth:          &testingH.AuthenticationMock{ExpVerDBTErr: errors.Newf("auth ver DBT error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/users/_userID_/verify/_dbToken_",
 			reqMethod:     http.MethodGet,
 			expStatusCode: http.StatusInternalServerError,
@@ -242,7 +242,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		{
 			name:          "verify code ver and extend dbt err",
 			auth:          &testingH.AuthenticationMock{ExpVerExtDBTErr: errors.Newf("auth ver and extend DBT error")},
-			guard:         &testingH.GuardMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
 			reqURLSuffix:  "/users/_userID_/verify/_dbToken_?extend=true",
 			reqMethod:     http.MethodGet,
 			expStatusCode: http.StatusInternalServerError,
@@ -261,10 +261,10 @@ func TestHandler_handleRoute(t *testing.T) {
 				bytes.NewReader([]byte(tc.reqBody)),
 			)
 			if err != nil {
-				t.Fatalf("Error setting up, new request: %v", err)
+				t.Fatalf("Error setting up: new request: %v", err)
 			}
 			if tc.reqWBasicAuth {
-				req.SetBasicAuth("uname", "password")
+				req.SetBasicAuth("username", "password")
 			}
 
 			cl := &http.Client{}

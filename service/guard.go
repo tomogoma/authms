@@ -70,29 +70,29 @@ func NewGuard(db APIKeyStore, opts ...Option) (*Guard, error) {
 	return g, nil
 }
 
-func (s *Guard) APIKeyValid(key string) error {
+func (s *Guard) APIKeyValid(key string) (string, error) {
 	if key != "" && key == s.masterKey {
-		return nil
+		return "master", nil
 	}
 	pair := strings.SplitN(key, ".", 2)
 	if len(pair) < 2 || pair[0] == "" || pair[1] == "" {
-		return errors.NewUnauthorizedf("invalid API key %+v", pair)
+		return "", errors.NewUnauthorizedf("invalid API key %+v", pair)
 	}
 	userID := pair[0]
 	keyStr := pair[1]
 	dbKeys, err := s.db.APIKeysByUserID(userID, 0, 10)
 	if err != nil {
 		if s.db.IsNotFoundError(err) {
-			return errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
+			return userID, errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 		}
-		return errors.Newf("get API Key: %v", err)
+		return userID, errors.Newf("get API Key: %v", err)
 	}
 	for _, dbKey := range dbKeys {
 		if dbKey.APIKey == keyStr {
-			return nil
+			return userID, nil
 		}
 	}
-	return errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
+	return userID, errors.NewForbiddenf(invalidAPIKeyErrorf, keyStr, userID)
 }
 
 func (s *Guard) NewAPIKey(userID string) (*APIKey, error) {
