@@ -315,19 +315,19 @@ func (c *authenticationConfig) fillDefaults() error {
 		if _, ok := phoneTpls[ActionInvite]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneInviteTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneInviteTpl())),
 			)
 		}
 		if _, ok := phoneTpls[ActionVerify]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneVerifyTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneVerifyTpl())),
 			)
 		}
 		if _, ok := phoneTpls[ActionResetPass]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneResetPassTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneResetPassTpl())),
 			)
 		}
 	}
@@ -336,19 +336,19 @@ func (c *authenticationConfig) fillDefaults() error {
 		if _, ok := emailTPls[ActionInvite]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailInviteTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailInviteTpl())),
 			)
 		}
 		if _, ok := emailTPls[ActionVerify]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailVerifyTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailVerifyTpl())),
 			)
 		}
 		if _, ok := emailTPls[ActionResetPass]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailResetPassTpl)),
+				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailResetPassTpl())),
 			)
 		}
 	}
