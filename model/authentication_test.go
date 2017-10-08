@@ -55,18 +55,29 @@ func TestNewAuthentication(t *testing.T) {
 
 func TestAuthentication_RegisterSelf(t *testing.T) {
 	tt := []struct {
-		name       string
-		db         model.AuthStore
-		jwter      *testingH.JWTMock
-		opts       []model.Option
-		loginType  string
-		userType   string
-		identifier string
-		secret     []byte
-		expErr     bool
+		name              string
+		db                model.AuthStore
+		jwter             *testingH.JWTMock
+		opts              []model.Option
+		loginType         string
+		userType          string
+		identifier        string
+		secret            []byte
+		expErr            bool
+		expNotImplemented bool
 	}{
 		{
-			name:       "successful individual w phone",
+			name:       "successful username",
+			db:         &testingH.DBMock{},
+			jwter:      &testingH.JWTMock{},
+			loginType:  model.LoginTypeUsername,
+			userType:   model.UserTypeIndividual,
+			identifier: "johndoe",
+			secret:     []byte("12345678"),
+			expErr:     false,
+		},
+		{
+			name:       "successful phone",
 			db:         &testingH.DBMock{},
 			jwter:      &testingH.JWTMock{},
 			loginType:  model.LoginTypePhone,
@@ -74,6 +85,41 @@ func TestAuthentication_RegisterSelf(t *testing.T) {
 			identifier: "+254712345678",
 			secret:     []byte("12345678"),
 			expErr:     false,
+		},
+		{
+			name:       "successful email",
+			db:         &testingH.DBMock{},
+			jwter:      &testingH.JWTMock{},
+			loginType:  model.LoginTypeEmail,
+			userType:   model.UserTypeIndividual,
+			identifier: "johndoe@mailinator.co.ke",
+			secret:     []byte("12345678"),
+			expErr:     false,
+		},
+		{
+			name:  "successful facebook",
+			db:    &testingH.DBMock{},
+			jwter: &testingH.JWTMock{},
+			opts: []model.Option{
+				model.WithFacebookCl(&testingH.FacebookMock{}),
+			},
+			loginType:  model.LoginTypeFacebook,
+			userType:   model.UserTypeIndividual,
+			identifier: "johndoe",
+			secret:     []byte("12345678"),
+			expErr:     false,
+		},
+		{
+			name:              "facebook unavailable",
+			db:                &testingH.DBMock{},
+			jwter:             &testingH.JWTMock{},
+			opts:              []model.Option{},
+			loginType:         model.LoginTypeFacebook,
+			userType:          model.UserTypeIndividual,
+			identifier:        "johndoe",
+			secret:            []byte("12345678"),
+			expErr:            true,
+			expNotImplemented: true,
 		},
 	}
 	for _, tc := range tt {
@@ -83,6 +129,10 @@ func TestAuthentication_RegisterSelf(t *testing.T) {
 			if tc.expErr {
 				if err == nil {
 					t.Fatalf("Expected an error, got nil")
+				}
+				if tc.expNotImplemented != a.IsNotImplementedError(err) {
+					t.Fatalf("Expected IsNotImplemented %t, got %v",
+						tc.expNotImplemented, err)
 				}
 				return
 			}
