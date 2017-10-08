@@ -4,38 +4,14 @@ import (
 	"bytes"
 	"fmt"
 	"html/template"
-	"reflect"
 	"testing"
 
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/smtp"
+	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/errors"
 )
-
-type ConfigStoreMock struct {
-	errors.NotFoundErrCheck
-	expConf model.SMTPConfig
-	expErr  error
-}
-
-func (c *ConfigStoreMock) GetSMTPConfig(conf interface{}) error {
-	if c.expErr != nil {
-		return c.expErr
-	}
-	rve := reflect.ValueOf(conf).Elem()
-	rve.FieldByName("Username").SetString(c.expConf.Username)
-	rve.FieldByName("Password").SetString(c.expConf.Password)
-	rve.FieldByName("FromEmail").SetString(c.expConf.FromEmail)
-	rve.FieldByName("ServerAddress").SetString(c.expConf.ServerAddress)
-	rve.FieldByName("TLSPort").SetInt(int64(c.expConf.TLSPort))
-	rve.FieldByName("SSLPort").SetInt(int64(c.expConf.SSLPort))
-	return nil
-}
-
-func (c *ConfigStoreMock) UpsertSMTPConfig(conf interface{}) error {
-	return c.expErr
-}
 
 var testConf *model.SMTPConfig
 
@@ -57,7 +33,7 @@ func TestNew(t *testing.T) {
 		cs     smtp.ConfigStore
 		expErr bool
 	}{
-		{name: "valid", cs: &ConfigStoreMock{}, expErr: false},
+		{name: "valid", cs: &testingH.DBMock{}, expErr: false},
 		{name: "nil ConfigStore", cs: nil, expErr: true},
 	}
 	for _, tc := range tt {
@@ -86,32 +62,32 @@ func TestMailer_SendEmail(t *testing.T) {
 	validEmail := genTestEmail(t, "Authms smtp SendEmail Test")
 	tt := []struct {
 		name   string
-		cs     *ConfigStoreMock
+		cs     *testingH.DBMock
 		email  model.SendMail
 		expErr bool
 	}{
 		{
 			name:   "valid",
 			expErr: false,
-			cs:     &ConfigStoreMock{expConf: validConf},
+			cs:     &testingH.DBMock{ExpSMTPConf: validConf},
 			email:  validEmail,
 		},
 		{
 			name:   "no config found",
 			expErr: true,
-			cs:     &ConfigStoreMock{expErr: errors.NewNotFound("none")},
+			cs:     &testingH.DBMock{ExpSMTPConfErr: errors.NewNotFound("none")},
 			email:  validEmail,
 		},
 		{
 			name:   "error getting config",
 			expErr: true,
-			cs:     &ConfigStoreMock{expErr: errors.New("database abducted")},
+			cs:     &testingH.DBMock{ExpSMTPConfErr: errors.New("database abducted")},
 			email:  validEmail,
 		},
 		{
 			name:   "invalid config",
 			expErr: true,
-			cs:     &ConfigStoreMock{expConf: invalidConfig},
+			cs:     &testingH.DBMock{ExpSMTPConf: invalidConfig},
 			email:  validEmail,
 		},
 	}
@@ -144,35 +120,35 @@ func TestMailer_SetConfig(t *testing.T) {
 		name       string
 		conf       model.SMTPConfig
 		notifEmail model.SendMail
-		cs         *ConfigStoreMock
+		cs         *testingH.DBMock
 		expErr     bool
 	}{
 		{
 			name:       "valid",
 			conf:       validConf,
 			notifEmail: validEmail,
-			cs:         &ConfigStoreMock{},
+			cs:         &testingH.DBMock{},
 			expErr:     false,
 		},
 		{
 			name:       "invalid conf",
 			conf:       invalidConf,
 			notifEmail: validEmail,
-			cs:         &ConfigStoreMock{},
+			cs:         &testingH.DBMock{},
 			expErr:     true,
 		},
 		{
 			name:       "upsert error",
 			conf:       validConf,
 			notifEmail: validEmail,
-			cs:         &ConfigStoreMock{expErr: errors.New("minions!")},
+			cs:         &testingH.DBMock{ExpUpsSMTPConfErr: errors.New("minions!")},
 			expErr:     true,
 		},
 		{
 			name:       "invalid test email",
 			conf:       validConf,
 			notifEmail: invalidEmail,
-			cs:         &ConfigStoreMock{},
+			cs:         &testingH.DBMock{},
 			expErr:     true,
 		},
 	}

@@ -12,7 +12,7 @@ import (
 	config2 "github.com/tomogoma/go-commons/config"
 )
 
-var confPath = flag.String("conf", config.DefaultConfPath, "/path/to/config")
+var confPath = flag.String("testConf", config.DefaultConfPath(), "/path/to/config")
 
 var currIDMutex = sync.Mutex{}
 var currID = 0

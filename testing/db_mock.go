@@ -3,6 +3,7 @@ package testing
 import (
 	"database/sql"
 	"time"
+	"reflect"
 
 	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/model"
@@ -84,6 +85,10 @@ type DBMock struct {
 
 	ExpInsFbAtmErr error
 
+	ExpUpsSMTPConfErr error
+	ExpSMTPConf       model.SMTPConfig
+	ExpSMTPConfErr    error
+
 	isInTx bool
 }
 
@@ -93,6 +98,24 @@ func (db *DBMock) ExecuteTx(fn func(*sql.Tx) error) error {
 		db.isInTx = false
 	}()
 	return fn(new(sql.Tx))
+}
+
+func (db *DBMock) GetSMTPConfig(conf interface{}) error {
+	if db.ExpSMTPConfErr != nil {
+		return db.ExpSMTPConfErr
+	}
+	rve := reflect.ValueOf(conf).Elem()
+	rve.FieldByName("Username").SetString(db.ExpSMTPConf.Username)
+	rve.FieldByName("Password").SetString(db.ExpSMTPConf.Password)
+	rve.FieldByName("FromEmail").SetString(db.ExpSMTPConf.FromEmail)
+	rve.FieldByName("ServerAddress").SetString(db.ExpSMTPConf.ServerAddress)
+	rve.FieldByName("TLSPort").SetInt(int64(db.ExpSMTPConf.TLSPort))
+	rve.FieldByName("SSLPort").SetInt(int64(db.ExpSMTPConf.SSLPort))
+	return nil
+}
+
+func (db *DBMock) UpsertSMTPConfig(conf interface{}) error {
+	return db.ExpUpsSMTPConfErr
 }
 
 func (db *DBMock) GroupByName(string) (*model.Group, error) {
