@@ -25,3 +25,5 @@ _testmain.go
 
 .idea/
 cockroach-data/
+
+mailer_test_config.json
