@@ -128,7 +128,7 @@ func oAuthOptions(conf config.Auth) ([]model.Option, error) {
 	return authOpts, nil
 }
 
-func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
+func smsAPI(conf config.SMS) (model.SMSer, error) {
 	if conf.ActiveAPI == "" {
 		return nil, nil
 	}
@@ -177,7 +177,7 @@ func smsAPI(conf config.SMSConfig) (model.SMSer, error) {
 	return s, nil
 }
 
-func serveRPC(conf config.ServiceConfig, rpcSrv *rpc.Handler, quitCh chan error) {
+func serveRPC(conf config.Service, rpcSrv *rpc.Handler, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(config.CanonicalRPCName),
 		micro.Version(conf.LoadBalanceVersion),
@@ -193,7 +193,7 @@ type RouteHandler interface {
 	HandleRoute(r *mux.Router) error
 }
 
-func serveHttp(conf config.ServiceConfig, h http2.Handler, quitCh chan error) {
+func serveHttp(conf config.Service, h http2.Handler, quitCh chan error) {
 	srvc := web.NewService(
 		web.Handler(h),
 		web.Name(config.CanonicalWebName),

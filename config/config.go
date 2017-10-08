@@ -41,36 +41,34 @@ const (
 	APIKeyLength = 56
 )
 
-type ServiceConfig struct {
+type Service struct {
 	RegisterInterval   time.Duration `json:"registerInterval,omitempty" yaml:"registerInterval"`
 	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
 	MasterAPIKey       string        `json:"masterAPIKey,omitempty" yaml:"masterAPIKey"`
 }
 
-type TwilioConfig struct {
+type Twilio struct {
 	ID           string `json:"ID" yaml:"ID"`
 	SenderPhone  string `json:"senderPhone" yaml:"senderPhone"`
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
 }
 
-type AfricasTalkingConfig struct {
+type AfricasTalking struct {
 	UserName   string `json:"username" yaml:"username"`
 	APIKeyFile string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
-type MessageBirdConfig struct {
+type MessageBird struct {
 	AccountName string `json:"accountName" yaml:"accountName"`
 	APIKeyFile  string `json:"apiKeyFile" yaml:"apiKeyFile"`
 }
 
-type SMSConfig struct {
-	TestNumber      string               `json:"testNumber" yaml:"testNumber"`
-	Twilio          TwilioConfig         `json:"twilio" yaml:"twilio"`
-	AfricasTalking  AfricasTalkingConfig `json:"africasTalking" yaml:"africasTalking"`
-	ActiveAPI       string               `json:"activeAPI" yaml:"activeAPI"`
-	MessageFmt      string               `json:"messageFormat" yaml:"messageFormat"`
-	SMSCodeValidity time.Duration        `json:"smsCodeValidity" yaml:"smsCodeValidity"`
-	MessageBird     MessageBirdConfig    `json:"messageBird" yaml:"messageBird"`
+type SMS struct {
+	TestNumber     string         `json:"testNumber" yaml:"testNumber"`
+	ActiveAPI      string         `json:"activeAPI" yaml:"activeAPI"`
+	Twilio         Twilio         `json:"twilio" yaml:"twilio"`
+	AfricasTalking AfricasTalking `json:"africasTalking" yaml:"africasTalking"`
+	MessageBird    MessageBird    `json:"messageBird" yaml:"messageBird"`
 }
 
 type Facebook struct {
@@ -89,9 +87,9 @@ type JWT struct {
 }
 
 type General struct {
-	Service        ServiceConfig `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Service        Service       `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
 	Database       cockroach.DSN `json:"database,omitempty" yaml:"database"`
 	Authentication Auth          `json:"authentication,omitempty" yaml:"authentication"`
 	Token          JWT           `json:"token,omitempty" yaml:"token"`
-	SMS            SMSConfig     `json:"sms" yaml:"sms"`
+	SMS            SMS           `json:"sms" yaml:"sms"`
 }

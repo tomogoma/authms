@@ -7,19 +7,25 @@
 # - comments should start with a "#" sign.
 
 
+
 # serviceConfig contains runtime micro-service configuration.
 serviceConfig:
+
   # loadBalanceVersion identifies which cluster this instance will belong to
   # when deploying multiple instances of the micro-service.
   # More information here:
   # https://micro.mu/blog/2016/04/18/micro-architecture.html#versioning
   loadBalanceVersion: cluster1
+
   # registerInterval is the interval for sending alive pulses to the
   # service registry.
   registerInterval: 5s
+
   # masterAPIKey is the default API Key to use when none is in the system. This
   # should be deleted once the system is set up
   masterAPIKey:
+
+
 
 # database contains configuration values for accessing CockroachDB as the
 # persistent store for the micro-service.
@@ -33,35 +39,42 @@ database:
   sslKey: /etc/cockroachdb/certs/node.key
   sslRootCert: /etc/cockroachdb/certs/ca.crt
 
+
+
 # authentication contains configuration values for authentication rules.
 authentication:
-  # blackListFailCount is the number of times an authentication request should
-  # fail before the user is blacklisted.
-  blackListFailCount: 3
-  # blacklistWindow is the number of minutes between failed authentication
-  # requests that should be considered not-blacklistable if authentication fails
-  # consecutively after.
-  blacklistWindow: 30m0s
+
+
   # facebook - configuration values for OAuth based authentication using facebook.
   # The values can be found in the app's dashboard in https://developers.facebook.com/apps
   facebook:
+
     # facebookID is the App ID on the facebook app's dashboard.
     # Leaving this blank, removes facebook OAuth support.
     ID:
+
     # facebookSecretFileLoc is the location of the file containing the facebook
     # secret as is on the facebook app's dashboard.
     # The file should contain only the key and no new line characters.
     secretFilePath: /etc/authms/keys/facebooksecret.key
 
+
+
 # token - configuration values for token generation
 token:
+
   # tokenKeyFile is the location of the file containing sha256 key that will
   # be used to encrypt the JWT produced by this micro-service.
   # The file should contain only the key and no new line characters.
   tokenKeyFile: /etc/authms/keys/jwt_sha256.key
 
+
+
 # sms - configuration values for sending SMSes via an API.
+# The templates for different message types can be found in
+# the adjacent templates folder.
 sms:
+
   # activeAPI is the API to use for sending SMSes.
   # Only the activeAPI's configuration values are required, the rest can be ignored.
   # The value can either be empty or one of (twilio, africasTalking, messageBird)
@@ -72,18 +85,14 @@ sms:
   # startup and while running tests.
   testNumber:
 
-  # messageFormat is the content of the verification SMS with a %s denoting
-  # the position which will contain the verification code being sent to the user.
-  messageFormat: Your verification code is %s
-  # smsCodeValidity is how long a verification code should be acceptable before
-  # it expires.
-  smsCodeValidity: 5m
 
   # twilio - configuration values for using twilio as the activeAPI
   # configuration values can be found in https://www.twilio.com/console
   twilio:
+
     # ID is the Account SID on the twilio dashboard
     ID:
+
     # senderPhone is the purchased/trial-period phone number to use for sending SMSes.
     # https://www.twilio.com/console/phone-numbers
     # The phone number must have SMS capability.
@@ -92,21 +101,27 @@ sms:
     # The file should contain only the token and no new line characters.
     tokenKeyFile: /etc/authms/keys/twiliotoken.key
 
+
   # africasTalking - configuration values for using africasTalking as the activeAPI
   africasTalking:
+
     # username is the africastalking.com username for the account to use.
     username:
+
     # apiKeyFile is the location of the Account API key which can be generated
     # at https://account.africastalking.com/auth/api
     # The file must contain only the api key and no new line characters.
     apiKeyFile: /etc/authms/keys/africastalkingapi.key
 
+
   # messageBird - configuration values for using messageBird as the active API.
   messageBird:
+
     # accountName is the sender of the message. This can be a telephone number
     # (including country code) or an alphanumeric string. In case of an
     # alphanumeric string, the maximum length is 11 characters.
     accountName:
+
     # apiKeyFile is the location of the file containing the Message Bird
     # API access key. This can be found/generated here:
     # https://dashboard.messagebird.com/app/settings/developers/access
