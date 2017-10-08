@@ -5,12 +5,10 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
-	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
@@ -44,8 +42,9 @@ type handler struct {
 	errors.NotImplErrCheck
 	errors.AuthErrCheck
 	errors.ClErrCheck
-	auth  Auth
-	guard Guard
+	auth   Auth
+	guard  Guard
+	logger logging.Logger
 }
 
 const (
@@ -67,49 +66,52 @@ const (
 	valDevice = "device"
 )
 
-func NewHandler(a Auth, g Guard) (http.Handler, error) {
+func NewHandler(a Auth, g Guard, l logging.Logger) (http.Handler, error) {
 	if a == nil {
 		return nil, errors.New("Auth was nil")
 	}
 	if g == nil {
 		return nil, errors.New("Guard was nil")
 	}
+	if l == nil {
+		return nil, errors.New("Logger was nil")
+	}
 	r := mux.NewRouter()
-	handler{auth: a, guard: g}.handleRoute(r)
+	handler{auth: a, guard: g, logger: l}.handleRoute(r)
 	return r, nil
 }
 
 func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
-		HandlerFunc(prepLogger(s.guardRoute(s.handleVerifyCode)))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
-		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
 
 	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyAddress + "}").
 		Methods(http.MethodGet).
-		HandlerFunc(prepLogger(s.guardRoute(s.handleSendVerifCode)))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSendVerifCode)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/login").
 		Methods(http.MethodPost).
-		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleLogin))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleLogin))))
 
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
-		HandlerFunc(prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
 }
 
-func prepLogger(next http.HandlerFunc) http.HandlerFunc {
+func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log := logrus.WithField(logging.FieldTransID, uuid.New())
-		log.WithFields(logrus.Fields{
+		log := s.logger.WithField(logging.FieldTransID, uuid.New())
+		log.WithFields(map[string]interface{}{
 			logging.FieldURL:            r.URL,
 			logging.FieldHost:           r.Host,
 			logging.FieldMethod:         r.Method,
 			logging.FieldRequestHandler: "HTTP",
-		}).Info("new request")
+		}).Infof("new request")
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
@@ -119,7 +121,7 @@ func (s *handler) guardRoute(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		APIKey := r.Header.Get(keyAPIKey)
 		clUsrID, err := s.guard.APIKeyValid(APIKey)
-		log := r.Context().Value(ctxKeyLog).(*logrus.Entry).
+		log := r.Context().Value(ctxKeyLog).(logging.Logger).
 			WithField(logging.FieldClientAppUserID, clUsrID)
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
 		if err != nil {
@@ -147,7 +149,7 @@ func (s *handler) readReqBody(next http.HandlerFunc) http.HandlerFunc {
 // unmarshalJSONOrRespondError returns true if json is extracted from
 // data into req successfully, otherwise, it writes an error response into
 // w and returns false.
-// The Context in r should contain a logrus Entry with key ctxKeyLog
+// The Context in r should contain a logging.Logger with key ctxKeyLog
 // for logging in case of error
 func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, data []byte, req interface{}) bool {
 	err := json.Unmarshal(data, req)
@@ -265,7 +267,7 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 
 func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {
 	reqDataB, _ := json.Marshal(reqData)
-	log := r.Context().Value(ctxKeyLog).(*logrus.Entry).
+	log := r.Context().Value(ctxKeyLog).(logging.Logger).
 		WithField(logging.FieldRequest, string(reqDataB))
 	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
 		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
@@ -314,7 +316,7 @@ func (s *handler) respondOn(w http.ResponseWriter, r *http.Request, reqData inte
 	w.WriteHeader(code)
 	i, err := w.Write(respBytes)
 	if err != nil {
-		log := r.Context().Value(ctxKeyLog).(*logrus.Entry)
+		log := r.Context().Value(ctxKeyLog).(logging.Logger)
 		log.Errorf("unable write data to response stream: %v", err)
 		return i
 	}

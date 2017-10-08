@@ -9,6 +9,7 @@ import (
 	"os"
 
 	"github.com/sirupsen/logrus"
+	"github.com/tomogoma/authms/logging"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/errors"
 )
@@ -23,15 +24,41 @@ func TestNewHandler(t *testing.T) {
 		name   string
 		auth   Auth
 		guard  Guard
+		logger logging.Logger
 		expErr bool
 	}{
-		{name: "valid deps", auth: &testingH.AuthenticationMock{}, guard: &testingH.GuardMock{}, expErr: false},
-		{name: "nil auth", auth: nil, guard: &testingH.GuardMock{}, expErr: true},
-		{name: "nil guard", auth: &testingH.AuthenticationMock{}, guard: nil, expErr: true},
+		{
+			name:   "valid deps",
+			auth:   &testingH.AuthenticationMock{},
+			guard:  &testingH.GuardMock{},
+			logger: &testingH.LoggerMock{},
+			expErr: false,
+		},
+		{
+			name:   "nil auth",
+			auth:   nil,
+			guard:  &testingH.GuardMock{},
+			logger: &testingH.LoggerMock{},
+			expErr: true,
+		},
+		{
+			name:   "nil guard",
+			auth:   &testingH.AuthenticationMock{},
+			guard:  nil,
+			logger: &testingH.LoggerMock{},
+			expErr: true,
+		},
+		{
+			name:   "nil logger",
+			auth:   &testingH.AuthenticationMock{},
+			guard:  &testingH.GuardMock{},
+			logger: nil,
+			expErr: true,
+		},
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := NewHandler(tc.auth, tc.guard)
+			h, err := NewHandler(tc.auth, tc.guard, tc.logger)
 			if tc.expErr {
 				if err == nil {
 					t.Fatal("Expected an error but got nil")
@@ -251,7 +278,7 @@ func TestHandler_handleRoute(t *testing.T) {
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 
-			h := newHandler(t, tc.auth, tc.guard)
+			h := newHandler(t, tc.auth, tc.guard, &testingH.LoggerMock{})
 			srvr := httptest.NewServer(h)
 			defer srvr.Close()
 
@@ -281,8 +308,8 @@ func TestHandler_handleRoute(t *testing.T) {
 	}
 }
 
-func newHandler(t *testing.T, a Auth, g Guard) http.Handler {
-	h, err := NewHandler(a, g)
+func newHandler(t *testing.T, a Auth, g Guard, lg logging.Logger) http.Handler {
+	h, err := NewHandler(a, g, lg)
 	if err != nil {
 		t.Fatalf("http.NewHandler(): %v", err)
 	}
