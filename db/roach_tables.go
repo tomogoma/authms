@@ -48,26 +48,26 @@ const (
 	// CREATE TABLE DESCRIPTIONS
 	TblDescConfigurations = `
 	CREATE TABLE IF NOT EXISTS ` + TblConfigurations + ` (
-		` + ColKey + ` CHAR PRIMARY KEY NOT NULL CHECK (` + ColKey + ` != ''),
+		` + ColKey + ` VARCHAR(56) PRIMARY KEY NOT NULL CHECK (` + ColKey + ` != ''),
 		` + ColValue + ` BYTEA NOT NULL CHECK (` + ColValue + ` != ''),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescUserTypes = `
 	CREATE TABLE IF NOT EXISTS ` + TblUserTypes + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColName + ` CHAR UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColName + ` VARCHAR(56) UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescGroups = `
 	CREATE TABLE IF NOT EXISTS ` + TblGroups + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColName + ` CHAR UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
+		` + ColName + ` VARCHAR(56) UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
 		` + ColAccessLevel + ` FLOAT UNIQUE NOT NULL CHECK (` + ColAccessLevel + ` BETWEEN 0 AND 10),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
@@ -76,7 +76,7 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColTypeID + ` INTEGER NOT NULL REFERENCES ` + TblUserTypes + ` (` + ColID + `),
 		` + ColPassword + ` BYTEA NOT NULL CHECK ( LENGTH(` + ColPassword + `) >= 8 ),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
@@ -85,7 +85,7 @@ const (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColGroupID + ` INTEGER NOT NULL REFERENCES ` + TblGroups + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL,
 		UNIQUE (` + ColUserID + `,` + ColGroupID + `)
 	);
@@ -94,36 +94,36 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblAPIKeys + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColKey + ` CHAR NOT NULL CHECK ( LENGTH(` + ColKey + `) >= 56 ),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColKey + ` VARCHAR(256) NOT NULL CHECK ( LENGTH(` + ColKey + `) >= 56 ),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescDeviceIDs = `
 	CREATE TABLE IF NOT EXISTS ` + TblDeviceIDs + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColDevID + ` CHAR UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
+		` + ColDevID + ` VARCHAR(256) UNIQUE NOT NULL CHECK (` + ColDevID + ` != ''),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescUserNames = `
 	CREATE TABLE IF NOT EXISTS ` + TblUserNames + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColUserName + ` STRING UNIQUE NOT NULL,
+		` + ColUserName + ` VARCHAR(56) UNIQUE NOT NULL,
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescEmails = `
 	CREATE TABLE IF NOT EXISTS ` + TblEmails + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColEmail + ` CHAR UNIQUE NOT NULL CHECK (` + ColEmail + ` != ''),
+		` + ColEmail + ` VARCHAR(128) UNIQUE NOT NULL CHECK (` + ColEmail + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
@@ -131,20 +131,20 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblEmailTokens + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColEmail + ` CHAR NOT NULL REFERENCES ` + TblEmails + ` (` + ColEmail + `),
+		` + ColEmail + ` VARCHAR(128) NOT NULL REFERENCES ` + TblEmails + ` (` + ColEmail + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescPhones = `
 	CREATE TABLE IF NOT EXISTS ` + TblPhones + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColPhone + ` CHAR UNIQUE NOT NULL CHECK (` + ColPhone + ` != ''),
+		` + ColPhone + ` VARCHAR(56) UNIQUE NOT NULL CHECK (` + ColPhone + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
@@ -152,20 +152,20 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblPhoneTokens + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColUserID + ` INTEGER NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColPhone + ` CHAR NOT NULL REFERENCES ` + TblPhones + ` (` + ColPhone + `),
+		` + ColPhone + ` VARCHAR(56) NOT NULL REFERENCES ` + TblPhones + ` (` + ColPhone + `),
 		` + ColToken + ` BYTEA NOT NULL CHECK (LENGTH(` + ColToken + `)>0),
 		` + ColIsUsed + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
 	TblDescFacebookIDs = `
 	CREATE TABLE IF NOT EXISTS ` + TblFacebookIDs + ` (
 		` + ColID + ` SERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColFacebookID + ` CHAR UNIQUE NOT NULL CHECK(` + ColFacebookID + ` != ''),
+		` + ColFacebookID + ` VARCHAR(512) UNIQUE NOT NULL CHECK(` + ColFacebookID + ` != ''),
 		` + ColUserID + ` INTEGER UNIQUE NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
 		` + ColVerified + ` BOOL NOT NULL DEFAULT FALSE,
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`
@@ -176,7 +176,7 @@ const (
 		` + ColAPIKeyID + ` INTEGER NOT NULL REFERENCES ` + TblAPIKeys + ` (` + ColID + `),
 		` + ColToken + ` BYTEA NOT NULL,
 		` + ColIsRevoked + ` BOOL NOT NULL,
-		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+		` + ColIssueDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColExpiryDate + ` TIMESTAMPTZ NOT NULL
 	);
 	`

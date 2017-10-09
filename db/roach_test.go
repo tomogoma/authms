@@ -5,41 +5,38 @@ import (
 	"strconv"
 	"testing"
 
+	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
 	testingH "github.com/tomogoma/authms/testing"
-	"github.com/tomogoma/go-commons/database/cockroach"
 	"github.com/tomogoma/go-commons/errors"
 )
 
 var isInit bool
 
-func setup(t *testing.T) cockroach.DSN {
+func setup(t *testing.T) config.Database {
 	conf := testingH.ReadConfig(t)
-	conf.Database.DB = conf.Database.DB + "_test"
+	conf.Database.DBName = conf.Database.DBName + "_test"
 	if !isInit {
 		rdb := getDB(t, conf.Database)
-		err := dropAllTables(rdb, conf.Database.DBName())
+		defer rdb.Close()
+		err := dropAllTables(rdb)
 		if err != nil {
-			_, err := rdb.Exec("DROP DATABASE IF EXISTS " + conf.Database.DBName())
-			if err != nil {
-				t.Fatalf("Error setting up: drop prev db: %v", err)
-			}
+			t.Fatalf("Error setting up: drop prev test tables: %v", err)
 		}
 		isInit = true
 	}
 	return conf.Database
 }
 
-func tearDown(t *testing.T, conf cockroach.DSN) {
-	if err := delAllTables(getDB(t, conf), conf.DBName()); err != nil {
+func tearDown(t *testing.T, conf config.Database) {
+	rdb := getDB(t, conf)
+	defer rdb.Close()
+	if err := delAllTables(rdb); err != nil {
 		t.Fatalf("Error tearing down: delete all tables: %v", err)
 	}
 }
 
-func delAllTables(rdb *sql.DB, dbName string) error {
-	if _, err := rdb.Exec("SET DATABASE=" + dbName); err != nil {
-		return nil
-	}
+func delAllTables(rdb *sql.DB) error {
 	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
 		_, err := rdb.Exec("DELETE FROM " + db.AllTableNames[i])
 		if err != nil {
@@ -49,10 +46,7 @@ func delAllTables(rdb *sql.DB, dbName string) error {
 	return nil
 }
 
-func dropAllTables(rdb *sql.DB, dbName string) error {
-	if _, err := rdb.Exec("SET DATABASE=" + dbName); err != nil {
-		return nil
-	}
+func dropAllTables(rdb *sql.DB) error {
 	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
 		_, err := rdb.Exec("DROP TABLE IF EXISTS " + db.AllTableNames[i])
 		if err != nil {
@@ -73,7 +67,7 @@ func TestNewRoach(t *testing.T) {
 		{
 			name: "valid",
 			opts: []db.Option{
-				db.WithDBName(conf.DBName()),
+				db.WithDBName(conf.DBName),
 				db.WithDSN(conf.FormatDSN()),
 			},
 			expErr: false,
@@ -100,6 +94,7 @@ func TestRoach_InitDBIfNot(t *testing.T) {
 	defer tearDown(t, conf)
 	r := newRoach(t, conf)
 	rdb := getDB(t, conf)
+	defer rdb.Close()
 	if err := r.InitDBIfNot(); err != nil {
 		t.Fatalf("Initial init call failed: %v", err)
 	}
@@ -136,8 +131,12 @@ func TestRoach_InitDBIfNot(t *testing.T) {
 	}
 
 	cols := db.ColDesc(db.ColKey, db.ColValue, db.ColUpdateDate)
-	upsertQ := `UPSERT INTO ` + db.TblConfigurations + ` (` + cols + `)
-					VALUES ('db.version', $1, CURRENT_TIMESTAMP)`
+	updCols := db.ColDesc(db.ColValue, db.ColUpdateDate)
+	upsertQ := `
+		INSERT INTO ` + db.TblConfigurations + ` (` + cols + `)
+			VALUES ('db.version', $1, CURRENT_TIMESTAMP)
+			ON CONFLICT (` + db.ColKey + `)
+			DO UPDATE SET (` + updCols + `) = ($1, CURRENT_TIMESTAMP)`
 	delQ := `DELETE FROM ` + db.TblConfigurations + ` WHERE ` + db.ColKey + `='db.version'`
 
 	for _, tc := range tt {
@@ -179,9 +178,9 @@ func TestRoach_InitDBIfNot(t *testing.T) {
 	}
 }
 
-func newRoach(t *testing.T, conf cockroach.DSN) *db.Roach {
+func newRoach(t *testing.T, conf config.Database) *db.Roach {
 	r := db.NewRoach(
-		db.WithDBName(conf.DBName()),
+		db.WithDBName(conf.DBName),
 		db.WithDSN(conf.FormatDSN()),
 	)
 	if r == nil {
@@ -190,10 +189,10 @@ func newRoach(t *testing.T, conf cockroach.DSN) *db.Roach {
 	return r
 }
 
-func getDB(t *testing.T, conf cockroach.DSN) *sql.DB {
-	DB, err := cockroach.DBConn(conf)
+func getDB(t *testing.T, conf config.Database) *sql.DB {
+	DB, err := sql.Open("postgres", conf.FormatDSN())
 	if err != nil {
-		t.Fatalf("unable to tear down: cockroach.DBConn(): %s", err)
+		t.Fatalf("new db instance: %s", err)
 	}
 	return DB
 }

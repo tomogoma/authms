@@ -27,7 +27,12 @@ func (r *Roach) upsertConf(key string, conf interface{}) error {
 		return errors.Newf("marshal conf: %v", err)
 	}
 	cols := ColDesc(ColKey, ColValue, ColUpdateDate)
-	q := `UPSERT INTO ` + TblConfigurations + ` (` + cols + `) VALUES ($1, $2, CURRENT_TIMESTAMP)`
+	updCols := ColDesc(ColValue, ColUpdateDate)
+	q := `
+		INSERT INTO ` + TblConfigurations + ` (` + cols + `)
+			VALUES ($1, $2, CURRENT_TIMESTAMP)
+			ON CONFLICT (` + ColKey + `)
+			DO UPDATE SET (` + updCols + `) = ($2, CURRENT_TIMESTAMP)`
 	res, err := r.db.Exec(q, key, valB)
 	return checkRowsAffected(res, err, 1)
 }

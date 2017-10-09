@@ -2,10 +2,7 @@ package config
 
 import (
 	"fmt"
-	"net/url"
 	"time"
-
-	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
 type Service struct {
@@ -52,59 +49,42 @@ type Auth struct {
 type JWT struct {
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
 }
-type DSN struct {
-	UName       string `yaml:"userName,omitempty"`
-	Password    string `yaml:"password,omitempty"`
-	Host        string `yaml:"host,omitempty"`
-	DB          string `yaml:"dbName,omitempty"`
-	SslCert     string `yaml:"sslCert,omitempty"`
-	SslKey      string `yaml:"sslKey,omitempty"`
-	SslRootCert string `yaml:"sslRootCert,omitempty"`
+
+type Database struct {
+	User           string `json:"user,omitempty" yaml:"user,omitempty"`
+	Password       string `json:"password,omitempty" yaml:"password,omitempty"`
+	Host           string `json:"host,omitempty" yaml:"host,omitempty"`
+	Port           string `json:"port,omitempty" yaml:"port,omitempty"`
+	DBName         string `json:"dbName,omitempty" yaml:"dbName,omitempty"`
+	ConnectTimeout int    `json:"connectTimeout,omitempty" yaml:"connectTimeout,omitempty"`
+	SSLMode        string `json:"sslMode,omitempty" yaml:"sslMode,omitempty"`
+	SSLCert        string `json:"sslCert,omitempty" yaml:"sslCert,omitempty"`
+	SSLKey         string `json:"sslKey,omitempty" yaml:"sslKey,omitempty"`
+	SSLRootCert    string `json:"sslRootCert,omitempty" yaml:"sslRootCert,omitempty"`
 }
 
-func (d DSN) DBName() string {
-	return d.DB
-}
-
-func (d DSN) Validate() error {
-	return nil
-}
-
-func (d DSN) FormatDSN() string {
-
-	dsnPrefix := "postgres://"
-	var dsnSuffix string
-
-	if d.SslCert != "" {
-		dsnSuffix = fmt.Sprintf("?sslmode=verify-full&sslcert=%s&sslkey=%s&sslrootcert=%s",
-			d.SslCert, d.SslKey, d.SslRootCert)
-	}
-
-	host := d.Host
-	if d.Host == "" {
-		host = "127.0.0.1:26257"
-	}
-
-	if d.UName != "" {
-		if d.Password != "" {
-			password := url.QueryEscape(d.Password)
-			return fmt.Sprintf("%s%s:%s@%s/%s%s",
-				dsnPrefix, d.UName, password, host, d.DB, dsnSuffix,
-			)
-		}
-		return fmt.Sprintf("%s%s@%s/%s%s",
-			dsnPrefix, d.UName, host, d.DB, dsnSuffix,
-		)
-	}
-
-	return fmt.Sprintf("%s%s/%s%s", dsnPrefix, host, d.DB, dsnSuffix)
-
+func (d Database) FormatDSN() string {
+	return fmt.Sprintf("user='%s' password='%s'"+
+		" host='%s' port='%s' dbname='%s'"+
+		" connect_timeout='%d'"+
+		" sslmode='%s' sslcert='%s' sslkey='%s' sslrootcert='%s'",
+		d.User,
+		d.Password,
+		d.Host,
+		d.Port,
+		d.DBName,
+		d.ConnectTimeout,
+		d.SSLMode,
+		d.SSLCert,
+		d.SSLKey,
+		d.SSLRootCert,
+	)
 }
 
 type General struct {
-	Service        Service       `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
-	Database       cockroach.DSN `json:"database,omitempty" yaml:"database"`
-	Authentication Auth          `json:"authentication,omitempty" yaml:"authentication"`
-	Token          JWT           `json:"token,omitempty" yaml:"token"`
-	SMS            SMS           `json:"sms" yaml:"sms"`
+	Service        Service  `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
+	Database       Database `json:"database,omitempty" yaml:"database"`
+	Authentication Auth     `json:"authentication,omitempty" yaml:"authentication"`
+	Token          JWT      `json:"token,omitempty" yaml:"token"`
+	SMS            SMS      `json:"sms" yaml:"sms"`
 }
