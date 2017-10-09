@@ -14,6 +14,14 @@ func init() {
 }
 
 func Log(e logging.Entry) {
+	if e.Level == logging.LevelFatal {
+		out(e)
+		return
+	}
+	go out(e)
+}
+
+func out(e logging.Entry) {
 	fields := "{"
 	for k, v := range e.Fields {
 		vStr, _ := json.Marshal(v)

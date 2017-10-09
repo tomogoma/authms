@@ -73,7 +73,8 @@ func (lg *EntryLogWrapper) WithField(k string, v interface{}) Logger {
 }
 
 func (lg *EntryLogWrapper) Infof(f string, args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelInfo,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -82,7 +83,8 @@ func (lg *EntryLogWrapper) Infof(f string, args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Warnf(f string, args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelWarn,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -91,7 +93,8 @@ func (lg *EntryLogWrapper) Warnf(f string, args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Errorf(f string, args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelError,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -100,6 +103,7 @@ func (lg *EntryLogWrapper) Errorf(f string, args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Fatalf(f string, args ...interface{}) {
+	lg.prepare()
 	entryLoggerFunc(Entry{
 		Level:   LevelFatal,
 		Time:    time.Now(),
@@ -110,7 +114,8 @@ func (lg *EntryLogWrapper) Fatalf(f string, args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Info(args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelInfo,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -119,7 +124,8 @@ func (lg *EntryLogWrapper) Info(args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Warn(args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelWarn,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -128,7 +134,8 @@ func (lg *EntryLogWrapper) Warn(args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Error(args ...interface{}) {
-	go entryLoggerFunc(Entry{
+	lg.prepare()
+	entryLoggerFunc(Entry{
 		Level:   LevelError,
 		Time:    time.Now(),
 		Fields:  lg.Fields,
@@ -137,6 +144,7 @@ func (lg *EntryLogWrapper) Error(args ...interface{}) {
 }
 
 func (lg *EntryLogWrapper) Fatal(args ...interface{}) {
+	lg.prepare()
 	entryLoggerFunc(Entry{
 		Level:   LevelFatal,
 		Time:    time.Now(),

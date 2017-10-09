@@ -111,6 +111,7 @@ func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
 			logging.FieldHost:           r.Host,
 			logging.FieldMethod:         r.Method,
 			logging.FieldRequestHandler: "HTTP",
+			logging.FieldHttpReqObj:     r,
 		}).Infof("new request")
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
 		next.ServeHTTP(w, r.WithContext(ctx))

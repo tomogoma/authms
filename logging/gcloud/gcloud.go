@@ -1,26 +1,26 @@
 package gcloud
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"time"
 
 	gcLogging "cloud.google.com/go/logging"
 	"github.com/tomogoma/authms/logging"
+	"google.golang.org/appengine"
 )
 
 type Logger struct {
 	projectID  string
 	loggerName string
-	errors     []error
+	pending    []logging.Entry
 }
-
-const LabelLogError = "logError"
 
 var logger *Logger
 
 func init() {
-	logger = &Logger{errors: make([]error, 0)}
+	logger = &Logger{pending: make([]logging.Entry, 0)}
 	logging.SetEntryLoggerFunc(logger.Log)
 }
 
@@ -31,45 +31,57 @@ func SetProject(projectID, loggerName string) *Logger {
 }
 
 func (lg *Logger) Log(e logging.Entry) {
-	cl, err := gcLogging.NewClient(context.Background(), lg.projectID)
+	reqObjI, exists := e.Fields[logging.FieldHttpReqObj]
+	if !exists {
+		lg.pending = append(lg.pending, e)
+		return
+	}
+	cl, err := gcLogging.NewClient(appengine.NewContext(reqObjI.(*http.Request)), lg.projectID)
 	if err != nil {
-		err = fmt.Errorf("instantiate gcloud logger: %v", err)
-		lg.errors = append(lg.errors, err)
+		fmt.Printf("instantiate gcloud logging client: %v\n", err)
 		return
 	}
 	defer func() {
 		if err := cl.Close(); err != nil {
-			err = fmt.Errorf("closing log client and flushing buffer: %v", err)
-			lg.errors = append(lg.errors, err)
+			lg.pending = append(lg.pending, logging.Entry{
+				Time:    time.Now(),
+				Level:   logging.LevelError,
+				Payload: err.Error(),
+				Fields: map[string]interface{}{
+					logging.FieldAction: "close gcloud logger & flush buffer",
+				},
+			})
 		}
-		lg.errors = make([]error, 0)
+		lg.pending = make([]logging.Entry, 0)
 	}()
 
-	log := cl.Logger(lg.loggerName)
-	lg.dumpErrors(log)
+	logger := cl.Logger(lg.loggerName)
+	lg.dumpPending(logger)
 
-	labels := make(map[string]string)
-	for k, v := range e.Fields {
-		label, err := json.Marshal(v)
-		if err != nil {
-			err = fmt.Errorf("marshal log fields: %v", err)
-			lg.errors = append(lg.errors, err)
-			return
-		}
-		labels[k] = string(label)
-	}
-
-	log.Log(gcLogging.Entry{
+	logger.Log(gcLogging.Entry{
 		Payload: e.Payload,
-		Labels:  labels,
+		Labels:  lg.fieldsToLabels(e.Fields),
 	})
 }
 
-func (lg *Logger) dumpErrors(log *gcLogging.Logger) {
-	for _, err := range lg.errors {
+func (lg *Logger) dumpPending(log *gcLogging.Logger) {
+	for _, p := range lg.pending {
 		log.Log(gcLogging.Entry{
-			Payload: err.Error(),
-			Labels:  map[string]string{LabelLogError: ""},
+			Payload: p.Payload,
+			Labels:  lg.fieldsToLabels(p.Fields),
 		})
 	}
+}
+
+func (lg *Logger) fieldsToLabels(fs map[string]interface{}) map[string]string {
+	labels := make(map[string]string)
+	for k, v := range fs {
+		label, err := json.Marshal(v)
+		if err != nil {
+			labels[k] = fmt.Sprintf("%s", v)
+		} else {
+			labels[k] = string(label)
+		}
+	}
+	return labels
 }

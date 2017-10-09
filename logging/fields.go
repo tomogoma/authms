@@ -10,4 +10,5 @@ const (
 	FieldService         = "service"
 	FieldRequestHandler  = "requestType"
 	FieldClientAppUserID = "ClientAppUserID"
+	FieldHttpReqObj      = "httpReqObj"
 )
