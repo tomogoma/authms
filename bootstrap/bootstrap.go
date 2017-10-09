@@ -1,9 +1,8 @@
 package bootstrap
 
 import (
-	"io/ioutil"
-
 	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/tomogoma/authms/api"
@@ -19,10 +18,9 @@ import (
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
-	"github.com/tomogoma/go-commons/errors"
 )
 
-func InstantiateRoach(conf cockroach.DSN) *db.Roach {
+func InstantiateRoach(lg logging.Logger, conf cockroach.DSN) *db.Roach {
 	var opts []db.Option
 	if dsn := conf.FormatDSN(); dsn != "" {
 		opts = append(opts, db.WithDSN(dsn))
@@ -32,15 +30,15 @@ func InstantiateRoach(conf cockroach.DSN) *db.Roach {
 	}
 	rdb := db.NewRoach(opts...)
 	err := rdb.InitDBIfNot()
-	logging.LogWarnOnError(err, "Initiate Cockroach DB connection")
+	logging.LogWarnOnError(lg, err, "Initiate Cockroach DB connection")
 	return rdb
 }
 
-func InstantiateJWTHandler(tknKyF string) *token.JWTHandler {
+func InstantiateJWTHandler(lg logging.Logger, tknKyF string) *token.JWTHandler {
 	JWTKey, err := ioutil.ReadFile(tknKyF)
-	logging.LogFatalOnError(err, "Read JWT key file")
+	logging.LogFatalOnError(lg, err, "Read JWT key file")
 	jwter, err := token.NewJWTHandler(JWTKey)
-	logging.LogFatalOnError(err, "Instantiate JWT handler")
+	logging.LogFatalOnError(lg, err, "Instantiate JWT handler")
 	return jwter
 }
 
@@ -50,7 +48,7 @@ func InstantiateFacebook(conf config.Facebook) (*facebook.FacebookOAuth, error) 
 	}
 	fbSecret, err := readFile(conf.SecretFilePath)
 	if err != nil {
-		return nil, errors.Newf("read facebook secret from file: %v", err)
+		return nil, fmt.Errorf("read facebook secret from file: %v", err)
 	}
 	fb, err := facebook.New(conf.ID, fbSecret)
 	if err != nil {
@@ -108,38 +106,37 @@ func InstantiateSMSer(conf config.SMS) (model.SMSer, error) {
 	return s, nil
 }
 
-func Instantiate(confFile string) (config.General, *model.Authentication, *api.Guard, *db.Roach, *token.JWTHandler, model.SMSer, *smtp.Mailer) {
+func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
 
 	conf := config.General{}
 	err := configH.ReadYamlConfig(confFile, &conf)
-	logging.LogFatalOnError(err, "Read config file")
+	logging.LogFatalOnError(lg, err, "Read config file")
 
-	rdb := InstantiateRoach(conf.Database)
-	tg := InstantiateJWTHandler(conf.Token.TokenKeyFile)
+	rdb := InstantiateRoach(lg, conf.Database)
+	tg := InstantiateJWTHandler(lg, conf.Token.TokenKeyFile)
 
 	var authOpts []model.Option
-
 	fb, err := InstantiateFacebook(conf.Authentication.Facebook)
-	logging.LogWarnOnError(err, "Set up OAuth options")
+	logging.LogWarnOnError(lg, err, "Set up OAuth options")
 	if fb != nil {
 		authOpts = append(authOpts, model.WithFacebookCl(fb))
 	}
 
 	sms, err := InstantiateSMSer(conf.SMS)
-	logging.LogWarnOnError(err, "Instantiate SMS API")
+	logging.LogWarnOnError(lg, err, "Instantiate SMS API")
 	if sms != nil {
 		authOpts = append(authOpts, model.WithSMSCl(sms))
 	}
 
 	emailCl, err := smtp.New(rdb)
-	logging.LogFatalOnError(err, "Instantiate email API")
+	logging.LogFatalOnError(lg, err, "Instantiate email API")
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
 	a, err := model.NewAuthentication(rdb, tg, authOpts...)
-	logging.LogFatalOnError(err, "Instantiate Auth Model")
+	logging.LogFatalOnError(lg, err, "Instantiate Auth Model")
 
 	g, err := api.NewGuard(rdb, api.WithMasterKey(conf.Service.MasterAPIKey))
-	logging.LogFatalOnError(err, "Instantate API access guard")
+	logging.LogFatalOnError(lg, err, "Instantate API access guard")
 
 	return conf, a, g, rdb, tg, sms, emailCl
 }

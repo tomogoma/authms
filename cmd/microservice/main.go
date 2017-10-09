@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-
 	http2 "net/http"
 
 	"github.com/limetext/log4go"
@@ -13,6 +12,7 @@ import (
 	"github.com/tomogoma/authms/handler/http"
 	"github.com/tomogoma/authms/handler/rpc"
 	"github.com/tomogoma/authms/logging"
+	"github.com/tomogoma/authms/logging/logrus"
 	"github.com/tomogoma/authms/proto/authms"
 )
 
@@ -29,23 +29,24 @@ func main() {
 
 	confFile := flag.String("conf", config.DefaultConfPath(), "location of config file")
 	flag.Parse()
-	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confFile)
+	log := &logrus.Wrapper{}
+	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confFile, log)
 
 	serverRPCQuitCh := make(chan error)
 	rpcSrv, err := rpc.NewHandler(config.CanonicalName, authentication)
-	logging.LogFatalOnError(err, "Instantate RPC handler")
+	logging.LogFatalOnError(log, err, "Instantate RPC handler")
 	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
 	serverHttpQuitCh := make(chan error)
-	httpHandler, err := http.NewHandler(authentication, APIGuard)
-	logging.LogFatalOnError(err, "Instantiate HTTP handler")
+	httpHandler, err := http.NewHandler(authentication, APIGuard, log)
+	logging.LogFatalOnError(log, err, "Instantiate HTTP handler")
 	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
 
 	select {
 	case err = <-serverHttpQuitCh:
-		logging.LogFatalOnError(err, "Serve HTTP")
+		logging.LogFatalOnError(log, err, "Serve HTTP")
 	case err = <-serverRPCQuitCh:
-		logging.LogFatalOnError(err, "Serve RPC")
+		logging.LogFatalOnError(log, err, "Serve RPC")
 	}
 }
 

@@ -152,7 +152,7 @@ func cleanGCloudConfFile() error {
 	if err != nil {
 		return errors.Newf("read file for transform: %v", err)
 	}
-	confContentClean := bytes.Replace(confContent, []byte("/etc/authms/"), []byte(""), -1)
+	confContentClean := bytes.Replace(confContent, []byte("/etc/authms/"), []byte("conf/"), -1)
 	err = ioutil.WriteFile(newPath, confContentClean, 0644)
 	if err != nil {
 		return errors.Newf("write transformed file: %v", err)
