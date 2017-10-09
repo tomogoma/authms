@@ -17,15 +17,14 @@ import (
 	"github.com/tomogoma/authms/smtp"
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
-	"github.com/tomogoma/go-commons/database/cockroach"
 )
 
-func InstantiateRoach(lg logging.Logger, conf cockroach.DSN) *db.Roach {
+func InstantiateRoach(lg logging.Logger, conf config.Database) *db.Roach {
 	var opts []db.Option
 	if dsn := conf.FormatDSN(); dsn != "" {
 		opts = append(opts, db.WithDSN(dsn))
 	}
-	if dbn := conf.DBName(); dbn != "" {
+	if dbn := conf.DBName; dbn != "" {
 		opts = append(opts, db.WithDBName(dbn))
 	}
 	rdb := db.NewRoach(opts...)
