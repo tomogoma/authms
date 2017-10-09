@@ -28,5 +28,5 @@ func out(e logging.Entry) {
 		fields = fmt.Sprintf("%s\"%s\": \"%s\", ", fields, k, vStr)
 	}
 	fields = strings.TrimSuffix(fields, ", ") + "}"
-	log.Printf("%s - %s: %s %s", e.Level, e.Time, e.Payload, fields)
+	log.Printf("%s - %s: %s %s\n", e.Level, e.Time, e.Payload, fields)
 }
