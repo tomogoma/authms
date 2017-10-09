@@ -4,7 +4,6 @@ import (
 	"flag"
 	http2 "net/http"
 
-	"github.com/limetext/log4go"
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
 	"github.com/tomogoma/authms/bootstrap"
@@ -13,17 +12,9 @@ import (
 	"github.com/tomogoma/authms/handler/rpc"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/logging/logrus"
+	_ "github.com/tomogoma/authms/logging/standard"
 	"github.com/tomogoma/authms/proto/authms"
 )
-
-type defLogWriter struct {
-	lg log4go.Logger
-}
-
-func (dlw defLogWriter) Write(p []byte) (int, error) {
-	dlw.lg.Info("%s", p)
-	return len(p), nil
-}
 
 func main() {
 
