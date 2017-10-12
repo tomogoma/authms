@@ -3,12 +3,14 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
+	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/go-commons/errors"
@@ -76,8 +78,10 @@ func NewHandler(a Auth, g Guard, l logging.Logger) (http.Handler, error) {
 	if l == nil {
 		return nil, errors.New("Logger was nil")
 	}
-	r := mux.NewRouter()
+
+	r := mux.NewRouter().PathPrefix(config.WebRootURL).Subrouter()
 	handler{auth: a, guard: g, logger: l}.handleRoute(r)
+
 	return r, nil
 }
 
@@ -101,6 +105,7 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
+	r.NotFoundHandler = http.HandlerFunc(s.prepLogger(s.notFoundHandler))
 }
 
 func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
@@ -322,4 +327,8 @@ func (s *handler) respondOn(w http.ResponseWriter, r *http.Request, reqData inte
 		return i
 	}
 	return i
+}
+
+func (s handler) notFoundHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprint(w, "Nothing to see here")
 }

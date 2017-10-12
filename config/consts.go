@@ -14,8 +14,9 @@ const (
 	CanonicalName       = Name + Version
 	RPCNamePrefix       = ""
 	CanonicalRPCName    = RPCNamePrefix + CanonicalName
-	WebNamePrefix       = "go.micro.web."
-	CanonicalWebName    = WebNamePrefix + CanonicalName
+	WebNamePrefix       = "go.micro.api." + Version + "."
+	WebRootURL          = "/" + Version + "/" + Name
+	CanonicalWebName    = WebNamePrefix + Name
 	DefaultSysDUnitName = CanonicalName + ".service"
 
 	SMSAPITwilio         = "twilio"
