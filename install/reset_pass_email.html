@@ -1,0 +1,30 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+        "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<body>
+<p>
+    Hello,
+</p>
+<div>
+    You have recently requested for a password reset{{if .AppName}} on your {{.AppName}}
+    account{{end}}.<br/>
+{{if .URLToken -}}
+    Click <a href="{{.URLToken}}">this link</a> to reset password.
+    If the link does not work, copy the URL below and paste it into your
+    browser's window:
+    <p>
+        {{.URLToken}}
+    </p>
+    Or alternatively<br/>
+{{- end}}
+    Use the code {{.Code}} when requested for one.
+</div>
+<p>
+    You may ignore this email if you did not make the request.
+</p>
+<p>
+    Your's truly,<br/>
+    the {{.AppName}} admin
+</p>
+</body>
+</html>

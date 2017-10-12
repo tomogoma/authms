@@ -13,3 +13,6 @@ fi
 if [ -f "$CONF_FILE" ]; then
     echo "config file at '${CONF_FILE}' left intact intentionally"
 fi
+if [ -d "$TPL_DIR" ]; then
+    echo "template directory at '${TPL_DIR}' left intact intentionally"
+fi
