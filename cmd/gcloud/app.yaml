@@ -1,6 +1,11 @@
 runtime: go
 api_version: go1.8
+env: flex
 
 handlers:
 - url: /.*
   script: _go_app
+
+beta_settings:
+  cloud_sql_instances: definition-ecosystem:europe-west3:authms-chumz
+

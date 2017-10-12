@@ -1,4 +1,4 @@
-package gcloud
+package main
 
 import (
 	"net/http"
@@ -7,18 +7,19 @@ import (
 	"github.com/tomogoma/authms/config"
 	httpInternal "github.com/tomogoma/authms/handler/http"
 	"github.com/tomogoma/authms/logging"
-	"github.com/tomogoma/authms/logging/gcloud"
-	_ "github.com/tomogoma/authms/logging/standard"
+	"github.com/tomogoma/authms/logging/logrus"
+	"google.golang.org/appengine"
 )
 
-func init() {
+func main() {
 
 	config.DefaultConfDir("conf")
-	log := &gcloud.Logger{}
+	log := &logrus.Wrapper{}
 	_, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(config.DefaultConfPath(), log)
 
 	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, log)
-	logging.LogFatalOnError(log, err, "Instantiating http Handler")
+	logging.LogFatalOnError(log, err, "Instantiate http Handler")
 
 	http.Handle("/", httpHandler)
+	appengine.Main()
 }
