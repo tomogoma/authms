@@ -9,3 +9,7 @@ type Username struct {
 	CreateDate time.Time
 	UpdateDate time.Time
 }
+
+func (un Username) HasValue() bool {
+	return un.ID != ""
+}

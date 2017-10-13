@@ -9,3 +9,7 @@ type Group struct {
 	CreateDate  time.Time
 	UpdateDate  time.Time
 }
+
+func (g Group) HasValue() bool {
+	return g.ID != ""
+}

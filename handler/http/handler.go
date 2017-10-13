@@ -179,26 +179,29 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		Identifier string `json:"identifier"`
 		Secret     string `json:"secret"`
 		GroupID    string `json:"groupID"`
+		DevID      string `json:"deviceID"`
 		LT         string `json:"loginType"`
+		SelfReg    string `json:"selfReg"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
 		return
 	}
 	vars := mux.Vars(r)
 	req.LT = vars[keyLoginType]
+	req.SelfReg = r.URL.Query().Get(keySelfReg)
 	var usr *model.User
 	var err error
-	switch strings.ToLower(r.URL.Query().Get(keySelfReg)) {
+	switch strings.ToLower(req.SelfReg) {
 	case valTrue:
 		usr, err = s.auth.RegisterSelf(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
 	case valDevice:
-		usr, err = s.auth.RegisterSelfByLockedPhone(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
+		usr, err = s.auth.RegisterSelfByLockedPhone(req.UserType, req.DevID, req.Identifier, []byte(req.Secret))
 	default:
 		JWT := r.URL.Query().Get(keyToken)
-		usr, err = s.auth.RegisterOther(req.LT, JWT, req.UserType, req.Identifier, req.GroupID)
+		usr, err = s.auth.RegisterOther(JWT, req.LT, req.UserType, req.Identifier, req.GroupID)
 	}
 	req.Secret = "" // prevent logging passwords.
-	s.respondOn(w, r, req, usr, http.StatusCreated, err)
+	s.respondOn(w, r, req, NewUser(usr), http.StatusCreated, err)
 }
 
 func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -216,8 +219,8 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.handleError(w, r, req, err)
 		return
 	}
-	authUsr, err := s.auth.Login(req.LT, req.Identifier, []byte(secret))
-	s.respondOn(w, r, req, authUsr, http.StatusOK, err)
+	usr, err := s.auth.Login(req.LT, req.Identifier, []byte(secret))
+	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -234,7 +237,7 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req.LT = vars[keyLoginType]
 	req.JWT = r.URL.Query().Get(keyToken)
 	usr, err := s.auth.UpdateIdentifier(req.JWT, req.LT, req.Identifier)
-	s.respondOn(w, r, req, usr, http.StatusOK, err)
+	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
@@ -248,8 +251,8 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 		ToAddr: vars[keyAddress],
 		JWT:    r.URL.Query().Get(keyToken),
 	}
-	resp, err := s.auth.SendVerCode(req.JWT, req.LT, req.ToAddr)
-	s.respondOn(w, r, req, resp, http.StatusOK, err)
+	dbtStatus, err := s.auth.SendVerCode(req.JWT, req.LT, req.ToAddr)
+	s.respondOn(w, r, req, NewDBTStatus(dbtStatus), http.StatusOK, err)
 }
 
 func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
@@ -269,9 +272,15 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	var resp interface{}
 	var err error
 	if strings.EqualFold(req.Extend, valTrue) {
-		resp, err = s.auth.VerifyAndExtendDBT(req.LT, req.UserID, []byte(req.DBT))
+		var dbt string
+		dbt, err = s.auth.VerifyAndExtendDBT(req.LT, req.UserID, []byte(req.DBT))
+		resp = struct {
+			DBT string `json:"dbt"`
+		}{DBT: dbt}
 	} else {
-		resp, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
+		var vl *model.VerifLogin
+		vl, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
+		resp = NewVerifLogin(vl)
 	}
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
@@ -289,8 +298,8 @@ func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {
 	}
 	vars := mux.Vars(r)
 	req.UserID = vars[keyUserID]
-	resp, err := s.auth.SetPassword(req.LT, req.UserID, []byte(req.DBT), []byte(req.Secret))
-	s.respondOn(w, r, req, resp, http.StatusOK, err)
+	vl, err := s.auth.SetPassword(req.LT, req.UserID, []byte(req.DBT), []byte(req.Secret))
+	s.respondOn(w, r, req, NewVerifLogin(vl), http.StatusOK, err)
 }
 
 func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData interface{}, err error) {

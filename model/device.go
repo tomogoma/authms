@@ -9,3 +9,7 @@ type Device struct {
 	CreateDate time.Time
 	UpdateDate time.Time
 }
+
+func (d Device) HasValue() bool {
+	return d.ID != ""
+}

@@ -10,3 +10,7 @@ type VerifLogin struct {
 	CreateDate time.Time
 	UpdateDate time.Time
 }
+
+func (vl VerifLogin) HasValue() bool {
+	return vl.ID != ""
+}

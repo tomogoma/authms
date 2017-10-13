@@ -11,3 +11,7 @@ type Facebook struct {
 	CreateDate    time.Time
 	UpdateDate    time.Time
 }
+
+func (fb Facebook) HasValue() bool {
+	return fb.ID != ""
+}

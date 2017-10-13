@@ -8,3 +8,7 @@ type UserType struct {
 	CreateDate time.Time
 	UpdateDate time.Time
 }
+
+func (ut UserType) HasValue() bool {
+	return ut.ID != ""
+}
