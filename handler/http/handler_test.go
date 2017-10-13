@@ -6,19 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"os"
-
-	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/logging"
 	testingH "github.com/tomogoma/authms/testing"
 	"github.com/tomogoma/go-commons/errors"
 )
-
-func init() {
-	// TODO test log outputs maybe?
-	logrus.SetOutput(os.Stdout)
-}
 
 func TestNewHandler(t *testing.T) {
 	tt := []struct {
@@ -275,11 +267,39 @@ func TestHandler_handleRoute(t *testing.T) {
 			reqMethod:     http.MethodGet,
 			expStatusCode: http.StatusInternalServerError,
 		},
+		{
+			name:          "reset password",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/users/_userID_/reset_password",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
+			expStatusCode: http.StatusOK,
+		},
+		{
+			name:          "reset password guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/users/_userID_/reset_password",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "reset password auth error",
+			auth:          &testingH.AuthenticationMock{ExpSetPassErr: errors.Newf("auth set pass error")},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/users/_userID_/reset_password",
+			reqMethod:     http.MethodPost,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
 
-			h := newHandler(t, tc.auth, tc.guard, &testingH.LoggerMock{})
+			lg := &testingH.LoggerMock{}
+			h := newHandler(t, tc.auth, tc.guard, lg)
 			srvr := httptest.NewServer(h)
 			defer srvr.Close()
 
@@ -298,10 +318,12 @@ func TestHandler_handleRoute(t *testing.T) {
 			cl := &http.Client{}
 			resp, err := cl.Do(req)
 			if err != nil {
+				lg.PrintLogs(t)
 				t.Fatalf("Do request error: %v", err)
 			}
 
 			if resp.StatusCode != tc.expStatusCode {
+				lg.PrintLogs(t)
 				t.Errorf("Expected status code %d, got %s",
 					tc.expStatusCode, resp.Status)
 			}

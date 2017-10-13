@@ -90,6 +90,10 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
 
+	r.PathPrefix("/users/{" + keyUserID + "}/reset_password").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleResetPass))))
+
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
@@ -105,6 +109,7 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
+
 	r.NotFoundHandler = http.HandlerFunc(s.prepLogger(s.notFoundHandler))
 }
 
@@ -268,6 +273,23 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	} else {
 		resp, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
 	}
+	s.respondOn(w, r, req, resp, http.StatusOK, err)
+}
+
+func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := struct {
+		UserID string `json:"userID"`
+		LT     string `json:"loginType"`
+		DBT    string `json:"dbt"`
+		Secret string `json:"secret"`
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {
+		return
+	}
+	vars := mux.Vars(r)
+	req.UserID = vars[keyUserID]
+	resp, err := s.auth.SetPassword(req.LT, req.UserID, []byte(req.DBT), []byte(req.Secret))
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 

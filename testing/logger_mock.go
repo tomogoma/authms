@@ -1,6 +1,11 @@
 package testing
 
-import "github.com/tomogoma/authms/logging"
+import (
+	"fmt"
+	"testing"
+
+	"github.com/tomogoma/authms/logging"
+)
 
 type Entry struct {
 	Level string
@@ -9,8 +14,9 @@ type Entry struct {
 }
 
 type LoggerMock struct {
-	Fields map[string]interface{}
-	Logs   []Entry
+	Fields   map[string]interface{}
+	Logs     []Entry
+	Spinoffs []*LoggerMock
 }
 
 const (
@@ -26,6 +32,7 @@ func (lg *LoggerMock) WithFields(f map[string]interface{}) logging.Logger {
 	for k, v := range f {
 		newLG.Fields[k] = v
 	}
+	lg.Spinoffs = append(lg.Spinoffs, newLG)
 	return newLG
 }
 
@@ -33,6 +40,7 @@ func (lg *LoggerMock) WithField(k string, v interface{}) logging.Logger {
 	lg.prep()
 	newLG := &LoggerMock{Fields: lg.Fields}
 	newLG.Fields[k] = v
+	lg.Spinoffs = append(lg.Spinoffs, newLG)
 	return newLG
 }
 
@@ -77,5 +85,23 @@ func (lg *LoggerMock) prep() {
 	}
 	if lg.Fields == nil {
 		lg.Fields = make(map[string]interface{})
+	}
+	if lg.Spinoffs == nil {
+		lg.Spinoffs = make([]*LoggerMock, 0)
+	}
+}
+
+func (lg *LoggerMock) PrintLogs(t *testing.T) {
+	for _, so := range lg.Spinoffs {
+		so.PrintLogs(t)
+	}
+	for _, e := range lg.Logs {
+		var payload string
+		if e.Fmt != nil {
+			payload = fmt.Sprintf(*e.Fmt, e.Args...)
+		} else {
+			payload = fmt.Sprint(e.Args...)
+		}
+		t.Logf("%s: %s\n", e.Level, payload)
 	}
 }
