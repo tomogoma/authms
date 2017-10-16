@@ -79,8 +79,9 @@ func TestHandler_handleRoute(t *testing.T) {
 		auth          Auth
 		guard         Guard
 	}{
-		// valuse starting and ending with "_" are place holders for variables
+		// values starting and ending with "_" are place holders for variables
 		// e.g. _loginType_ is a place holder for "any (valid) login type"
+
 		{
 			name:          "status",
 			auth:          &testingH.AuthenticationMock{},
@@ -88,6 +89,49 @@ func TestHandler_handleRoute(t *testing.T) {
 			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/status",
 			reqMethod:     http.MethodGet,
 			expStatusCode: http.StatusOK,
+		},
+		{
+			name:          "status guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/status",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "status internal error",
+			auth:          &testingH.AuthenticationMock{ExpCanRegFirstErr: errors.New("auth can reg first error")},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/status",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "register first",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/first_user",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusCreated,
+		},
+		{
+			name:          "register guard error",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidErr: errors.Newf("guard error")},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/first_user",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{}",
+			expStatusCode: http.StatusInternalServerError,
+		},
+		{
+			name:          "register bad body",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{ExpAPIKValidUsrID: "12345"},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/first_user",
+			reqMethod:     http.MethodPut,
+			reqBody:       "{bad json]",
+			expStatusCode: http.StatusBadRequest,
 		},
 		{
 			name:          "register",

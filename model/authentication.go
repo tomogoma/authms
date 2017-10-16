@@ -28,6 +28,7 @@ type AuthStore interface {
 	InsertUserType(name string) (*UserType, error)
 	UserTypeByName(string) (*UserType, error)
 
+	HasUsers(groupID string) error
 	InsertUserAtomic(tx *sql.Tx, t UserType, password []byte) (*User, error)
 	UpdatePassword(userID string, password []byte) error
 	UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error
@@ -209,6 +210,69 @@ func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, 
 		resPassSubjEmptyable: c.resPassSubjEmptyable,
 		loginTpActionTplts:   c.loginTpActionTplts,
 	}, nil
+}
+
+func (a *Authentication) CanRegisterFirst() (bool, error) {
+
+	superGrp, err := a.getOrCreateGroup(GroupSuper, AccessLevelSuper)
+	if err != nil {
+		return false, err
+	}
+
+	err = a.db.HasUsers(superGrp.ID)
+	if err == nil {
+		return false, nil
+	}
+	if a.db.IsNotFoundError(err) {
+		return true, nil
+	}
+
+	return false, errors.Newf("check db has users: %v", err)
+}
+
+func (a *Authentication) RegisterFirst(loginType, userType, id string, secret []byte) (*User, error) {
+
+	ok, err := a.CanRegisterFirst()
+	if err != nil {
+		return nil, errors.Newf("check ok to register first user: %v", err)
+	}
+	if !ok {
+		return nil, errors.NewForbidden("Nothing to see here")
+	}
+
+	var regF regFunc
+	var regCondF regConditions
+	switch loginType {
+	case LoginTypeUsername:
+		regCondF = a.regUsernameConditions
+		regF = a.regUsername
+	case LoginTypeEmail:
+		regCondF = a.regEmailConditions
+		regF = a.regEmail
+	case LoginTypePhone:
+		regCondF = a.regPhoneConditions
+		regF = a.regPhone
+	case LoginTypeFacebook:
+		if a.fbNilable == nil {
+			return nil, errorFbNotAvail
+		}
+		var err error
+		secret, err = a.passGen.SecureRandomBytes(genPassLen)
+		if err != nil {
+			return nil, errors.Newf("generate password: %v", err)
+		}
+		regCondF = a.regFacebookConditions
+		regF = a.regFacebook
+	default:
+		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
+	}
+
+	superGrp, err := a.getOrCreateGroup(GroupSuper, AccessLevelSuper)
+	if err != nil {
+		return nil, err
+	}
+
+	return a.registerOther(userType, id, superGrp.ID, regCondF, regF)
 }
 
 // RegisterSelf registers a new user account using id secret combination.

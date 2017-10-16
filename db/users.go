@@ -9,6 +9,25 @@ import (
 	errors "github.com/tomogoma/go-typed-errors"
 )
 
+func (r *Roach) HasUsers(groupID string) error {
+	if err := r.InitDBIfNot(); err != nil {
+		return err
+	}
+	q := `
+		SELECT COUNT(` + ColUserID + `)
+			FROM ` + TblUserGroupsJoin + `
+			WHERE ` + ColGroupID + `=$1`
+	var numUsers int
+	err := r.db.QueryRow(q, groupID).Scan(&numUsers)
+	if err != nil {
+		return err
+	}
+	if numUsers == 0 {
+		return errors.NewNotFound("No users found")
+	}
+	return nil
+}
+
 // InsertUserType inserts into the database returning calculated values.
 func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
 	if err := r.InitDBIfNot(); err != nil {

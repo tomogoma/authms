@@ -10,6 +10,9 @@ type AuthenticationMock struct {
 	errors.AuthErrCheck
 	errors.ClErrCheck
 
+	ExpRegFirstUser *model.User
+	ExpRegFirstErr  error
+
 	ExpRegSelfUser *model.User
 	ExpRegSelfErr  error
 
@@ -41,6 +44,17 @@ type AuthenticationMock struct {
 	ExpVerExtDBTErr error
 
 	ExpUpdPassErr error
+
+	ExpCanRegFirst    bool
+	ExpCanRegFirstErr error
+}
+
+func (a *AuthenticationMock) CanRegisterFirst() (bool, error) {
+	return a.ExpCanRegFirst, a.ExpCanRegFirstErr
+}
+
+func (a *AuthenticationMock) RegisterFirst(loginType, userType, id string, secret []byte) (*model.User, error) {
+	return a.ExpRegFirstUser, a.ExpRegFirstErr
 }
 
 func (a *AuthenticationMock) RegisterSelf(loginType, userType, id string, secret []byte) (*model.User, error) {

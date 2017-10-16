@@ -23,6 +23,8 @@ type Auth interface {
 	IsClientError(error) bool
 	IsForbiddenError(error) bool
 	IsAuthError(error) bool
+	RegisterFirst(loginType, userType, id string, secret []byte) (*model.User, error)
+	CanRegisterFirst() (bool, error)
 	RegisterSelf(loginType, userType, id string, secret []byte) (*model.User, error)
 	RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*model.User, error)
 	RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error)
@@ -90,6 +92,10 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/status").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleStatus)))
+
+	r.PathPrefix("/first_user").
+		Methods(http.MethodPut).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegisterFirst))))
 
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
@@ -178,17 +184,36 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 }
 
 func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
+	canRegFrst, err := s.auth.CanRegisterFirst()
 	s.respondOn(w, r, nil, struct {
 		Name          string `json:"name"`
 		Version       string `json:"version"`
 		Description   string `json:"description"`
 		CanonicalName string `json:"canonicalName"`
+		NeedRegSuper  bool   `json:"needRegSuper"`
 	}{
 		Name:          config.Name,
 		Version:       config.Version,
 		Description:   config.Description,
 		CanonicalName: config.CanonicalWebName,
-	}, http.StatusOK, nil)
+		NeedRegSuper:  canRegFrst,
+	}, http.StatusOK, err)
+}
+
+func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &struct {
+		UserType   string `json:"userType"`
+		LT         string `json:"loginType"`
+		Identifier string `json:"identifier"`
+		Secret     string `json:"secret"`
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
+	}
+	usr, err := s.auth.RegisterFirst(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
+	req.Secret = "" // prevent logging passwords.
+	s.respondOn(w, r, req, NewUser(usr), http.StatusCreated, err)
 }
 
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
