@@ -1,6 +1,6 @@
 package testing
 
-import "github.com/tomogoma/go-commons/errors"
+import errors "github.com/tomogoma/go-typed-errors"
 
 type FacebookMock struct {
 	errors.AuthErrCheck

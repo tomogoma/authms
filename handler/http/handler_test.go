@@ -9,7 +9,7 @@ import (
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/logging"
 	testingH "github.com/tomogoma/authms/testing"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 func TestNewHandler(t *testing.T) {

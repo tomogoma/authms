@@ -23,7 +23,7 @@ import (
 	"path"
 
 	"github.com/tomogoma/authms/config"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 func main() {

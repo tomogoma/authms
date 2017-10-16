@@ -8,7 +8,7 @@ import (
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
 	testingH "github.com/tomogoma/authms/testing"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 var isInit bool

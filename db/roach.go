@@ -10,8 +10,8 @@ import (
 
 	"github.com/cockroachdb/cockroach-go/crdb"
 	"github.com/tomogoma/authms/config"
-	"github.com/tomogoma/go-commons/database/cockroach"
-	"github.com/tomogoma/go-commons/errors"
+	cockroach "github.com/tomogoma/crdb"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 // Roach is a cockroach db store.

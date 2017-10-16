@@ -13,7 +13,7 @@ import (
 	"reflect"
 
 	"github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 )
 

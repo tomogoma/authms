@@ -11,7 +11,7 @@ import (
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"golang.org/x/net/context"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 type Handler struct {

@@ -2,7 +2,10 @@ package config
 
 import (
 	"fmt"
+	"io/ioutil"
 	"time"
+
+	"gopkg.in/yaml.v2"
 )
 
 type Service struct {
@@ -87,4 +90,17 @@ type General struct {
 	Authentication Auth     `json:"authentication,omitempty" yaml:"authentication"`
 	Token          JWT      `json:"token,omitempty" yaml:"token"`
 	SMS            SMS      `json:"sms" yaml:"sms"`
+}
+
+func ReadFile(fName string) (*General, error) {
+	confD, err := ioutil.ReadFile(fName)
+	if err != nil {
+		return nil, err
+	}
+	conf := &General{}
+	if err := yaml.Unmarshal(confD, conf); err != nil {
+		return nil, fmt.Errorf("unmarshal yaml file (%s): %v",
+			fName, err)
+	}
+	return conf, nil
 }

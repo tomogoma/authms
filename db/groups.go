@@ -4,7 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 // InsertGroup inserts into the database returning calculated values.

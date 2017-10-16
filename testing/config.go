@@ -9,7 +9,6 @@ import (
 	"strconv"
 
 	"github.com/tomogoma/authms/config"
-	config2 "github.com/tomogoma/go-commons/config"
 )
 
 var confPath = flag.String("testConf", config.DefaultConfPath(), "/path/to/config")
@@ -29,9 +28,9 @@ func currentID() string {
 }
 
 func ReadConfig(t *testing.T) config.General {
-	conf := config.General{}
-	if err := config2.ReadYamlConfig(*confPath, &conf); err != nil {
+	conf, err := config.ReadFile(*confPath)
+	if err != nil {
 		t.Fatalf("Error setting up: read config: %v", err)
 	}
-	return conf
+	return *conf
 }

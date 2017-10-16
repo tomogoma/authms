@@ -7,7 +7,7 @@ import (
 
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/sms/twilio"
-	configH "github.com/tomogoma/go-commons/config"
+	"gopkg.in/yaml.v2"
 )
 
 type ConfigMock struct {
@@ -38,7 +38,7 @@ type AuthMsConfigMock struct {
 
 var confFile = flag.String(
 	"conf",
-	config.DefaultConfPath,
+	config.DefaultConfPath(),
 	"/path/to/config/file.conf.yml",
 )
 var testMessage = "Twilio tests are running, this is a confirmation of success"
@@ -49,7 +49,11 @@ func init() {
 
 func setupTwilio(t *testing.T) SMSMock {
 	conf := AuthMsConfigMock{}
-	err := configH.ReadYamlConfig(*confFile, &conf)
+	confB, err := ioutil.ReadFile(*confFile)
+	if err != nil {
+		t.Fatalf("Error setting up: read conf file: %v", err)
+	}
+	err = yaml.Unmarshal(confB, &conf)
 	if err != nil {
 		t.Fatalf("Error setting up (reading config file): %v", err)
 	}

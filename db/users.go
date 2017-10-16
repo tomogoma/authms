@@ -6,7 +6,7 @@ import (
 
 	"github.com/lib/pq"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 // InsertUserType inserts into the database returning calculated values.

@@ -5,7 +5,7 @@ import (
 	"reflect"
 
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 func (r *Roach) InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*model.Device, error) {

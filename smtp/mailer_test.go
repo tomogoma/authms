@@ -6,11 +6,13 @@ import (
 	"html/template"
 	"testing"
 
+	"encoding/json"
+	"io/ioutil"
+
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/smtp"
 	testingH "github.com/tomogoma/authms/testing"
-	"github.com/tomogoma/go-commons/config"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 var testConf *model.SMTPConfig
@@ -20,7 +22,11 @@ func setup(t *testing.T) model.SMTPConfig {
 		return *testConf
 	}
 	c := new(model.SMTPConfig)
-	if err := config.ReadJSONConfig("mailer_test_config.json", c); err != nil {
+	confD, err := ioutil.ReadFile("mailer_test_config.json")
+	if err != nil {
+		t.Fatalf("Error setting up: read test config file: %v", err)
+	}
+	if err := json.Unmarshal(confD, c); err != nil {
 		t.Fatalf("Error setting up: read test config file: %v", err)
 	}
 	testConf = c

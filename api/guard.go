@@ -7,7 +7,7 @@ import (
 
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 type KeyStore interface {

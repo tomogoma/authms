@@ -13,7 +13,7 @@ import (
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 type contextKey string

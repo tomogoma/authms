@@ -5,7 +5,7 @@ import (
 
 	"github.com/tomogoma/authms/api"
 	testingH "github.com/tomogoma/authms/testing"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 func TestNewGuard(t *testing.T) {
@@ -237,7 +237,7 @@ func TestGuard_APIKeyValid(t *testing.T) {
 		},
 		{
 			name:     "db report error",
-			key:      "12345." + "some-invalid-key",
+			key:      "12345." + validKey,
 			expUsrID: "12345",
 			db:       &testingH.DBMock{ExpAPIKsBUsrIDErr: errors.New("some errors")},
 			expErr:   true,

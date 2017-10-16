@@ -2,12 +2,12 @@ package testing
 
 import (
 	"database/sql"
-	"time"
 	"reflect"
+	"time"
 
 	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/model"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 type DBMock struct {
@@ -182,9 +182,6 @@ func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte
 func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
 	if db.isInTx {
 		return nil, errors.Newf("direct db call while in tx")
-	}
-	if db.ExpAPIKsBUsrID == nil {
-		return nil, errors.NewNotFound("not found")
 	}
 	return db.ExpAPIKsBUsrID, db.ExpAPIKsBUsrIDErr
 }

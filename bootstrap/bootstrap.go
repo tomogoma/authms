@@ -15,8 +15,7 @@ import (
 	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/smtp"
-	"github.com/tomogoma/go-commons/auth/token"
-	configH "github.com/tomogoma/go-commons/config"
+	token "github.com/tomogoma/jwt"
 )
 
 func InstantiateRoach(lg logging.Logger, conf config.Database) *db.Roach {
@@ -33,10 +32,10 @@ func InstantiateRoach(lg logging.Logger, conf config.Database) *db.Roach {
 	return rdb
 }
 
-func InstantiateJWTHandler(lg logging.Logger, tknKyF string) *token.JWTHandler {
+func InstantiateJWTHandler(lg logging.Logger, tknKyF string) *token.Handler {
 	JWTKey, err := ioutil.ReadFile(tknKyF)
 	logging.LogFatalOnError(lg, err, "Read JWT key file")
-	jwter, err := token.NewJWTHandler(JWTKey)
+	jwter, err := token.NewHandler(JWTKey)
 	logging.LogFatalOnError(lg, err, "Instantiate JWT handler")
 	return jwter
 }
@@ -107,8 +106,7 @@ func InstantiateSMSer(conf config.SMS) (model.SMSer, error) {
 
 func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
 
-	conf := config.General{}
-	err := configH.ReadYamlConfig(confFile, &conf)
+	conf, err := config.ReadFile(confFile)
 	logging.LogFatalOnError(lg, err, "Read config file")
 
 	rdb := InstantiateRoach(lg, conf.Database)
@@ -137,7 +135,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	g, err := api.NewGuard(rdb, api.WithMasterKey(conf.Service.MasterAPIKey))
 	logging.LogFatalOnError(lg, err, "Instantate API access guard")
 
-	return conf, a, g, rdb, tg, sms, emailCl
+	return *conf, a, g, rdb, tg, sms, emailCl
 }
 
 func readFile(path string) (string, error) {

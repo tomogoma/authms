@@ -2,7 +2,7 @@ package db
 
 import (
 	"github.com/tomogoma/authms/api"
-	"github.com/tomogoma/go-commons/errors"
+	errors "github.com/tomogoma/go-typed-errors"
 )
 
 // InsertAPIKey inserts an API key for the userID.
