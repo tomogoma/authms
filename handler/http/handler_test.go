@@ -82,6 +82,14 @@ func TestHandler_handleRoute(t *testing.T) {
 		// valuse starting and ending with "_" are place holders for variables
 		// e.g. _loginType_ is a place holder for "any (valid) login type"
 		{
+			name:          "status",
+			auth:          &testingH.AuthenticationMock{},
+			guard:         &testingH.GuardMock{},
+			reqURLSuffix:  "/" + config.Version + "/" + config.Name + "/status",
+			reqMethod:     http.MethodGet,
+			expStatusCode: http.StatusOK,
+		},
+		{
 			name:          "register",
 			auth:          &testingH.AuthenticationMock{},
 			guard:         &testingH.GuardMock{},

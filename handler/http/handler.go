@@ -86,6 +86,11 @@ func NewHandler(a Auth, g Guard, l logging.Logger) (http.Handler, error) {
 }
 
 func (s handler) handleRoute(r *mux.Router) {
+
+	r.PathPrefix("/status").
+		Methods(http.MethodGet).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleStatus)))
+
 	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
@@ -170,6 +175,20 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 		return false
 	}
 	return true
+}
+
+func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
+	s.respondOn(w, r, nil, struct {
+		Name          string `json:"name"`
+		Version       string `json:"version"`
+		Description   string `json:"description"`
+		CanonicalName string `json:"canonicalName"`
+	}{
+		Name:          config.Name,
+		Version:       config.Version,
+		Description:   config.Description,
+		CanonicalName: config.CanonicalWebName,
+	}, http.StatusOK, nil)
 }
 
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
