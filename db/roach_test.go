@@ -19,7 +19,7 @@ func setup(t *testing.T) config.Database {
 	if !isInit {
 		rdb := getDB(t, conf.Database)
 		defer rdb.Close()
-		err := dropAllTables(rdb)
+		err := dropAllTables(rdb, conf.Database.DBName)
 		if err != nil {
 			t.Fatalf("Error setting up: drop prev test tables: %v", err)
 		}
@@ -31,12 +31,40 @@ func setup(t *testing.T) config.Database {
 func tearDown(t *testing.T, conf config.Database) {
 	rdb := getDB(t, conf)
 	defer rdb.Close()
-	if err := delAllTables(rdb); err != nil {
+	if err := delAllTables(rdb, conf.DBName); err != nil {
 		t.Fatalf("Error tearing down: delete all tables: %v", err)
 	}
 }
 
-func delAllTables(rdb *sql.DB) error {
+func dbCreated(rdb *sql.DB, dbName string) (bool, error) {
+	rslt, err := rdb.Query("SHOW databases")
+	if err != nil {
+		return false, errors.Newf("list databases: %v", err)
+	}
+	defer rslt.Close()
+	for rslt.Next() {
+		var name string
+		if err := rslt.Scan(&name); err != nil {
+			return false, errors.Newf("dbName from resultset: %v", err)
+		}
+		if dbName == name {
+			return true, nil
+		}
+	}
+	if err := rslt.Err(); err != nil {
+		return false, errors.Newf("iterating resultset: %v", err)
+	}
+	return false, nil
+}
+
+func delAllTables(rdb *sql.DB, dbName string) error {
+	haveDB, err := dbCreated(rdb, dbName)
+	if err != nil {
+		return errors.Newf("check test db created: %v", err)
+	}
+	if !haveDB {
+		return nil
+	}
 	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
 		_, err := rdb.Exec("DELETE FROM " + db.AllTableNames[i])
 		if err != nil {
@@ -46,7 +74,14 @@ func delAllTables(rdb *sql.DB) error {
 	return nil
 }
 
-func dropAllTables(rdb *sql.DB) error {
+func dropAllTables(rdb *sql.DB, dbName string) error {
+	haveDB, err := dbCreated(rdb, dbName)
+	if err != nil {
+		return errors.Newf("check test db created: %v", err)
+	}
+	if !haveDB {
+		return nil
+	}
 	for i := len(db.AllTableNames) - 1; i >= 0; i-- {
 		_, err := rdb.Exec("DROP TABLE IF EXISTS " + db.AllTableNames[i])
 		if err != nil {
