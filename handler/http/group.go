@@ -6,7 +6,7 @@ import (
 )
 
 /**
- * @api {NULL} Group
+ * @api {NULL} Group Group
  * @apiName Group
  * @apiGroup Objects
  *

@@ -6,7 +6,7 @@ import (
 )
 
 /**
- * @api {NULL} FacebookID
+ * @api {NULL} FacebookID FacebookID
  * @apiName FacebookID
  * @apiGroup Objects
  *

@@ -6,7 +6,7 @@ import (
 )
 
 /**
- * @api {NULL} Device
+ * @api {NULL} Device Device
  * @apiName Device
  * @apiGroup Objects
  *

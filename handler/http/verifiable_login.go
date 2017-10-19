@@ -6,7 +6,7 @@ import (
 )
 
 /**
- * @api {NULL} VerifLogin
+ * @api {NULL} VerifLogin Verifiable Login
  * @apiName VerifLogin
  * @apiGroup Objects
  *

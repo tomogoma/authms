@@ -57,7 +57,7 @@ const (
 	keySelfReg   = "selfReg"
 	keyAPIKey    = "x-api-key"
 	keyToken     = "token"
-	keyDBT       = "dbt"
+	keyOTP       = "OTP"
 	keyExtend    = "extend"
 	keyAddress   = "address"
 	keyUserID    = "userID"
@@ -96,7 +96,7 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodPut).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegisterFirst))))
 
-	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyDBT + "}").
+	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyOTP + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
 
@@ -188,7 +188,7 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 }
 
 /**
- * @api {get} /status
+ * @api {get} /status Status
  * @apiName Status
  * @apiGroup Auth
  *
@@ -219,13 +219,19 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {put} /:loginType/register
- * @apiName Register
- * @apiGroup Auth
+ * @api {put} /first_user First User
+ * @apiDescription Register the first super-user (super admin)
+ * @apiName FirstUser
+ * @apiGroup Setup
  *
  * @apiHeader x-api-key the api key
  *
- * @apiSuccess (201) see  See <a href="#api-Objects-User">User</a>.
+ * @apiParam {Enum} userType Type of user [individual|company]
+ * @apiParam {Enum} loginType Type of identifier [usernames|emails|phones|facebook]
+ * @apiParam {String} identifier The 'username' corresponding to loginType
+ * @apiParam {String} secret The users password
+ *
+ * @apiSuccess (201) {Object} json-body See <a href="#api-Objects-User">User</a>.
  *
  */
 func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
@@ -244,6 +250,34 @@ func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, NewUser(usr), http.StatusCreated, err)
 }
 
+/**
+ * @api {put} /:loginType/register?selfReg=:selfReg Register
+ * @apiDescription  Register new user.
+ * Registration can be:
+ * - self registration - provide URL param selfReg=true
+ * - self registration by unique device ID - provide URL param selfReg=device
+ * - or other user (by admin) - don't provide URL params
+ *
+ * loginType is what the user will be logging in by, can be one of:
+ * - usernames
+ * - emails
+ * - phones
+ * - facebook
+ *
+ * @apiName Register
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam {Enum} userType Type of user [individual|company]
+ * @apiParam {String} identifier The 'username' corresponding to loginType
+ * @apiParam {String} secret The users password
+ * @apiParam {String} groupID [only if selfReg not set or false] groupID to add this user to
+ * @apiParam {String} deviceID [only if selfReg set to device] the unique device ID for the user
+ *
+ * @apiSuccess (201) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ *
+ */
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
@@ -276,6 +310,19 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, NewUser(usr), http.StatusCreated, err)
 }
 
+/**
+ * @api {POST} /:loginType/login Login
+ * @apiDescription User login.
+ * See <a href="#api-Auth-Register">Register</a> for loginType options.
+ * @apiName Login
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ * @apiHeader Authorization Basic auth containing identifier/secret, both provided during <a href="#api-Auth-Register">Registration</a>
+ *
+ * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ *
+ */
 func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		LT         string `json:"loginType"`
@@ -295,6 +342,21 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
+/**
+ * @api {POST} /:loginType/update?token=:JWT Update Identifier
+ * @apiDescription Update (or set for first time) the identifier details for loginType.
+ * See <a href="#api-Auth-Register">Register</a> for loginType.
+ * See <a href="#api-Objects-User">User</a> for how to access the JWT.
+ * @apiName UpdateIdentifier
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam {String} identifier The new 'username' corresponding to loginType
+ *
+ * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ *
+ */
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
@@ -312,6 +374,18 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
+/**
+ * @api {POST} /:loginType/verify/:identifier?token=:JWT Send Verification Code
+ * @apiDescription Send OTP to identifier of type loginType for purpose of verifying identifier.
+ * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
+ * @apiName SendVerificationCode
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-OTPStatus">OTPStatus</a>.
+ *
+ */
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	req := struct {
@@ -327,18 +401,34 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, NewDBTStatus(dbtStatus), http.StatusOK, err)
 }
 
+/**
+ * @api {GET} /users/:userID/verify/:OTP?loginType=:loginType&extend=:extend Verify OTP
+ * @apiDescription Verify OTP.
+ * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
+ * userID is the ID of the <a href="#api-Objects-User">User</a> to whom OTP was sent.
+ * extend can be set to "true" if intent on extending the expiry of the OTP.
+ * @apiName SendVerificationCode
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiSuccess (200) {String} OTP [if extending OTP] the new OTP with extended expiry
+ *
+ * @apiSuccess (200) {Object} json-body [if not extending OTP] see <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ *
+ */
 func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	q := r.URL.Query()
 	req := struct {
 		UserID string `json:"userID"`
 		LT     string `json:"loginType"`
-		DBT    string `json:"dbt"`
+		DBT    string `json:"OTP"`
 		Extend string `json:"extend"`
 	}{
 		UserID: vars[keyUserID],
 		LT:     q.Get(keyLoginType),
-		DBT:    vars[keyDBT],
+		DBT:    vars[keyOTP],
 		Extend: q.Get(keyExtend),
 	}
 	var resp interface{}
@@ -347,8 +437,8 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		var dbt string
 		dbt, err = s.auth.VerifyAndExtendDBT(req.LT, req.UserID, []byte(req.DBT))
 		resp = struct {
-			DBT string `json:"dbt"`
-		}{DBT: dbt}
+			OTP string `json:"OTP"`
+		}{OTP: dbt}
 	} else {
 		var vl *model.VerifLogin
 		vl, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
@@ -357,12 +447,26 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 
+/**
+ * @api {POST} /users/:userID/reset_password Reset password
+ * @apiName ResetPassword
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam {String} loginType See <a href="#api-Auth-Register">Register</a> for loginType options.
+ * @apiParam {String} OTP The OTP sent to user.
+ * @apiParam {String} secret The new password.
+ *
+ * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ *
+ */
 func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := struct {
 		UserID string `json:"userID"`
 		LT     string `json:"loginType"`
-		DBT    string `json:"dbt"`
+		DBT    string `json:"OTP"`
 		Secret string `json:"secret"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {

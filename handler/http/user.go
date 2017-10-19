@@ -6,12 +6,12 @@ import (
 )
 
 /**
- * @api {NULL} User
+ * @api {NULL} User User
  * @apiName User
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the user (can be cast to long Integer).
- * @apiSuccess {String} JWT JSON Web Token for accessing services.
+ * @apiSuccess {String} JWT JSON Web Token for accessing services. This is only provided during <a href="#api-Auth-Login">Login</a>.
  * @use {Object} type See <a href="#api-Objects-UserType">UserType</a>.
  * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
  * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
