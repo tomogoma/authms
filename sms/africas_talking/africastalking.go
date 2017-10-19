@@ -8,8 +8,6 @@ import (
 	"net/url"
 	"strings"
 
-	"fmt"
-
 	errors "github.com/tomogoma/go-typed-errors"
 )
 
@@ -78,7 +76,8 @@ func (at *SMSCl) SMS(toPhone, message string) error {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode >= http.StatusBadRequest {
-		return errors.Newf("error connecting to API: %s", resp.Status)
+		respBody, _ := ioutil.ReadAll(resp.Body)
+		return errors.Newf("error connecting to API: %s: %s", resp.Status, respBody)
 	}
 	respBody, err := readRespBody(resp.Body)
 	if err != nil {
@@ -120,7 +119,6 @@ func readRespBody(resp io.Reader) (atResponse, error) {
 	if err != nil {
 		return atResponse{}, errors.Newf("error reading response body: %v", err)
 	}
-	fmt.Printf("Response:\n%s", respBody)
 	respStruct := atResponse{}
 	if err := xml.Unmarshal(respBody, &respStruct); err != nil {
 		return atResponse{}, errors.Newf("error unmarshalling response body: %v", err)
