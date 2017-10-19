@@ -10,6 +10,9 @@ fi
 if [ -f "$INSTALL_FILE" ]; then
 	rm -f "${INSTALL_FILE}" || exit 1
 fi
+if [ -d "$DOCS_DIR" ]; then
+    rm -rf "${DOCS_DIR}" || exit 1
+fi
 if [ -f "$CONF_FILE" ]; then
     echo "config file at '${CONF_FILE}' left intact intentionally"
 fi

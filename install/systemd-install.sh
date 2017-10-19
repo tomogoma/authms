@@ -30,10 +30,12 @@ printDetails() {
     echo "conf file:         $CONF_FILE"
     echo "install file:      $INSTALL_FILE"
     echo "systemd unit file: $UNIT_FILE"
+    echo "docs dir:          $DOCS_DIR"
     echo "templates dir:     $TPL_DIR"
 }
 
 mkdir -p "${CONF_DIR}" || exit 1
+cp -rf docs "${DOCS_DIR}" || exit 1
 if [ ! -f "${CONF_FILE}" ]; then
     cp "conf.yml" "${CONF_FILE}" || exit 1
 fi

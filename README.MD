@@ -19,6 +19,8 @@ provided installer links.
 
 ### Pre-requisites
 
+1. APIDoc installed and in `PATH` variable (if you plan on doing a build):
+http://apidocjs.com/
 1. A [cockroachdb](https://www.cockroachlabs.com/) instance for
 persistance. A systemd installer can be found here:
 https://github.com/tomogoma/cockroach-installer
@@ -118,6 +120,9 @@ used.
         ```
 
 ### Accessing the Authentication Services
+
+Documentation for the API endpoints can be found at the `<version>/authms/docs`
+endpoint.
 
 `micro` is the recommended gateway for accessing the micro-service.
 

@@ -5,12 +5,23 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+/**
+ * @api {NULL} Username
+ * @apiName Username
+ * @apiGroup Objects
+ *
+ * @apiSuccess {String} ID Unique ID of the username (can be cast to long Integer).
+ * @apiSuccess {String} userID ID for user who owns this Username.
+ * @apiSuccess {String} value The unique username string value.
+ * @apiSuccess {String} created ISO8601 date the username was created.
+ * @apiSuccess {String} lastUpdated ISO8601 date the username was last updated.
+ */
 type Username struct {
 	ID         string `json:"ID,omitempty"`
 	UserID     string `json:"userID,omitempty"`
 	Value      string `json:"value,omitempty"`
-	CreateDate string `json:"updateDate,omitempty"`
-	UpdateDate string `json:"createDate,omitempty"`
+	CreateDate string `json:"created,omitempty"`
+	UpdateDate string `json:"lastUpdated,omitempty"`
 }
 
 func NewUserName(un model.Username) *Username {

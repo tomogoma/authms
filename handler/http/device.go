@@ -5,12 +5,23 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+/**
+ * @api {NULL} Device
+ * @apiName Device
+ * @apiGroup Objects
+ *
+ * @apiSuccess {String} ID Unique ID of the device (can be cast to long Integer).
+ * @apiSuccess {String} userID ID for user who owns this device ID.
+ * @apiSuccess {String} deviceID The unique device ID string value.
+ * @apiSuccess {String} created ISO8601 date the device was created.
+ * @apiSuccess {String} lastUpdated ISO8601 date the device was last updated.
+ */
 type Device struct {
 	ID         string `json:"ID,omitempty"`
 	UserID     string `json:"userID,omitempty"`
 	DeviceID   string `json:"deviceID,omitempty"`
-	CreateDate string `json:"createDate,omitempty"`
-	UpdateDate string `json:"updateDate,omitempty"`
+	CreateDate string `json:"created,omitempty"`
+	UpdateDate string `json:"lastUpdated,omitempty"`
 }
 
 func NewDevice(g model.Device) *Device {

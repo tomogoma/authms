@@ -5,6 +5,24 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+/**
+ * @api {NULL} User
+ * @apiName User
+ * @apiGroup Objects
+ *
+ * @apiSuccess {String} ID Unique ID of the user (can be cast to long Integer).
+ * @apiSuccess {String} JWT JSON Web Token for accessing services.
+ * @use {Object} type See <a href="#api-Objects-UserType">UserType</a>.
+ * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
+ * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
+ * @apiSuccess {Object} phone See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ * @apiSuccess {Object} email See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ * @apiSuccess {Object} facebook See <a href="#api-Objects-FacebookID">FacebookID</a>.
+ * @apiSuccess {Object} group See <a href="#api-Objects-Group">Group</a>.
+ * @apiSuccess {Object} device See <a href="#api-Objects-Device">Device</a>.
+ * @apiSuccess {String} created Date the user was created.
+ * @apiSuccess {String} lastUpdated date the user was last updated.
+ */
 type User struct {
 	ID         string      `json:"ID,omitempty"`
 	JWT        string      `json:"JWT,omitempty"`
@@ -15,8 +33,8 @@ type User struct {
 	Facebook   *Facebook   `json:"facebook,omitempty"`
 	Groups     []Group     `json:"groups,omitempty"`
 	Devices    []Device    `json:"devices,omitempty"`
-	CreateDate string      `json:"createDate,omitempty"`
-	UpdateDate string      `json:"updateDate,omitempty"`
+	CreateDate string      `json:"created,omitempty"`
+	UpdateDate string      `json:"lastUpdated,omitempty"`
 }
 
 func NewUser(user *model.User) *User {

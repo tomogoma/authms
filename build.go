@@ -44,8 +44,8 @@ func main() {
 		flag.Usage()
 		os.Exit(0)
 	}
-	if err := build(goos, goarch, goarm); err != nil {
-		log.Fatalf("build error: %v", err)
+	if err := buildMicroService(goos, goarch, goarm); err != nil {
+		log.Fatalf("Error building micro-service binary: %v", err)
 	}
 	if err := installVars(); err != nil {
 		log.Fatalf("write installer script error: %v", err)
@@ -74,15 +74,19 @@ EMAIL_RESET_PASS_TPL="` + config.DefaultEmailResetPassTpl() + `"
 PHONE_RESET_PASS_TPL="` + config.DefaultPhoneResetPassTpl() + `"
 EMAIL_VERIFY_TPL="` + config.DefaultEmailVerifyTpl() + `"
 PHONE_VERIFY_TPL="` + config.DefaultPhoneVerifyTpl() + `"
+DOCS_DIR="` + config.DefaultDocsDir() + `"
 `
 	return ioutil.WriteFile("install/vars.sh", []byte(content), 0755)
 }
 
-func build(goos, goarch, goarm string) error {
+func buildMicroService(goos, goarch, goarm string) error {
+	docsDir := path.Join("install", "docs", config.Version, config.Name, "docs")
+	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Newf("generate http docs: %v: %s", err, out)
+	}
 	args := []string{"build", "-o", "bin/app", "./cmd/microservice"}
-	cmd := exec.Command("go", args...)
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
+	cmd = exec.Command("go", args...)
 	cmd.Env = os.Environ()
 	for _, env := range []string{
 		"GOOS=" + goos,
@@ -91,7 +95,10 @@ func build(goos, goarch, goarm string) error {
 	} {
 		cmd.Env = append(cmd.Env, env)
 	}
-	return cmd.Run()
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Newf("build binary: %v: %s", err, out)
+	}
+	return nil
 }
 
 func buildGcloud() error {
@@ -99,6 +106,12 @@ func buildGcloud() error {
 
 	if err := os.MkdirAll(confDir, 0755); err != nil {
 		return errors.Newf("create conf dir: %v", err)
+	}
+
+	docsDir := path.Join(config.DefaultDocsDir(), config.Version, config.Name, "docs")
+	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Newf("generate http docs: %v: %s", err, out)
 	}
 
 	if err := os.MkdirAll(config.DefaultTplDir(), 0755); err != nil {

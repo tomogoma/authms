@@ -26,6 +26,8 @@ const (
 	TimeFormat = time.RFC3339
 
 	APIKeyLength = 56
+
+	DocsPath = "docs"
 )
 
 var (
@@ -65,6 +67,10 @@ func DefaultConfPath() string {
 
 func DefaultTplDir() string {
 	return path.Join(defaultConfDir, "templates")
+}
+
+func DefaultDocsDir() string {
+	return path.Join(defaultConfDir, DocsPath)
 }
 
 func DefaultEmailInviteTpl() string {

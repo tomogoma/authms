@@ -121,6 +121,9 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
 
+	r.PathPrefix("/" + config.DocsPath).
+		Handler(http.FileServer(http.Dir(config.DefaultDocsDir())))
+
 	r.NotFoundHandler = http.HandlerFunc(s.prepLogger(s.notFoundHandler))
 }
 
@@ -185,6 +188,20 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 	return true
 }
 
+/**
+ * @api {get} /status
+ * @apiName Status
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiSuccess (200) {String} name Micro-service name.
+ * @apiSuccess (200)  {String} version Current running version.
+ * @apiSuccess (200)  {String} description Short description of the micro-service.
+ * @apiSuccess (200)  {String} canonicalName Canonical name of the micro-service.
+ * @apiSuccess (200)  {String} needRegSuper true if a super-user has been registered, false otherwise.
+ *
+ */
 func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	canRegFrst, err := s.auth.CanRegisterFirst()
 	s.respondOn(w, r, nil, struct {
@@ -202,6 +219,16 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	}, http.StatusOK, err)
 }
 
+/**
+ * @api {put} /:loginType/register
+ * @apiName Register
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiSuccess (201) see  See <a href="#api-Objects-User">User</a>.
+ *
+ */
 func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {

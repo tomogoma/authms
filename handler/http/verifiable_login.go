@@ -5,13 +5,26 @@ import (
 	"github.com/tomogoma/authms/model"
 )
 
+/**
+ * @api {NULL} VerifLogin
+ * @apiName VerifLogin
+ * @apiGroup Objects
+ *
+ * @apiSuccess {String} ID Unique ID of the verifiable login (can be cast to long Integer).
+ * @apiSuccess {String} userID ID for user who owns this verifiable login.
+ * @apiSuccess {String} value The unique verifiable login string value.
+ * @apiSuccess {Boolean} verified True if this login is verified, false otherwise.
+ * @apiSuccess {String} created ISO8601 date the verifiable login was created.
+ * @apiSuccess {String} lastUpdated ISO8601 date the verifiable login was last updated.
+ */
+
 type VerifLogin struct {
 	ID         string `json:"ID,omitempty"`
 	UserID     string `json:"userID,omitempty"`
 	Address    string `json:"value,omitempty"`
 	Verified   bool   `json:"verified,omitempty"`
-	CreateDate string `json:"createDate,omitempty"`
-	UpdateDate string `json:"updateDate,omitempty"`
+	CreateDate string `json:"created,omitempty"`
+	UpdateDate string `json:"lastUpdated,omitempty"`
 }
 
 func NewVerifLogin(vl *model.VerifLogin) *VerifLogin {
