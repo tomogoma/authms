@@ -24,9 +24,6 @@ func Log(e logging.Entry) {
 func out(e logging.Entry) {
 	fields := "{"
 	for k, v := range e.Fields {
-		if v == logging.FieldHttpReqObj {
-			continue
-		}
 		vStr, _ := json.Marshal(v)
 		fields = fmt.Sprintf("%s\"%s\": \"%s\", ", fields, k, vStr)
 	}

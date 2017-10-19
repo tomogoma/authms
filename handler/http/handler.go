@@ -127,13 +127,15 @@ func (s handler) handleRoute(r *mux.Router) {
 func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		log := s.logger.WithField(logging.FieldTransID, uuid.New())
-		log.WithFields(map[string]interface{}{
-			logging.FieldURL:            r.URL,
-			logging.FieldHost:           r.Host,
-			logging.FieldMethod:         r.Method,
-			logging.FieldRequestHandler: "HTTP",
-			logging.FieldHttpReqObj:     r,
-		}).Info("new request")
+		log.
+			WithFields(map[string]interface{}{
+				logging.FieldURL:            r.URL,
+				logging.FieldHost:           r.Host,
+				logging.FieldMethod:         r.Method,
+				logging.FieldRequestHandler: "HTTP",
+			}).
+			WithHTTPRequest(r).
+			Info("new request")
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}

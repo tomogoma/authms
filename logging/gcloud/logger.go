@@ -22,12 +22,11 @@ type Entry struct {
 type Logger struct {
 	Fields  map[string]interface{}
 	pending []Entry
+	HTTPReq *http.Request
 }
 
 func (lg *Logger) WithFields(f map[string]interface{}) logging.Logger {
-	lg.prepare()
-	newLG := &Logger{}
-	newLG.Fields = lg.Fields
+	newLG := lg.copy()
 	for k, v := range f {
 		newLG.Fields[k] = v
 	}
@@ -35,11 +34,15 @@ func (lg *Logger) WithFields(f map[string]interface{}) logging.Logger {
 }
 
 func (lg *Logger) WithField(k string, v interface{}) logging.Logger {
-	lg.prepare()
-	newLG := &Logger{}
-	newLG.Fields = lg.Fields
+	newLG := lg.copy()
 	newLG.Fields[k] = v
 	return newLG
+}
+
+func (lg *Logger) WithHTTPRequest(r *http.Request) logging.Logger {
+	newLg := lg.copy()
+	newLg.HTTPReq = r
+	return newLg
 }
 
 func (lg *Logger) Infof(f string, args ...interface{}) {
@@ -83,6 +86,17 @@ func (lg *Logger) Fatal(args ...interface{}) {
 	os.Exit(1)
 }
 
+func (lg *Logger) copy() *Logger {
+	lg.prepare()
+	newLG := &Logger{
+		Fields:  lg.Fields,
+		HTTPReq: lg.HTTPReq,
+		pending: lg.pending,
+	}
+	lg.pending = make([]Entry, 0)
+	return newLG
+}
+
 func (lg *Logger) prepare() {
 	if lg.Fields == nil {
 		lg.Fields = make(map[string]interface{})
@@ -93,9 +107,6 @@ func (lg *Logger) log(payload string, f logFunc) {
 
 	lg.prepare()
 
-	reqObjI, isReqObjExist := lg.Fields[logging.FieldHttpReqObj]
-
-	delete(lg.Fields, logging.FieldHttpReqObj)
 	delete(lg.Fields, logging.FieldHost)
 	delete(lg.Fields, logging.FieldRequestHandler)
 	delete(lg.Fields, logging.FieldMethod)
@@ -103,11 +114,11 @@ func (lg *Logger) log(payload string, f logFunc) {
 	fields, _ := json.Marshal(lg.Fields)
 	val := fmt.Sprintf("%s %s\n", payload, fields)
 
-	if !isReqObjExist {
+	if lg.HTTPReq == nil {
 		lg.pending = append(lg.pending, Entry{callFunc: f, value: val})
 		return
 	}
-	ctx := appengine.NewContext(reqObjI.(*http.Request))
+	ctx := appengine.NewContext(lg.HTTPReq)
 
 	for _, pending := range lg.pending {
 		log.Infof(ctx, "***Begin pending logs***")

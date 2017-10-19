@@ -2,11 +2,13 @@ package logging
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"time"
 )
 
 type Logger interface {
+	WithHTTPRequest(r *http.Request) Logger
 	WithFields(map[string]interface{}) Logger
 	WithField(string, interface{}) Logger
 	Infof(fmt string, args ...interface{})
@@ -38,7 +40,8 @@ type EntryLogger interface {
 //     _ "github.com/tomogoma/authms/logging/standard"
 // for the purpose of its side effects.
 type EntryLogWrapper struct {
-	Fields map[string]interface{}
+	Fields  map[string]interface{}
+	HTTPReq *http.Request
 }
 
 const (
@@ -54,10 +57,14 @@ func SetEntryLoggerFunc(loggerFunc EntryLoggerFunc) {
 	entryLoggerFunc = loggerFunc
 }
 
+func (lg *EntryLogWrapper) WithHTTPRequest(r *http.Request) Logger {
+	newLG := lg.copy()
+	newLG.HTTPReq = r
+	return newLG
+}
+
 func (lg *EntryLogWrapper) WithFields(f map[string]interface{}) Logger {
-	lg.prepare()
-	newLG := &EntryLogWrapper{}
-	newLG.Fields = lg.Fields
+	newLG := lg.copy()
 	for k, v := range f {
 		newLG.Fields[k] = v
 	}
@@ -65,9 +72,7 @@ func (lg *EntryLogWrapper) WithFields(f map[string]interface{}) Logger {
 }
 
 func (lg *EntryLogWrapper) WithField(k string, v interface{}) Logger {
-	lg.prepare()
-	newLG := &EntryLogWrapper{}
-	newLG.Fields = lg.Fields
+	newLG := lg.copy()
 	newLG.Fields[k] = v
 	return newLG
 }
@@ -152,6 +157,14 @@ func (lg *EntryLogWrapper) Fatal(args ...interface{}) {
 		Payload: fmt.Sprintln(args...),
 	})
 	os.Exit(1)
+}
+
+func (lg *EntryLogWrapper) copy() *EntryLogWrapper {
+	lg.prepare()
+	return &EntryLogWrapper{
+		Fields:  lg.Fields,
+		HTTPReq: lg.HTTPReq,
+	}
 }
 
 func (lg *EntryLogWrapper) prepare() {
