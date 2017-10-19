@@ -3,7 +3,6 @@ package http
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -434,5 +433,5 @@ func (s *handler) respondOn(w http.ResponseWriter, r *http.Request, reqData inte
 }
 
 func (s handler) notFoundHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprint(w, "Nothing to see here")
+	http.Error(w, "Nothing to see here", http.StatusNotFound)
 }
