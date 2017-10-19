@@ -15,10 +15,11 @@ import (
 	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/smtp"
+	"github.com/tomogoma/crdb"
 	token "github.com/tomogoma/jwt"
 )
 
-func InstantiateRoach(lg logging.Logger, conf config.Database) *db.Roach {
+func InstantiateRoach(lg logging.Logger, conf crdb.Config) *db.Roach {
 	var opts []db.Option
 	if dsn := conf.FormatDSN(); dsn != "" {
 		opts = append(opts, db.WithDSN(dsn))
