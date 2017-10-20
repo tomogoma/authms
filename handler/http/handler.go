@@ -18,6 +18,7 @@ import (
 type contextKey string
 
 type Auth interface {
+	IsNotFoundError(error) bool
 	IsNotImplementedError(error) bool
 	IsClientError(error) bool
 	IsForbiddenError(error) bool
@@ -29,7 +30,7 @@ type Auth interface {
 	RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error)
 	UpdateIdentifier(JWT, loginType, newId string) (*model.User, error)
 	UpdatePassword(JWT string, old, newPass []byte) error
-	SetPassword(loginType, userID string, dbt, pass []byte) (*model.VerifLogin, error)
+	SetPassword(loginType, onAddr string, dbt, pass []byte) (*model.VerifLogin, error)
 	SendVerCode(JWT, loginType, toAddr string) (*model.DBTStatus, error)
 	SendPassResetCode(loginType, toAddr string) (*model.DBTStatus, error)
 	VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error)
@@ -45,6 +46,8 @@ type handler struct {
 	errors.NotImplErrCheck
 	errors.AuthErrCheck
 	errors.ClErrCheck
+	errors.NotFoundErrCheck
+
 	auth   Auth
 	guard  Guard
 	logger logging.Logger
@@ -53,14 +56,14 @@ type handler struct {
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
 
-	keyLoginType = "loginType"
-	keySelfReg   = "selfReg"
-	keyAPIKey    = "x-api-key"
-	keyToken     = "token"
-	keyOTP       = "OTP"
-	keyExtend    = "extend"
-	keyAddress   = "address"
-	keyUserID    = "userID"
+	keyLoginType  = "loginType"
+	keySelfReg    = "selfReg"
+	keyAPIKey     = "x-api-key"
+	keyToken      = "token"
+	keyOTP        = "OTP"
+	keyExtend     = "extend"
+	keyIdentifier = "identifier"
+	keyUserID     = "userID"
 
 	ctxtKeyBody = contextKey("id")
 	ctxKeyLog   = contextKey("log")
@@ -100,7 +103,11 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
 
-	r.PathPrefix("/users/{" + keyUserID + "}/reset_password").
+	r.PathPrefix("/reset_password/send_otp").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleSendPassResetCode))))
+
+	r.PathPrefix("/reset_password").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleResetPass))))
 
@@ -108,7 +115,7 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodPut).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
 
-	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyAddress + "}").
+	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyIdentifier + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSendVerifCode)))
 
@@ -390,11 +397,11 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	req := struct {
 		LT     string `json:"loginType"`
-		ToAddr string `json:"address"`
+		ToAddr string `json:"identifier"`
 		JWT    string `json:"token"`
 	}{
 		LT:     vars[keyLoginType],
-		ToAddr: vars[keyAddress],
+		ToAddr: vars[keyIdentifier],
 		JWT:    r.URL.Query().Get(keyToken),
 	}
 	dbtStatus, err := s.auth.SendVerCode(req.JWT, req.LT, req.ToAddr)
@@ -448,15 +455,46 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /users/:userID/reset_password Reset password
+ * @api {POST} /reset_password/send_otp Send Password Reset OTP
+ * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
+ * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
+ * @apiName SendPasswordResetOTP
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam {String} loginType See <a href="#api-Auth-Register">Register</a> for loginType options.
+ * @apiParam {String} identifier See <a href="#api-Auth-Register">Register</a> for identifier options.
+ *
+ * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-OTPStatus">OTPStatus</a>.
+ *
+ */
+func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request) {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := struct {
+		LT     string `json:"loginType"`
+		ToAddr string `json:"identifier"`
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {
+		return
+	}
+	dbtStatus, err := s.auth.SendPassResetCode(req.LT, req.ToAddr)
+	s.respondOn(w, r, req, NewDBTStatus(dbtStatus), http.StatusOK, err)
+}
+
+/**
+ * @api {POST} /reset_password Reset password
+ * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
+ * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
  * @apiName ResetPassword
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
  * @apiParam {String} loginType See <a href="#api-Auth-Register">Register</a> for loginType options.
- * @apiParam {String} OTP The OTP sent to user.
- * @apiParam {String} secret The new password.
+ * @apiParam {String} identifier See <a href="#api-Auth-Register">Register</a> for identifier options.
+ * @apiParam {String} OTP The password reset code sent to user during <a href="#api-Auth-SendPasswordResetOTP">SendPasswordResetOTP</a>.
+ * @apiParam {String} newSecret The new password.
  *
  * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
  *
@@ -464,17 +502,15 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {
 	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := struct {
-		UserID string `json:"userID"`
-		LT     string `json:"loginType"`
-		DBT    string `json:"OTP"`
-		Secret string `json:"secret"`
+		LT        string `json:"loginType"`
+		OnAddress string `json:"identifier"`
+		DBT       string `json:"OTP"`
+		NewSecret string `json:"newSecret"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {
 		return
 	}
-	vars := mux.Vars(r)
-	req.UserID = vars[keyUserID]
-	vl, err := s.auth.SetPassword(req.LT, req.UserID, []byte(req.DBT), []byte(req.Secret))
+	vl, err := s.auth.SetPassword(req.LT, req.OnAddress, []byte(req.DBT), []byte(req.NewSecret))
 	s.respondOn(w, r, req, NewVerifLogin(vl), http.StatusOK, err)
 }
 
@@ -494,6 +530,11 @@ func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData in
 	}
 	if s.auth.IsClientError(err) || s.IsClientError(err) {
 		log.Warnf("Bad request: %v", err)
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if s.auth.IsNotFoundError(err) || s.IsNotFoundError(err) {
+		log.Warnf("Not found: %v", err)
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}

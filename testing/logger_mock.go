@@ -2,6 +2,7 @@ package testing
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/tomogoma/authms/logging"
@@ -17,6 +18,7 @@ type LoggerMock struct {
 	Fields   map[string]interface{}
 	Logs     []Entry
 	Spinoffs []*LoggerMock
+	HTTPReq  *http.Request
 }
 
 const (
@@ -27,20 +29,22 @@ const (
 )
 
 func (lg *LoggerMock) WithFields(f map[string]interface{}) logging.Logger {
-	lg.prep()
-	newLG := &LoggerMock{Fields: lg.Fields}
+	newLG := lg.copy()
 	for k, v := range f {
 		newLG.Fields[k] = v
 	}
-	lg.Spinoffs = append(lg.Spinoffs, newLG)
 	return newLG
 }
 
 func (lg *LoggerMock) WithField(k string, v interface{}) logging.Logger {
-	lg.prep()
-	newLG := &LoggerMock{Fields: lg.Fields}
+	newLG := lg.copy()
 	newLG.Fields[k] = v
-	lg.Spinoffs = append(lg.Spinoffs, newLG)
+	return newLG
+}
+
+func (lg *LoggerMock) WithHTTPRequest(r *http.Request) logging.Logger {
+	newLG := lg.copy()
+	newLG.HTTPReq = r
 	return newLG
 }
 
@@ -77,6 +81,13 @@ func (lg *LoggerMock) Error(args ...interface{}) {
 func (lg *LoggerMock) Fatal(args ...interface{}) {
 	lg.prep()
 	lg.Logs = append(lg.Logs, Entry{Level: LevelFatal, Args: args})
+}
+
+func (lg *LoggerMock) copy() *LoggerMock {
+	lg.prep()
+	newLG := &LoggerMock{Fields: lg.Fields}
+	lg.Spinoffs = append(lg.Spinoffs, newLG)
+	return newLG
 }
 
 func (lg *LoggerMock) prep() {

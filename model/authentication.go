@@ -96,6 +96,7 @@ type Authentication struct {
 	errors.AuthErrCheck
 	errors.ClErrCheck
 	errors.NotImplErrCheck
+	errors.NotFoundErrCheck
 	// mandatory parameters
 	db            AuthStore
 	jwter         JWTEr
@@ -426,18 +427,35 @@ func (a *Authentication) UpdatePassword(JWT string, old, newPass []byte) error {
 // SetPassword updates a user account's password following a SendPassResetCode()
 // request. dbt is the token initially sent to the user for verification.
 // loginType should be similar to the one used during SendPassResetCode().
-func (a *Authentication) SetPassword(loginType, userID string, dbt, pass []byte) (*VerifLogin, error) {
+func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte) (*VerifLogin, error) {
 	var tkn *DBToken
 	var err error
 	var updtVerifiedFunc func(*sql.Tx, string, string, bool) (*VerifLogin, error)
 
+	var usr *User
+	switch loginType {
+	case LoginTypeEmail:
+		usr, _, err = a.db.UserByEmail(forAddr)
+	case LoginTypePhone:
+		usr, _, err = a.db.UserByPhone(forAddr)
+	default:
+		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
+	}
+
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound("User not found")
+		}
+		return nil, errors.Newf("fetch user by %s: %v", loginType, err)
+	}
+
 	switch loginType {
 	case LoginTypeEmail:
 		updtVerifiedFunc = a.db.UpdateUserEmailAtomic
-		tkn, err = a.dbTokenValid(userID, dbt, a.db.EmailTokens)
+		tkn, err = a.dbTokenValid(usr.ID, dbt, a.db.EmailTokens)
 	case LoginTypePhone:
 		updtVerifiedFunc = a.db.UpdateUserPhoneAtomic
-		tkn, err = a.dbTokenValid(userID, dbt, a.db.PhoneTokens)
+		tkn, err = a.dbTokenValid(usr.ID, dbt, a.db.PhoneTokens)
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
@@ -453,11 +471,11 @@ func (a *Authentication) SetPassword(loginType, userID string, dbt, pass []byte)
 
 	var addr *VerifLogin
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		err = a.db.UpdatePasswordAtomic(tx, userID, passH)
+		err = a.db.UpdatePasswordAtomic(tx, usr.ID, passH)
 		if err != nil {
 			return errors.Newf("update password: %v", err)
 		}
-		addr, err = updtVerifiedFunc(tx, userID, tkn.Address, true)
+		addr, err = updtVerifiedFunc(tx, usr.ID, tkn.Address, true)
 		if err != nil {
 			return errors.Newf("update phone to verified: %v", err)
 		}
@@ -554,7 +572,7 @@ func (a *Authentication) SendPassResetCode(loginType, toAddr string) (*DBTStatus
 
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
-			return nil, errors.NewForbiddenf("%s does not exist", toAddr)
+			return nil, errors.NewNotFoundf("%s does not exist", toAddr)
 		}
 		return nil, errors.Newf("user by %s: %v", loginType, err)
 	}

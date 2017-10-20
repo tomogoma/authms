@@ -9,6 +9,7 @@ type AuthenticationMock struct {
 	errors.NotImplErrCheck
 	errors.AuthErrCheck
 	errors.ClErrCheck
+	errors.NotFoundErrCheck
 
 	ExpRegFirstUser *model.User
 	ExpRegFirstErr  error

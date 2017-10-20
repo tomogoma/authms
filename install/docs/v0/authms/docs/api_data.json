@@ -120,8 +120,9 @@
   },
   {
     "type": "POST",
-    "url": "/users/:userID/reset_password",
+    "url": "/reset_password",
     "title": "Reset password",
+    "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
     "name": "ResetPassword",
     "group": "Auth",
     "header": {
@@ -150,14 +151,21 @@
             "group": "Parameter",
             "type": "String",
             "optional": false,
-            "field": "OTP",
-            "description": "<p>The OTP sent to user.</p>"
+            "field": "identifier",
+            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for identifier options.</p>"
           },
           {
             "group": "Parameter",
             "type": "String",
             "optional": false,
-            "field": "secret",
+            "field": "OTP",
+            "description": "<p>The password reset code sent to user during <a href=\"#api-Auth-SendPasswordResetOTP\">SendPasswordResetOTP</a>.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "newSecret",
             "description": "<p>The new password.</p>"
           }
         ]
@@ -172,6 +180,62 @@
             "optional": false,
             "field": "json-body",
             "description": "<p>See <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+          }
+        ]
+      }
+    },
+    "version": "0.0.0",
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
+    "type": "POST",
+    "url": "/reset_password/send_otp",
+    "title": "Send Password Reset OTP",
+    "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
+    "name": "SendPasswordResetOTP",
+    "group": "Auth",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>"
+          },
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "identifier",
+            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for identifier options.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "200": [
+          {
+            "group": "200",
+            "type": "Object",
+            "optional": false,
+            "field": "json-body",
+            "description": "<p>See <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
           }
         ]
       }
