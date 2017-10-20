@@ -15,9 +15,10 @@ func main() {
 
 	config.DefaultConfDir("conf")
 	log := &logrus.Wrapper{}
-	_, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(config.DefaultConfPath(), log)
+	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(config.DefaultConfPath(), log)
 
-	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, log)
+	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, log,
+		conf.Service.AllowedOrigins)
 	logging.LogFatalOnError(log, err, "Instantiate http Handler")
 
 	http.Handle("/", httpHandler)

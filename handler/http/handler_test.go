@@ -18,10 +18,19 @@ func TestNewHandler(t *testing.T) {
 		auth   Auth
 		guard  Guard
 		logger logging.Logger
+		allowedOrigins []string
 		expErr bool
 	}{
 		{
 			name:   "valid deps",
+			auth:   &testingH.AuthenticationMock{},
+			guard:  &testingH.GuardMock{},
+			logger: &testingH.LoggerMock{},
+			allowedOrigins: []string{"*"},
+			expErr: false,
+		},
+		{
+			name:   "valid deps (nil origins)",
 			auth:   &testingH.AuthenticationMock{},
 			guard:  &testingH.GuardMock{},
 			logger: &testingH.LoggerMock{},
@@ -51,7 +60,7 @@ func TestNewHandler(t *testing.T) {
 	}
 	for _, tc := range tt {
 		t.Run(tc.name, func(t *testing.T) {
-			h, err := NewHandler(tc.auth, tc.guard, tc.logger)
+			h, err := NewHandler(tc.auth, tc.guard, tc.logger, tc.allowedOrigins)
 			if tc.expErr {
 				if err == nil {
 					t.Fatal("Expected an error but got nil")
@@ -378,7 +387,7 @@ func TestHandler_handleRoute(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 
 			lg := &testingH.LoggerMock{}
-			h := newHandler(t, tc.auth, tc.guard, lg)
+			h := newHandler(t, tc.auth, tc.guard, lg, nil)
 			srvr := httptest.NewServer(h)
 			defer srvr.Close()
 
@@ -410,8 +419,8 @@ func TestHandler_handleRoute(t *testing.T) {
 	}
 }
 
-func newHandler(t *testing.T, a Auth, g Guard, lg logging.Logger) http.Handler {
-	h, err := NewHandler(a, g, lg)
+func newHandler(t *testing.T, a Auth, g Guard, lg logging.Logger, allowedOrigins []string) http.Handler {
+	h, err := NewHandler(a, g, lg, allowedOrigins)
 	if err != nil {
 		t.Fatalf("http.NewHandler(): %v", err)
 	}

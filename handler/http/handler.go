@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pborman/uuid"
 	"github.com/tomogoma/authms/config"
@@ -72,7 +73,7 @@ const (
 	valDevice = "device"
 )
 
-func NewHandler(a Auth, g Guard, l logging.Logger) (http.Handler, error) {
+func NewHandler(a Auth, g Guard, l logging.Logger, allowedOrigins []string) (http.Handler, error) {
 	if a == nil {
 		return nil, errors.New("Auth was nil")
 	}
@@ -86,7 +87,14 @@ func NewHandler(a Auth, g Guard, l logging.Logger) (http.Handler, error) {
 	r := mux.NewRouter().PathPrefix(config.WebRootURL).Subrouter()
 	handler{auth: a, guard: g, logger: l}.handleRoute(r)
 
-	return r, nil
+	headersOk := handlers.AllowedHeaders([]string{
+		"X-Requested-With", "Accept", "Content-Type", "Content-Length",
+		"Accept-Encoding", "X-CSRF-Token", "Authorization", "X-api-key",
+	})
+	originsOk := handlers.AllowedOrigins(allowedOrigins)
+	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
+
+	return handlers.CORS(headersOk, originsOk, methodsOk)(r), nil
 }
 
 func (s handler) handleRoute(r *mux.Router) {
