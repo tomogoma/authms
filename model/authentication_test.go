@@ -5,6 +5,7 @@ import (
 
 	"github.com/tomogoma/authms/model"
 	testingH "github.com/tomogoma/authms/testing"
+	"golang.org/x/crypto/bcrypt"
 )
 
 func TestNewAuthentication(t *testing.T) {
@@ -56,7 +57,7 @@ func TestNewAuthentication(t *testing.T) {
 func TestAuthentication_RegisterSelf(t *testing.T) {
 	tt := []struct {
 		name              string
-		db                model.AuthStore
+		db                *testingH.DBMock
 		jwter             *testingH.JWTMock
 		opts              []model.Option
 		loginType         string
@@ -141,6 +142,61 @@ func TestAuthentication_RegisterSelf(t *testing.T) {
 			}
 			if usr == nil {
 				t.Fatalf("Received nil user")
+			}
+		})
+	}
+}
+
+func TestAuthentication_Login(t *testing.T) {
+	validPass := []byte("a valid password")
+	validPassH, err := bcrypt.GenerateFromPassword(validPass, bcrypt.DefaultCost)
+	if err != nil {
+		t.Fatalf("Error setting up: hash test password: %v", err)
+	}
+	tt := []struct {
+		name            string
+		db              model.AuthStore
+		jwter           *testingH.JWTMock
+		opts            []model.Option
+		identifier      string
+		password        []byte
+		loginType       string
+		expErr          bool
+		expUnauthorized bool
+		expForbidden    bool
+	}{
+		{
+			name:       "valid phone",
+			db:         &testingH.DBMock{ExpUsrBPhn: &model.User{ID: "123"}, ExpUsrBPhnPass: validPassH},
+			jwter:      &testingH.JWTMock{},
+			identifier: "+254",
+			password:   validPass,
+			loginType:  model.LoginTypePhone,
+		},
+	}
+	for _, tc := range tt {
+		t.Run(tc.name, func(t *testing.T) {
+			a := newAuthentication(t, tc.db, tc.jwter, tc.opts...)
+			usr, err := a.Login(tc.loginType, tc.identifier, tc.password)
+			if tc.expErr {
+				if err == nil {
+					t.Fatalf("Expected an error, got nil")
+				}
+				if tc.expUnauthorized != a.IsUnauthorizedError(err) {
+					t.Fatalf("Expected IsUnauthorizedError %t, got %t",
+						tc.expUnauthorized, a.IsUnauthorizedError(err))
+				}
+				if tc.expForbidden != a.IsForbiddenError(err) {
+					t.Fatalf("Expected IsUnauthorizedError %t, got %t",
+						tc.expForbidden, a.IsForbiddenError(err))
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("Got error: %v", err)
+			}
+			if usr == nil {
+				t.Fatalf("Got nil user")
 			}
 		})
 	}
