@@ -8,6 +8,7 @@ import (
 /**
  * @api {NULL} User User
  * @apiName User
+ * @apiVersion 0.1.0
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the user (can be cast to long Integer).

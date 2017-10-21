@@ -14,6 +14,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -58,7 +59,7 @@ func main() {
 func installVars() error {
 	content := `#!/usr/bin/env bash
 NAME="` + config.Name + `"
-VERSION="` + config.Version + `"
+VERSION="` + config.VersionFull + `"
 DESCRIPTION="` + config.Description + `"
 CANONICAL_NAME="` + config.CanonicalName + `"
 CONF_DIR="` + config.DefaultConfDir() + `"
@@ -80,7 +81,7 @@ DOCS_DIR="` + config.DefaultDocsDir() + `"
 }
 
 func buildMicroService(goos, goarch, goarm string) error {
-	docsDir := path.Join("install", "docs", config.Version, config.Name, "docs")
+	docsDir := path.Join("install", "docs", config.VersionMajor, config.Name, "docs")
 	if err := compileDocs(docsDir); err != nil {
 		return err
 	}
@@ -107,7 +108,7 @@ func buildGcloud() error {
 		return errors.Newf("create conf dir: %v", err)
 	}
 
-	docsDir := path.Join(config.DefaultDocsDir(), config.Version, config.Name, "docs")
+	docsDir := path.Join(config.DefaultDocsDir(), config.VersionMajor, config.Name, "docs")
 	if err := compileDocs(docsDir); err != nil {
 		return err
 	}
@@ -158,7 +159,43 @@ func buildGcloud() error {
 }
 
 func compileDocs(docsDir string) error {
-	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
+
+	subjDir := path.Join("handler", "http")
+	headerFile := path.Join(subjDir, "apidoc_header.md")
+	APIDocConfFile := path.Join(subjDir, "apidoc.json")
+
+	apiDoc := struct {
+		Name        string      `json:"name"`
+		Version     string      `json:"version"`
+		Description string      `json:"description"`
+		Title       string      `json:"title"`
+		Header      interface{} `json:"header"`
+	}{
+		Name:        config.Name,
+		Version:     config.VersionFull,
+		Description: config.Description,
+		Title:       config.CanonicalName,
+		Header: struct {
+			Title    string `json:"title"`
+			FileName string `json:"filename"`
+		}{
+			Title:    "Introduction",
+			FileName: headerFile,
+		},
+	}
+
+	apiDocB, err := json.Marshal(apiDoc)
+	if err != nil {
+		return errors.Newf("Marshal API doc config file: %v", err)
+	}
+
+	err = ioutil.WriteFile(APIDocConfFile, apiDocB, 0655)
+	if err != nil {
+		return errors.Newf("Write API doc file: %v", err)
+	}
+
+	args := []string{"-i", subjDir, "-c", subjDir, "-o", docsDir}
+	cmd := exec.Command("apidoc", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return errors.Newf("generate http docs: %v: %s", err, out)
 	}

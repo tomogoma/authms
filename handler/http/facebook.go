@@ -8,6 +8,7 @@ import (
 /**
  * @api {NULL} FacebookID FacebookID
  * @apiName FacebookID
+ * @apiVersion 0.1.0
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the facebook ID (can be cast to long Integer).

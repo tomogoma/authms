@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 NAME="authms"
-VERSION="v0"
+VERSION="v0.1.0"
 DESCRIPTION="Authentication Micro-Service"
 CANONICAL_NAME="authmsv0"
 CONF_DIR="/etc/authms"

@@ -8,6 +8,7 @@ import (
 /**
  * @api {NULL} Device Device
  * @apiName Device
+ * @apiVersion 0.1.0
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the device (can be cast to long Integer).

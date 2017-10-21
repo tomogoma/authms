@@ -8,6 +8,7 @@ import (
 /**
  * @api {NULL} VerifLogin Verifiable Login
  * @apiName VerifLogin
+ * @apiVersion 0.1.0
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the verifiable login (can be cast to long Integer).

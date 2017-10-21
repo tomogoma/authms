@@ -9,13 +9,14 @@ import (
 // during runtime.
 const (
 	Name                = "authms"
-	Version             = "v0"
+	VersionMajor        = "v0"
+	VersionFull         = "v0.1.0"
 	Description         = "Authentication Micro-Service"
-	CanonicalName       = Name + Version
+	CanonicalName       = Name + VersionMajor
 	RPCNamePrefix       = ""
 	CanonicalRPCName    = RPCNamePrefix + CanonicalName
-	WebNamePrefix       = "go.micro.api." + Version + "."
-	WebRootURL          = "/" + Version + "/" + Name
+	WebNamePrefix       = "go.micro.api." + VersionMajor + "."
+	WebRootURL          = "/" + VersionMajor + "/" + Name
 	CanonicalWebName    = WebNamePrefix + Name
 	DefaultSysDUnitName = CanonicalName + ".service"
 

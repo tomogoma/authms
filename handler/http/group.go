@@ -8,6 +8,7 @@ import (
 /**
  * @api {NULL} Group Group
  * @apiName Group
+ * @apiVersion 0.1.0
  * @apiGroup Objects
  *
  * @apiSuccess {String} ID Unique ID of the group (can be cast to long Integer).

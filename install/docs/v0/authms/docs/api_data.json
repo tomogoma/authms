@@ -5,6 +5,7 @@
     "title": "Login",
     "description": "<p>User login. See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>",
     "name": "Login",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -37,7 +38,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -47,6 +47,7 @@
     "title": "Register",
     "description": "<p>Register new user. Registration can be:</p> <ul> <li>self registration - provide URL param selfReg=true</li> <li>self registration by unique device ID - provide URL param selfReg=device</li> <li>or other user (by admin) - don't provide URL params</li> </ul> <p>loginType is what the user will be logging in by, can be one of:</p> <ul> <li>usernames</li> <li>emails</li> <li>phones</li> <li>facebook</li> </ul>",
     "name": "Register",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -114,7 +115,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -124,6 +124,7 @@
     "title": "Reset password",
     "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
     "name": "ResetPassword",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -184,7 +185,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -194,6 +194,7 @@
     "title": "Send Password Reset OTP",
     "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
     "name": "SendPasswordResetOTP",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -240,7 +241,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -250,6 +250,7 @@
     "title": "Send Verification Code",
     "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
     "name": "SendVerificationCode",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -276,7 +277,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -286,6 +286,7 @@
     "title": "Verify OTP",
     "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options. userID is the ID of the <a href=\"#api-Objects-User\">User</a> to whom OTP was sent. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
     "name": "SendVerificationCode",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -319,7 +320,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -328,6 +328,7 @@
     "url": "/status",
     "title": "Status",
     "name": "Status",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -382,7 +383,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -392,6 +392,7 @@
     "title": "Update Identifier",
     "description": "<p>Update (or set for first time) the identifier details for loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType. See <a href=\"#api-Objects-User\">User</a> for how to access the JWT.</p>",
     "name": "UpdateIdentifier",
+    "version": "0.1.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -431,7 +432,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Auth"
   },
@@ -440,6 +440,7 @@
     "url": "Device",
     "title": "Device",
     "name": "Device",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -482,7 +483,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/device.go",
     "groupTitle": "Objects"
   },
@@ -491,6 +491,7 @@
     "url": "FacebookID",
     "title": "FacebookID",
     "name": "FacebookID",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -540,7 +541,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/facebook.go",
     "groupTitle": "Objects"
   },
@@ -549,6 +549,7 @@
     "url": "Group",
     "title": "Group",
     "name": "Group",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -591,7 +592,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/group.go",
     "groupTitle": "Objects"
   },
@@ -600,6 +600,7 @@
     "url": "OTPStatus",
     "title": "OTP Status",
     "name": "OTPStatus",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -621,7 +622,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/dbt_status.go",
     "groupTitle": "Objects"
   },
@@ -630,6 +630,7 @@
     "url": "User",
     "title": "User",
     "name": "User",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -707,7 +708,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/user.go",
     "groupTitle": "Objects"
   },
@@ -716,6 +716,7 @@
     "url": "UserType",
     "title": "User Type",
     "name": "UserType",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -751,7 +752,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/user_type.go",
     "groupTitle": "Objects"
   },
@@ -760,6 +760,7 @@
     "url": "Username",
     "title": "Username",
     "name": "Username",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -802,7 +803,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/username.go",
     "groupTitle": "Objects"
   },
@@ -811,6 +811,7 @@
     "url": "VerifLogin",
     "title": "Verifiable Login",
     "name": "VerifLogin",
+    "version": "0.1.0",
     "group": "Objects",
     "success": {
       "fields": {
@@ -860,7 +861,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/verifiable_login.go",
     "groupTitle": "Objects"
   },
@@ -870,6 +870,7 @@
     "title": "First User",
     "description": "<p>Register the first super-user (super admin)</p>",
     "name": "FirstUser",
+    "version": "0.1.0",
     "group": "Setup",
     "header": {
       "fields": {
@@ -930,7 +931,6 @@
         ]
       }
     },
-    "version": "0.0.0",
     "filename": "handler/http/handler.go",
     "groupTitle": "Setup"
   }

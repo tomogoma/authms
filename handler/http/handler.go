@@ -205,6 +205,7 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
 /**
  * @api {get} /status Status
  * @apiName Status
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -226,7 +227,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		NeedRegSuper  bool   `json:"needRegSuper"`
 	}{
 		Name:          config.Name,
-		Version:       config.Version,
+		Version:       config.VersionFull,
 		Description:   config.Description,
 		CanonicalName: config.CanonicalWebName,
 		NeedRegSuper:  canRegFrst,
@@ -237,6 +238,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  * @api {put} /first_user First User
  * @apiDescription Register the first super-user (super admin)
  * @apiName FirstUser
+ * @apiVersion 0.1.0
  * @apiGroup Setup
  *
  * @apiHeader x-api-key the api key
@@ -280,6 +282,7 @@ func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
  * - facebook
  *
  * @apiName Register
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -330,6 +333,7 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
  * @apiDescription User login.
  * See <a href="#api-Auth-Register">Register</a> for loginType options.
  * @apiName Login
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -363,6 +367,7 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
  * See <a href="#api-Auth-Register">Register</a> for loginType.
  * See <a href="#api-Objects-User">User</a> for how to access the JWT.
  * @apiName UpdateIdentifier
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -394,6 +399,7 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
  * @apiDescription Send OTP to identifier of type loginType for purpose of verifying identifier.
  * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
  * @apiName SendVerificationCode
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -423,6 +429,7 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
  * userID is the ID of the <a href="#api-Objects-User">User</a> to whom OTP was sent.
  * extend can be set to "true" if intent on extending the expiry of the OTP.
  * @apiName SendVerificationCode
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -467,6 +474,7 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
  * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
  * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
  * @apiName SendPasswordResetOTP
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
@@ -495,6 +503,7 @@ func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request
  * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
  * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
  * @apiName ResetPassword
+ * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
