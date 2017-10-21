@@ -273,7 +273,7 @@ func (a *Authentication) RegisterFirst(loginType, userType, id string, secret []
 		return nil, err
 	}
 
-	return a.registerOther(userType, id, superGrp.ID, regCondF, regF)
+	return a.registerOther(userType, id, superGrp.ID, secret, regCondF, regF)
 }
 
 // RegisterSelf registers a new user account using id secret combination.
@@ -361,7 +361,12 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, newLoginType)
 	}
 
-	return a.registerOther(userType, id, groupID, regCondF, regF)
+	pass, err := a.passGen.SecureRandomBytes(genPassLen)
+	if err != nil {
+		return nil, errors.Newf("generate password: %v", err)
+	}
+
+	return a.registerOther(userType, id, groupID, pass, regCondF, regF)
 }
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
@@ -814,7 +819,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 	return usr, nil
 }
 
-func (a *Authentication) registerOther(userType, id, groupID string, rcf regConditions, f regFunc) (*User, error) {
+func (a *Authentication) registerOther(userType, id, groupID string, pass []byte, rcf regConditions, f regFunc) (*User, error) {
 
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
@@ -836,10 +841,11 @@ func (a *Authentication) registerOther(userType, id, groupID string, rcf regCond
 		return nil, err
 	}
 
-	_, passH, err := a.genPasswordWithHash()
+	passH, err := hashIfValid(pass)
 	if err != nil {
 		return nil, err
 	}
+
 	usr := new(User)
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
 		usr, err = a.db.InsertUserAtomic(tx, *ut, passH)
@@ -995,15 +1001,6 @@ func (a *Authentication) updatePhone(usrID, newNum string) (*VerifLogin, error) 
 		return nil, err
 	}
 	return phone, nil
-}
-
-func (a *Authentication) genPasswordWithHash() (password []byte, passwordH []byte, err error) {
-	password, err = a.passGen.SecureRandomBytes(genPassLen)
-	if err != nil {
-		return nil, nil, errors.Newf("generate password: %v", err)
-	}
-	passwordH, err = hash(password)
-	return
 }
 
 func (a *Authentication) genAndInsertToken(tx *sql.Tx, expiry time.Time, loginType, forUsrID, loginID string) ([]byte, error) {
