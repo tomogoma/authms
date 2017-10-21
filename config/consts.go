@@ -10,7 +10,7 @@ import (
 // during runtime.
 const (
 	Name        = "authms"
-	VersionFull = "0.1.0" // Use http://semver.org standards
+	VersionFull = "0.2.0" // Use http://semver.org standards
 	Description = "Authentication Micro-Service"
 
 	RPCNamePrefix = ""

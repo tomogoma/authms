@@ -34,8 +34,8 @@ type Auth interface {
 	SetPassword(loginType, onAddr string, dbt, pass []byte) (*model.VerifLogin, error)
 	SendVerCode(JWT, loginType, toAddr string) (*model.DBTStatus, error)
 	SendPassResetCode(loginType, toAddr string) (*model.DBTStatus, error)
-	VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error)
-	VerifyDBT(loginType, userID string, dbt []byte) (*model.VerifLogin, error)
+	VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (string, error)
+	VerifyDBT(loginType, forAddr string, dbt []byte) (*model.VerifLogin, error)
 	Login(loginType, identifier string, password []byte) (*model.User, error)
 }
 
@@ -107,10 +107,6 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodPut).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegisterFirst))))
 
-	r.PathPrefix("/users/{" + keyUserID + "}/verify/{" + keyOTP + "}").
-		Methods(http.MethodGet).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
-
 	r.PathPrefix("/reset_password/send_otp").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleSendPassResetCode))))
@@ -123,9 +119,13 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodPut).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
 
-	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyIdentifier + "}").
-		Methods(http.MethodGet).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSendVerifCode)))
+	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyOTP + "}").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleVerifyCode))))
+
+	r.PathPrefix("/{" + keyLoginType + "}/verify").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleSendVerifCode))))
 
 	r.PathPrefix("/{" + keyLoginType + "}/login").
 		Methods(http.MethodPost).
@@ -396,44 +396,49 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /:loginType/verify/:identifier?token=:JWT Send Verification Code
+ * @api {POST} /:loginType/verify?token=:JWT Send Verification Code
  * @apiDescription Send OTP to identifier of type loginType for purpose of verifying identifier.
- * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
+ * See <a href="#api-Auth-Register">Register</a> for loginType options.
  * @apiName SendVerificationCode
- * @apiVersion 0.1.0
+ * @apiVersion 0.2.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
+ *
+ * @apiParam {String} identifier The loginType's address to be verified.
  *
  * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-OTPStatus">OTPStatus</a>.
  *
  */
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	req := struct {
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &struct {
 		LT     string `json:"loginType"`
 		ToAddr string `json:"identifier"`
 		JWT    string `json:"token"`
-	}{
-		LT:     vars[keyLoginType],
-		ToAddr: vars[keyIdentifier],
-		JWT:    r.URL.Query().Get(keyToken),
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
 	}
+	vars := mux.Vars(r)
+	req.LT = vars[keyLoginType]
+	req.JWT = r.URL.Query().Get(keyToken)
 	dbtStatus, err := s.auth.SendVerCode(req.JWT, req.LT, req.ToAddr)
 	s.respondOn(w, r, req, NewDBTStatus(dbtStatus), http.StatusOK, err)
 }
 
 /**
- * @api {GET} /users/:userID/verify/:OTP?loginType=:loginType&extend=:extend Verify OTP
+ * @api {POST} /:loginType/verify/:OTP?extend=:extend Verify OTP
  * @apiDescription Verify OTP.
- * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
- * userID is the ID of the <a href="#api-Objects-User">User</a> to whom OTP was sent.
+ * See <a href="#api-Auth-Register">Register</a> for loginType options.
  * extend can be set to "true" if intent on extending the expiry of the OTP.
- * @apiName SendVerificationCode
- * @apiVersion 0.1.0
+ * @apiName VerifyOTP
+ * @apiVersion 0.2.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
+ *
+ * @apiParam {String} identifier The loginType's address to whom the OTP was sent.
  *
  * @apiSuccess (200) {String} OTP [if extending OTP] the new OTP with extended expiry
  *
@@ -441,30 +446,33 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	q := r.URL.Query()
-	req := struct {
-		UserID string `json:"userID"`
-		LT     string `json:"loginType"`
-		DBT    string `json:"OTP"`
-		Extend string `json:"extend"`
-	}{
-		UserID: vars[keyUserID],
-		LT:     q.Get(keyLoginType),
-		DBT:    vars[keyOTP],
-		Extend: q.Get(keyExtend),
+	dataB := r.Context().Value(ctxtKeyBody).([]byte)
+	req := &struct {
+		Identifier string `json:"identifier"`
+		LT         string `json:"loginType"`
+		DBT        string `json:"OTP"`
+		Extend     string `json:"extend"`
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+		return
 	}
+	vars := mux.Vars(r)
+	req.LT = vars[keyLoginType]
+	req.DBT = vars[keyOTP]
+	q := r.URL.Query()
+	req.Extend = q.Get(keyExtend)
+
 	var resp interface{}
 	var err error
 	if strings.EqualFold(req.Extend, valTrue) {
 		var dbt string
-		dbt, err = s.auth.VerifyAndExtendDBT(req.LT, req.UserID, []byte(req.DBT))
+		dbt, err = s.auth.VerifyAndExtendDBT(req.LT, req.Identifier, []byte(req.DBT))
 		resp = struct {
 			OTP string `json:"OTP"`
 		}{OTP: dbt}
 	} else {
 		var vl *model.VerifLogin
-		vl, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
+		vl, err = s.auth.VerifyDBT(req.LT, req.Identifier, []byte(req.DBT))
 		resp = NewVerifLogin(vl)
 	}
 	s.respondOn(w, r, req, resp, http.StatusOK, err)

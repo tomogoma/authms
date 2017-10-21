@@ -1,6 +1,6 @@
 define({
   "name": "authms",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Authentication Micro-Service",
   "title": "authmsv0",
   "header": {
@@ -12,7 +12,7 @@ define({
   "apidoc": "0.3.0",
   "generator": {
     "name": "apidoc",
-    "time": "2017-10-21T20:06:28.415Z",
+    "time": "2017-10-21T22:09:14.446Z",
     "url": "http://apidocjs.com",
     "version": "0.17.6"
   }

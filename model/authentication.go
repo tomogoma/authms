@@ -601,13 +601,13 @@ func (a *Authentication) SendPassResetCode(loginType, toAddr string) (*DBTStatus
 // that can be used to perform actions that would otherwise not be possible on
 // the user's account without a password or a JWT for a limited period of time.
 // See VerifyDBT() for details on verification.
-func (a *Authentication) VerifyAndExtendDBT(lt, usrID string, dbt []byte) (string, error) {
-	lv, err := a.verifyDBT(lt, usrID, dbt)
+func (a *Authentication) VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (string, error) {
+	lv, err := a.verifyDBT(lt, forAddr, dbt)
 	if err != nil {
 		return "", err
 	}
 	expiry := time.Now().Add(extendTknValidity)
-	tkn, err := a.genAndInsertToken(nil, expiry, lt, usrID, lv.Address)
+	tkn, err := a.genAndInsertToken(nil, expiry, lt, lv.UserID, lv.Address)
 	if err != nil {
 		return "", err
 	}
@@ -617,8 +617,8 @@ func (a *Authentication) VerifyAndExtendDBT(lt, usrID string, dbt []byte) (strin
 // VerifyDBT sets a user's address as verified after successful SendVerCode()
 // and subsequent entry of the code by the user.
 // loginType should be similar to the one used during SendVerCode().
-func (a *Authentication) VerifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
-	return a.verifyDBT(loginType, userID, dbt)
+func (a *Authentication) VerifyDBT(loginType, forAddr string, dbt []byte) (*VerifLogin, error) {
+	return a.verifyDBT(loginType, forAddr, dbt)
 }
 
 // Login validates a user's credentials and returns the user's information
@@ -673,27 +673,35 @@ func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) er
 	return nil
 }
 
-func (a *Authentication) verifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
+func (a *Authentication) verifyDBT(loginType, forAddr string, dbt []byte) (*VerifLogin, error) {
 
 	var tokensFetchFunc func(string, int64, int64) ([]DBToken, error)
 	var updateLoginFunc func(string, string, bool) (*VerifLogin, error)
+	var usr *User
+	var err error
 
 	switch loginType {
 	case LoginTypeEmail:
 		tokensFetchFunc = a.db.EmailTokens
 		updateLoginFunc = a.db.UpdateUserEmail
+		usr, _, err = a.db.UserByEmail(forAddr)
 	case LoginTypePhone:
 		tokensFetchFunc = a.db.PhoneTokens
 		updateLoginFunc = a.db.UpdateUserPhone
+		usr, _, err = a.db.UserByPhone(forAddr)
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
-	tkn, err := a.dbTokenValid(userID, dbt, tokensFetchFunc)
+	if err != nil {
+		return nil, errors.Newf("get user by %s: %v", loginType, err)
+	}
+
+	tkn, err := a.dbTokenValid(usr.ID, dbt, tokensFetchFunc)
 	if err != nil {
 		return nil, err
 	}
-	phone, err := updateLoginFunc(userID, tkn.Address, true)
+	phone, err := updateLoginFunc(usr.ID, tkn.Address, true)
 	if err != nil {
 		return nil, errors.Newf("update phone to verified: %v", err)
 	}

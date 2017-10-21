@@ -246,11 +246,11 @@ define({ "api": [
   },
   {
     "type": "POST",
-    "url": "/:loginType/verify/:identifier?token=:JWT",
+    "url": "/:loginType/verify?token=:JWT",
     "title": "Send Verification Code",
-    "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
+    "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier. See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>",
     "name": "SendVerificationCode",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "group": "Auth",
     "header": {
       "fields": {
@@ -260,6 +260,19 @@ define({ "api": [
             "optional": false,
             "field": "x-api-key",
             "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "identifier",
+            "description": "<p>The loginType's address to be verified.</p>"
           }
         ]
       }
@@ -281,10 +294,10 @@ define({ "api": [
     "groupTitle": "Auth"
   },
   {
-    "type": "GET",
-    "url": "/users/:userID/verify/:OTP?loginType=:loginType&extend=:extend",
-    "title": "Verify OTP",
-    "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options. userID is the ID of the <a href=\"#api-Objects-User\">User</a> to whom OTP was sent. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
+    "type": "POST",
+    "url": "/:loginType/verify/:identifier?token=:JWT",
+    "title": "Send Verification Code",
+    "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
     "name": "SendVerificationCode",
     "version": "0.1.0",
     "group": "Auth",
@@ -300,27 +313,33 @@ define({ "api": [
         ]
       }
     },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "identifier",
+            "description": "<p>The new 'username' corresponding to loginType</p>"
+          }
+        ]
+      }
+    },
     "success": {
       "fields": {
         "200": [
           {
             "group": "200",
-            "type": "String",
-            "optional": false,
-            "field": "OTP",
-            "description": "<p>[if extending OTP] the new OTP with extended expiry</p>"
-          },
-          {
-            "group": "200",
             "type": "Object",
             "optional": false,
             "field": "json-body",
-            "description": "<p>[if not extending OTP] see <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+            "description": "<p>See <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
           }
         ]
       }
     },
-    "filename": "handler/http/handler.go",
+    "filename": "handler/http/_apidoc.js",
     "groupTitle": "Auth"
   },
   {
@@ -433,6 +452,105 @@ define({ "api": [
       }
     },
     "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
+    "type": "POST",
+    "url": "/:loginType/verify/:OTP?extend=:extend",
+    "title": "Verify OTP",
+    "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType options. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
+    "name": "VerifyOTP",
+    "version": "0.2.0",
+    "group": "Auth",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "Parameter": [
+          {
+            "group": "Parameter",
+            "type": "String",
+            "optional": false,
+            "field": "identifier",
+            "description": "<p>The loginType's address to whom the OTP was sent.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "200": [
+          {
+            "group": "200",
+            "type": "String",
+            "optional": false,
+            "field": "OTP",
+            "description": "<p>[if extending OTP] the new OTP with extended expiry</p>"
+          },
+          {
+            "group": "200",
+            "type": "Object",
+            "optional": false,
+            "field": "json-body",
+            "description": "<p>[if not extending OTP] see <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
+    "type": "GET",
+    "url": "/users/:userID/verify/:OTP?loginType=:loginType&extend=:extend",
+    "title": "Verify OTP",
+    "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options. userID is the ID of the <a href=\"#api-Objects-User\">User</a> to whom OTP was sent. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
+    "name": "VerifyOTP",
+    "version": "0.1.0",
+    "group": "Auth",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "200": [
+          {
+            "group": "200",
+            "type": "String",
+            "optional": false,
+            "field": "OTP",
+            "description": "<p>[if extending OTP] the new OTP with extended expiry</p>"
+          },
+          {
+            "group": "200",
+            "type": "Object",
+            "optional": false,
+            "field": "json-body",
+            "description": "<p>[if not extending OTP] see <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/_apidoc.js",
     "groupTitle": "Auth"
   },
   {
