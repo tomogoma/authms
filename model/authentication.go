@@ -916,7 +916,6 @@ func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *Us
 		return errors.Newf("insert phone: %v", err)
 	}
 	usr.Phone = *phone
-	return nil
 	if a.smserNilable == nil {
 		return nil
 	}
@@ -938,7 +937,6 @@ func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *U
 		return errors.Newf("insert email: %v", err)
 	}
 	usr.Email = *email
-	return nil
 	if a.mailerNilable == nil {
 		return nil
 	}
@@ -968,11 +966,11 @@ func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbID string, usr *U
 }
 
 func (a *Authentication) updateUsername(usrID, newUsrName string) (*Username, error) {
-	_, _, err := a.db.UserByUsername(newUsrName)
-	if err = a.usrIdentifierAvail(LoginTypeUsername, err); err != nil {
-		return nil, err
-	}
 	// TODO
+	//_, _, err := a.db.UserByUsername(newUsrName)
+	//if err = a.usrIdentifierAvail(LoginTypeUsername, err); err != nil {
+	//	return nil, err
+	//}
 	//uname, err := a.db.UpdateUserName(clm.UsrID, newUsrName)
 	//if err != nil {
 	//	return nil, errors.Newf("user by phone: %v", err)
