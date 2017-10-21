@@ -565,32 +565,28 @@ func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData in
 }
 
 func (s *handler) respondOn(w http.ResponseWriter, r *http.Request, reqData interface{}, respData interface{}, code int, err error) int {
+
 	if err != nil {
 		s.handleError(w, r, reqData, err)
 		return 0
 	}
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	response := struct {
-		Status  int         `json:"status"`
-		Message string      `json:"message"`
-		Data    interface{} `json:"data"`
-	}{
-		Status: code,
-		Data:   respData,
+
+	respBytes, err := json.Marshal(respData)
+	if err != nil {
+		s.handleError(w, r, reqData, err)
+		return 0
 	}
+
 	w.Header().Set("Content-Type", "application/json")
-	respBytes, err := json.Marshal(&response)
-	if err != nil {
-		s.handleError(w, r, reqData, err)
-		return 0
-	}
 	w.WriteHeader(code)
+
 	i, err := w.Write(respBytes)
 	if err != nil {
 		log := r.Context().Value(ctxKeyLog).(logging.Logger)
 		log.Errorf("unable write data to response stream: %v", err)
 		return i
 	}
+
 	return i
 }
 
