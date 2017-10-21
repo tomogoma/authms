@@ -81,12 +81,11 @@ DOCS_DIR="` + config.DefaultDocsDir() + `"
 
 func buildMicroService(goos, goarch, goarm string) error {
 	docsDir := path.Join("install", "docs", config.Version, config.Name, "docs")
-	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Newf("generate http docs: %v: %s", err, out)
+	if err := compileDocs(docsDir); err != nil {
+		return err
 	}
 	args := []string{"build", "-o", "bin/app", "./cmd/microservice"}
-	cmd = exec.Command("go", args...)
+	cmd := exec.Command("go", args...)
 	cmd.Env = os.Environ()
 	for _, env := range []string{
 		"GOOS=" + goos,
@@ -109,9 +108,8 @@ func buildGcloud() error {
 	}
 
 	docsDir := path.Join(config.DefaultDocsDir(), config.Version, config.Name, "docs")
-	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return errors.Newf("generate http docs: %v: %s", err, out)
+	if err := compileDocs(docsDir); err != nil {
+		return err
 	}
 
 	if err := os.MkdirAll(config.DefaultTplDir(), 0755); err != nil {
@@ -156,6 +154,14 @@ func buildGcloud() error {
 		return errors.Newf("copy phone verification template: %v", err)
 	}
 
+	return nil
+}
+
+func compileDocs(docsDir string) error {
+	cmd := exec.Command("apidoc", "-i", "handler/http", "-o", docsDir)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return errors.Newf("generate http docs: %v: %s", err, out)
+	}
 	return nil
 }
 
