@@ -127,10 +127,10 @@ const (
 	GroupStaff  = "staff"
 	GroupPublic = "public"
 
-	AccessLevelSuper  = 0
+	AccessLevelSuper  = 1
 	AccessLevelAdmin  = 3
 	AccessLevelStaff  = 7
-	AccessLevelPublic = 10
+	AccessLevelPublic = 9
 
 	UserTypeIndividual = "individual"
 	UserTypeCompany    = "company"
@@ -273,7 +273,12 @@ func (a *Authentication) RegisterFirst(loginType, userType, id string, secret []
 		return nil, err
 	}
 
-	return a.registerOther(userType, id, superGrp.ID, secret, regCondF, regF)
+	// Assume system is a 'person' in group super registering another
+	// of the same group - the first human 'person'.
+	// This bypasses restrictions on registerSelf() e.g.
+	// 1. User can only be a member of the public group.
+	// 2. Self registration may be disabled by config options.
+	return a.registerOther(*superGrp, userType, superGrp.ID, id, secret, regCondF, regF)
 }
 
 // RegisterSelf registers a new user account using id secret combination.
@@ -338,7 +343,12 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 	if err != nil {
 		return nil, err
 	}
-	if _, err := a.validateJWTInGroup(JWT, *adminGrp); err != nil {
+	superGroup, err := a.getOrCreateGroup(GroupSuper, AccessLevelSuper)
+	if err != nil {
+		return nil, err
+	}
+	clm, err := a.validateJWTInOneOf(JWT, *adminGrp, *superGroup)
+	if err != nil {
 		return nil, err
 	}
 
@@ -366,7 +376,9 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 		return nil, errors.Newf("generate password: %v", err)
 	}
 
-	return a.registerOther(userType, id, groupID, pass, regCondF, regF)
+	// clm.StrongestGroup cannot panic because we validate that JWT claims
+	// to be in either admin or super groups or both.
+	return a.registerOther(*clm.StrongestGroup, userType, groupID, id, pass, regCondF, regF)
 }
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
@@ -819,7 +831,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 	return usr, nil
 }
 
-func (a *Authentication) registerOther(userType, id, groupID string, pass []byte, rcf regConditions, f regFunc) (*User, error) {
+func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, id string, pass []byte, rcf regConditions, f regFunc) (*User, error) {
 
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
@@ -830,6 +842,9 @@ func (a *Authentication) registerOther(userType, id, groupID string, pass []byte
 			return nil, errors.NewClient("groupID does not exist")
 		}
 		return nil, errors.Newf("get group by ID: %v", err)
+	}
+	if regerLrgstGrp.AccessLevel < usrGroup.AccessLevel {
+		return nil, errors.NewForbiddenf("You do not have enough rights to perform this operation")
 	}
 	id, err = rcf(id)
 	if err != nil {
@@ -1166,7 +1181,7 @@ func (a *Authentication) getOrCreateUserType(name string) (*UserType, error) {
 	return ut, nil
 }
 
-func (a *Authentication) validateJWTInGroup(JWT string, g Group) (JWTClaim, error) {
+func (a *Authentication) validateJWTInOneOf(JWT string, gs ...Group) (JWTClaim, error) {
 	clm := JWTClaim{}
 	if JWT == "" {
 		return clm, errors.NewUnauthorizedf("JWT must be provided")
@@ -1175,10 +1190,12 @@ func (a *Authentication) validateJWTInGroup(JWT string, g Group) (JWTClaim, erro
 	if err != nil {
 		return clm, errors.NewForbidden("invalid JWT")
 	}
-	if !inGroups(g, clm.Groups) {
-		return clm, errors.NewForbidden("invalid JWT")
+	for _, g := range gs {
+		if inGroups(g, clm.Groups) {
+			return clm, nil
+		}
 	}
-	return clm, nil
+	return clm, errors.NewForbidden("invalid JWT")
 }
 
 func (a *Authentication) loginFacebook(fbToken string) (*User, error) {
