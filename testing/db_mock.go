@@ -89,6 +89,8 @@ type DBMock struct {
 	ExpSMTPConf       model.SMTPConfig
 	ExpSMTPConfErr    error
 
+	ExpHasUsrsErr error
+
 	isInTx bool
 }
 
@@ -112,6 +114,10 @@ func (db *DBMock) GetSMTPConfig(conf interface{}) error {
 	rve.FieldByName("TLSPort").SetInt(int64(db.ExpSMTPConf.TLSPort))
 	rve.FieldByName("SSLPort").SetInt(int64(db.ExpSMTPConf.SSLPort))
 	return nil
+}
+
+func (db *DBMock) HasUsers(grpID string) error {
+	return db.ExpHasUsrsErr
 }
 
 func (db *DBMock) UpsertSMTPConfig(conf interface{}) error {

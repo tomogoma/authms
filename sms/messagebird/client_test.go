@@ -1,13 +1,12 @@
 package messagebird_test
 
 import (
-	"flag"
 	"io/ioutil"
 	"testing"
 
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/sms/messagebird"
-	config2 "github.com/tomogoma/go-commons/config"
+	testingH "github.com/tomogoma/authms/testing"
 )
 
 type configMock struct {
@@ -16,9 +15,7 @@ type configMock struct {
 	apiKey      string
 }
 
-const testMessage = "This is a test message, the Message Bird client is being tested on " + config.CanonicalName
-
-var confPath = flag.String("conf", config.DefaultConfPath, "/path/to/authms.conf.yml")
+var testMessage = "This is a test message, the Message Bird client is being tested on " + config.CanonicalName()
 
 func TestNewClient(t *testing.T) {
 	conf := setUp(t)
@@ -140,10 +137,7 @@ func TestClient_SMS(t *testing.T) {
 }
 
 func setUp(t *testing.T) configMock {
-	conf := config.General{}
-	if err := config2.ReadYamlConfig(*confPath, &conf); err != nil {
-		t.Fatalf("Error setting up: read yaml config: %v", err)
-	}
+	conf := testingH.ReadConfig(t)
 	apiKey, err := ioutil.ReadFile(conf.SMS.MessageBird.APIKeyFile)
 	if err != nil {
 		t.Fatalf("Error setting up: read API key file: %v", err)

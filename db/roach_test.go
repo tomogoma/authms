@@ -5,15 +5,15 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
 	testingH "github.com/tomogoma/authms/testing"
+	"github.com/tomogoma/crdb"
 	errors "github.com/tomogoma/go-typed-errors"
 )
 
 var isInit bool
 
-func setup(t *testing.T) config.Database {
+func setup(t *testing.T) crdb.Config {
 	conf := testingH.ReadConfig(t)
 	conf.Database.DBName = conf.Database.DBName + "_test"
 	if !isInit {
@@ -28,7 +28,7 @@ func setup(t *testing.T) config.Database {
 	return conf.Database
 }
 
-func tearDown(t *testing.T, conf config.Database) {
+func tearDown(t *testing.T, conf crdb.Config) {
 	rdb := getDB(t, conf)
 	defer rdb.Close()
 	if err := delAllTables(rdb, conf.DBName); err != nil {
@@ -213,7 +213,7 @@ func TestRoach_InitDBIfNot(t *testing.T) {
 	}
 }
 
-func newRoach(t *testing.T, conf config.Database) *db.Roach {
+func newRoach(t *testing.T, conf crdb.Config) *db.Roach {
 	r := db.NewRoach(
 		db.WithDBName(conf.DBName),
 		db.WithDSN(conf.FormatDSN()),
@@ -224,7 +224,7 @@ func newRoach(t *testing.T, conf config.Database) *db.Roach {
 	return r
 }
 
-func getDB(t *testing.T, conf config.Database) *sql.DB {
+func getDB(t *testing.T, conf crdb.Config) *sql.DB {
 	DB, err := sql.Open("postgres", conf.FormatDSN())
 	if err != nil {
 		t.Fatalf("new db instance: %s", err)
