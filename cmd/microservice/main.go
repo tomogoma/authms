@@ -24,7 +24,7 @@ func main() {
 	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confFile, log)
 
 	serverRPCQuitCh := make(chan error)
-	rpcSrv, err := rpc.NewHandler(config.CanonicalName, authentication)
+	rpcSrv, err := rpc.NewHandler(config.CanonicalName(), authentication)
 	logging.LogFatalOnError(log, err, "Instantate RPC handler")
 	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
@@ -44,7 +44,7 @@ func main() {
 
 func serveRPC(conf config.Service, rpcSrv *rpc.Handler, quitCh chan error) {
 	service := micro.NewService(
-		micro.Name(config.CanonicalRPCName),
+		micro.Name(config.CanonicalRPCName()),
 		micro.Version(conf.LoadBalanceVersion),
 		micro.RegisterInterval(conf.RegisterInterval),
 		micro.WrapHandler(rpcSrv.Wrapper),
@@ -57,7 +57,7 @@ func serveRPC(conf config.Service, rpcSrv *rpc.Handler, quitCh chan error) {
 func serveHttp(conf config.Service, h http2.Handler, quitCh chan error) {
 	srvc := web.NewService(
 		web.Handler(h),
-		web.Name(config.CanonicalWebName),
+		web.Name(config.CanonicalWebName()),
 		web.Version(conf.LoadBalanceVersion),
 		web.RegisterInterval(conf.RegisterInterval),
 	)

@@ -61,12 +61,12 @@ func installVars() error {
 NAME="` + config.Name + `"
 VERSION="` + config.VersionFull + `"
 DESCRIPTION="` + config.Description + `"
-CANONICAL_NAME="` + config.CanonicalName + `"
+CANONICAL_NAME="` + config.CanonicalName() + `"
 CONF_DIR="` + config.DefaultConfDir() + `"
 CONF_FILE="` + config.DefaultConfPath() + `"
 INSTALL_DIR="` + config.DefaultInstallDir() + `"
 INSTALL_FILE="` + config.DefaultInstallPath() + `"
-UNIT_NAME="` + config.DefaultSysDUnitName + `"
+UNIT_NAME="` + config.DefaultSysDUnitName() + `"
 UNIT_FILE="` + config.DefaultSysDUnitFilePath() + `"
 TPL_DIR="` + config.DefaultTplDir() + `"
 EMAIL_INVITE_TPL="` + config.DefaultEmailInviteTpl() + `"
@@ -81,7 +81,7 @@ DOCS_DIR="` + config.DefaultDocsDir() + `"
 }
 
 func buildMicroService(goos, goarch, goarm string) error {
-	docsDir := path.Join("install", "docs", config.VersionMajor, config.Name, "docs")
+	docsDir := path.Join("install", "docs", config.VersionMajorPrefixed(), config.Name, "docs")
 	if err := compileDocs(docsDir); err != nil {
 		return err
 	}
@@ -108,7 +108,7 @@ func buildGcloud() error {
 		return errors.Newf("create conf dir: %v", err)
 	}
 
-	docsDir := path.Join(config.DefaultDocsDir(), config.VersionMajor, config.Name, "docs")
+	docsDir := path.Join(config.DefaultDocsDir(), config.VersionMajorPrefixed(), config.Name, "docs")
 	if err := compileDocs(docsDir); err != nil {
 		return err
 	}
@@ -174,7 +174,7 @@ func compileDocs(docsDir string) error {
 		Name:        config.Name,
 		Version:     config.VersionFull,
 		Description: config.Description,
-		Title:       config.CanonicalName,
+		Title:       config.CanonicalName(),
 		Header: struct {
 			Title    string `json:"title"`
 			FileName string `json:"filename"`

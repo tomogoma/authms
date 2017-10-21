@@ -45,7 +45,7 @@ func NewRoach(opts ...Option) *Roach {
 	r := &Roach{
 		isDBInit:      false,
 		isDBInitMutex: sync.Mutex{},
-		dbName:        config.CanonicalName,
+		dbName:        config.CanonicalName(),
 	}
 	for _, f := range opts {
 		f(r)

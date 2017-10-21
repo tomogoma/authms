@@ -22,7 +22,7 @@ func newJWTClaim(usrID string, groups []Group) *JWTClaim {
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  issue.Unix(),
 			ExpiresAt: expiry.Unix(),
-			Issuer:    config.CanonicalName,
+			Issuer:    config.CanonicalName(),
 		},
 	}
 }

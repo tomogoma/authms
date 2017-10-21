@@ -84,7 +84,7 @@ func NewHandler(a Auth, g Guard, l logging.Logger, allowedOrigins []string) (htt
 		return nil, errors.New("Logger was nil")
 	}
 
-	r := mux.NewRouter().PathPrefix(config.WebRootURL).Subrouter()
+	r := mux.NewRouter().PathPrefix(config.WebRootURL()).Subrouter()
 	handler{auth: a, guard: g, logger: l}.handleRoute(r)
 
 	headersOk := handlers.AllowedHeaders([]string{
@@ -229,7 +229,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		Name:          config.Name,
 		Version:       config.VersionFull,
 		Description:   config.Description,
-		CanonicalName: config.CanonicalWebName,
+		CanonicalName: config.CanonicalWebName(),
 		NeedRegSuper:  canRegFrst,
 	}, http.StatusOK, err)
 }
