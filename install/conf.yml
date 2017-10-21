@@ -11,6 +11,10 @@
 # serviceConfig contains runtime micro-service configuration.
 serviceConfig:
 
+  # appName is an optional name for the app that will be using this service.
+  # The value will be used during communication with the client via the templates.
+  appName:
+
   # loadBalanceVersion identifies which cluster this instance will belong to
   # when deploying multiple instances of the micro-service.
   # More information here:
@@ -82,6 +86,15 @@ database:
 
 # authentication contains configuration values for authentication rules.
 authentication:
+
+  # allowSelfReg is a boolean flag. Setting it to true allows the
+  # public to self register with the micro-service.
+  allowSelfReg: false
+
+  # lockDevsToUsers is a boolean flag. Setting it to true locks
+  # a device to one public user, preventing other users from registering
+  # with the same device.
+  lockDevsToUsers: false
 
 
   # facebook - configuration values for OAuth based authentication using facebook.

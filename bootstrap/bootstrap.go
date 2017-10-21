@@ -130,6 +130,13 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	logging.LogFatalOnError(lg, err, "Instantiate email API")
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
+	authOpts = append(
+		authOpts,
+		model.WithAppName(conf.Service.AppName),
+		model.WithDevLockedToUser(conf.Authentication.LockDevsToUsers),
+		model.WithSelfRegAllowed(conf.Authentication.AllowSelfReg),
+	)
+
 	a, err := model.NewAuthentication(rdb, tg, authOpts...)
 	logging.LogFatalOnError(lg, err, "Instantiate Auth Model")
 

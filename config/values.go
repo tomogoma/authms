@@ -14,6 +14,7 @@ type Service struct {
 	LoadBalanceVersion string        `json:"loadBalanceVersion,omitempty" yaml:"loadBalanceVersion"`
 	MasterAPIKey       string        `json:"masterAPIKey,omitempty" yaml:"masterAPIKey"`
 	AllowedOrigins     []string      `json:"allowedOrigins" yaml:"allowedOrigins"`
+	AppName            string        `json:"appName" yaml:"appName"`
 }
 
 type Twilio struct {
@@ -46,6 +47,8 @@ type Facebook struct {
 }
 
 type Auth struct {
+	AllowSelfReg       bool          `json:"allowSelfReg" yaml:"allowSelfReg"`
+	LockDevsToUsers    bool          `json:"lockDevsToUsers" yaml:"lockDevsToUsers"`
 	Facebook           Facebook      `json:"facebook,omitempty" yaml:"facebook"`
 	BlackListFailCount int           `json:"blackListFailCount" yaml:"blackListFailCount"`
 	BlacklistWindow    time.Duration `json:"blacklistWindow" yaml:"blacklistWindow"`

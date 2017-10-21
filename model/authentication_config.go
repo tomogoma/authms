@@ -301,13 +301,13 @@ func (c *authenticationConfig) fillDefaults() error {
 	if c.numGen == nil {
 		defaultOpts = append(
 			defaultOpts,
-			WithPasswordGen(generator.NewRandom(generator.NumberChars)),
+			WithNumGen(generator.NewRandom(generator.NumberChars)),
 		)
 	}
 	if c.urlTokenGen == nil {
 		defaultOpts = append(
 			defaultOpts,
-			WithPasswordGen(generator.NewRandom(generator.AlphaNumericChars)),
+			WithURLTokenGen(generator.NewRandom(generator.AlphaNumericChars)),
 		)
 	}
 	if c.smserNilable != nil {
@@ -321,13 +321,13 @@ func (c *authenticationConfig) fillDefaults() error {
 		if _, ok := phoneTpls[ActionVerify]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneVerifyTpl())),
+				WithPhoneVerifyTplt(template.ParseFiles(config.DefaultPhoneVerifyTpl())),
 			)
 		}
 		if _, ok := phoneTpls[ActionResetPass]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultPhoneResetPassTpl())),
+				WithPhoneResetPassTplt(template.ParseFiles(config.DefaultPhoneResetPassTpl())),
 			)
 		}
 	}
@@ -336,19 +336,19 @@ func (c *authenticationConfig) fillDefaults() error {
 		if _, ok := emailTPls[ActionInvite]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailInviteTpl())),
+				WithEmailInviteTplt(template.ParseFiles(config.DefaultEmailInviteTpl())),
 			)
 		}
 		if _, ok := emailTPls[ActionVerify]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailVerifyTpl())),
+				WithEmailVerifyTplt(template.ParseFiles(config.DefaultEmailVerifyTpl())),
 			)
 		}
 		if _, ok := emailTPls[ActionResetPass]; !ok {
 			defaultOpts = append(
 				defaultOpts,
-				WithPhoneInviteTplt(template.ParseFiles(config.DefaultEmailResetPassTpl())),
+				WithEmailResetPassTplt(template.ParseFiles(config.DefaultEmailResetPassTpl())),
 			)
 		}
 	}
