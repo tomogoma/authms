@@ -5,6 +5,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"html/template"
+
 	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
@@ -94,15 +96,50 @@ func InstantiateSMSer(conf config.SMS) (model.SMSer, error) {
 			config.SMSAPIAfricasTalking, config.SMSAPITwilio)
 	}
 	var testMessage string
-	if hostName, err := os.Hostname(); err == nil {
-		testMessage = fmt.Sprintf("The SMS API is being used on %s", hostName)
-	} else {
-		testMessage = "The SMS API is being used on an unknown host"
-	}
+	host := hostname()
+	testMessage = fmt.Sprintf("The SMS API is being used on %s", host)
 	if err := s.SMS(conf.TestNumber, testMessage); err != nil {
 		return s, fmt.Errorf("test SMS: %v", err)
 	}
 	return s, nil
+}
+
+func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.Mailer {
+
+	emailCl, err := smtp.New(rdb)
+	logging.LogFatalOnError(lg, err, "Instantiate email API")
+
+	err = emailCl.Configured()
+	if err == nil {
+		return emailCl
+	}
+
+	if !emailCl.IsNotFoundError(err) {
+		logging.LogFatalOnError(lg, err, "Check email API configured")
+	}
+
+	pass, err := readFile(conf.PasswordFile)
+	logging.LogWarnOnError(lg, err, "Read SMTP password file")
+
+	host := hostname()
+	err = emailCl.SetConfig(
+		smtp.Config{
+			ServerAddress: conf.ServerAddress,
+			TLSPort:       conf.TLSPort,
+			SSLPort:       conf.SSLPort,
+			Username:      conf.Username,
+			FromEmail:     conf.FromEmail,
+			Password:      pass,
+		},
+		model.SendMail{
+			ToEmails: []string{conf.TestEmail},
+			Subject:  "Authentication Micro-Service Started on " + host,
+			Body:     template.HTML("The authentication micro-service is being used on " + host),
+		},
+	)
+	logging.LogWarnOnError(lg, err, "Set default SMTP config")
+
+	return emailCl
 }
 
 func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
@@ -126,8 +163,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 		authOpts = append(authOpts, model.WithSMSCl(sms))
 	}
 
-	emailCl, err := smtp.New(rdb)
-	logging.LogFatalOnError(lg, err, "Instantiate email API")
+	emailCl := InstantiateSMTP(rdb, lg, conf.SMTP)
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
 	authOpts = append(
@@ -144,6 +180,14 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	logging.LogFatalOnError(lg, err, "Instantate API access guard")
 
 	return *conf, a, g, rdb, tg, sms, emailCl
+}
+
+func hostname() string {
+	hostName, err := os.Hostname()
+	if err != nil {
+		return "an unknown host"
+	}
+	return hostName
 }
 
 func readFile(path string) (string, error) {

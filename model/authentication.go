@@ -86,7 +86,6 @@ type JWTEr interface {
 }
 
 type Mailer interface {
-	SetConfig(conf SMTPConfig, notifEmail SendMail) error
 	SendEmail(email SendMail) error
 }
 

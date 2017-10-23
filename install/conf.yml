@@ -121,6 +121,31 @@ token:
   tokenKeyFile: /etc/authms/keys/jwt_sha256.key
 
 
+# SMTP - Email dispatch configuration settings for Simple Mail Transfer Protocol.
+SMTP:
+
+  # serverAddress
+  serverAddress:
+
+  # TLSPort
+  TLSPort:
+
+  # SSLPort
+  SSLPort:
+
+  # username
+  username:
+
+  # passwordFile file containing SMTP server's password,
+  # should not contain extra characters e.g. new line
+  passwordFile: /etc/authms/keys/smtp.pass
+
+  # fromEmail the email address to be used when sending mail.
+  fromEmail:
+
+  # testEmail the email address to be used for testing
+  testEmail:
+
 
 # sms - configuration values for sending SMSes via an API.
 # The templates for different message types can be found in

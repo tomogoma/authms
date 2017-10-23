@@ -58,11 +58,24 @@ type JWT struct {
 	TokenKeyFile string `json:"tokenKeyFile" yaml:"tokenKeyFile"`
 }
 
+type SMTP struct {
+	ServerAddress string `json:"serverAddress,omitempty" yaml:"serverAddress,omitempty"`
+	TLSPort       int32  `json:"TLSPort,omitempty" yaml:"TLSPort,omitempty"`
+	SSLPort       int32  `json:"SSLPort,omitempty" yaml:"SSLPort,omitempty"`
+	Username      string `json:"username,omitempty" yaml:"username,omitempty"`
+	PasswordFile  string `json:"passwordFile,omitempty" yaml:"passwordFile,omitempty"`
+	FromEmail     string `json:"fromEmail,omitempty" yaml:"fromEmail,omitempty"`
+	TestEmail     string `json:"testEmail" yaml:"testEmail"`
+	CreatedAt     string `json:"createdAt,omitempty" yaml:"createdAt,omitempty"`
+	UpdatedAt     string `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+}
+
 type General struct {
 	Service        Service     `json:"serviceConfig,omitempty" yaml:"serviceConfig"`
 	Database       crdb.Config `json:"database,omitempty" yaml:"database"`
 	Authentication Auth        `json:"authentication,omitempty" yaml:"authentication"`
 	Token          JWT         `json:"token,omitempty" yaml:"token"`
+	SMTP           SMTP        `json:"SMTP" yaml:"SMTP"`
 	SMS            SMS         `json:"sms" yaml:"sms"`
 }
 

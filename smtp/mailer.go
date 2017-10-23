@@ -46,7 +46,12 @@ func (m *Mailer) SendEmail(email model.SendMail) error {
 	return sendMessage(*conf, email.ToEmails, msg)
 }
 
-func (m *Mailer) SetConfig(conf model.SMTPConfig, notifEmail model.SendMail) error {
+func (m *Mailer) Configured() error {
+	_, err := m.getConfig()
+	return err
+}
+
+func (m *Mailer) SetConfig(conf Config, notifEmail model.SendMail) error {
 	msg, err := m.generateMessage(notifEmail)
 	if err != nil {
 		return errors.Newf("generate notification email message: %v", err)
@@ -57,8 +62,8 @@ func (m *Mailer) SetConfig(conf model.SMTPConfig, notifEmail model.SendMail) err
 	return m.db.UpsertSMTPConfig(conf)
 }
 
-func (m *Mailer) getConfig() (*model.SMTPConfig, error) {
-	conf := new(model.SMTPConfig)
+func (m *Mailer) getConfig() (*Config, error) {
+	conf := new(Config)
 	if err := m.db.GetSMTPConfig(conf); err != nil {
 		if m.db.IsNotFoundError(err) {
 			return nil, errors.NewNotFound("SMTP not configured")
@@ -77,7 +82,7 @@ func (m *Mailer) generateMessage(r model.SendMail) ([]byte, error) {
 	return eb.Bytes(), nil
 }
 
-func sendMessage(conf model.SMTPConfig, recipients []string, msg []byte) error {
+func sendMessage(conf Config, recipients []string, msg []byte) error {
 	auth := smtp.PlainAuth("", conf.Username, conf.Password, conf.ServerAddress)
 	addr := fmt.Sprintf("%s:%d", conf.ServerAddress, conf.TLSPort)
 	err := smtp.SendMail(addr, auth, conf.FromEmail, recipients, msg)
