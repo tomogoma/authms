@@ -13,7 +13,7 @@ import (
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/logging/logrus"
 	_ "github.com/tomogoma/authms/logging/standard"
-	"github.com/tomogoma/authms/proto/authms"
+	"github.com/tomogoma/authms/api"
 )
 
 func main() {
@@ -24,7 +24,7 @@ func main() {
 	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confFile, log)
 
 	serverRPCQuitCh := make(chan error)
-	rpcSrv, err := rpc.NewHandler(config.CanonicalName(), authentication)
+	rpcSrv, err := rpc.NewHandler(APIGuard, authentication)
 	logging.LogFatalOnError(log, err, "Instantate RPC handler")
 	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
 
@@ -42,16 +42,15 @@ func main() {
 	}
 }
 
-func serveRPC(conf config.Service, rpcSrv *rpc.Handler, quitCh chan error) {
+func serveRPC(conf config.Service, usrsH *rpc.UsersHandler, quitCh chan error) {
 	service := micro.NewService(
 		micro.Name(config.CanonicalRPCName()),
 		micro.Version(conf.LoadBalanceVersion),
 		micro.RegisterInterval(conf.RegisterInterval),
-		micro.WrapHandler(rpcSrv.Wrapper),
+		micro.WrapHandler(usrsH.Wrapper),
 	)
-	authms.RegisterAuthMSHandler(service.Server(), rpcSrv)
-	err := service.Run()
-	quitCh <- err
+	api.RegisterUsersHandler(service.Server(), usrsH)
+	quitCh <- service.Run()
 }
 
 func serveHttp(conf config.Service, h http2.Handler, quitCh chan error) {

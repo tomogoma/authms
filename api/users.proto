@@ -1,0 +1,76 @@
+syntax = "proto3";
+
+package api;
+
+service Users {
+    rpc GetDetails (GetDetailsReq) returns (User);
+}
+
+message UserName {
+    string ID = 1;
+    string userID = 2;
+    string value = 3;
+    string created = 4;
+    string lastUpdated = 5;
+}
+
+message UserType {
+    string ID = 1;
+    string name = 2;
+    string created = 3;
+    string lastUpdated = 4;
+}
+
+message VerifLogin {
+    string ID = 1;
+    string userID = 2;
+    string value = 3;
+    bool verified = 4;
+    string created = 5;
+    string lastUpdated = 6;
+}
+
+message Facebook {
+    string ID = 1;
+    string userID = 2;
+    string facebookID = 3;
+    bool verified = 4;
+    string created = 5;
+    string lastUpdated = 6;
+}
+
+message Group {
+    string ID = 1;
+    string name = 2;
+    float accessLevel = 3;
+    string created = 4;
+    string lastUpdated = 5;
+}
+
+message Device {
+    string ID = 1;
+    string userID = 2;
+    string deviceID = 3;
+    string created = 4;
+    string lastUpdated = 5;
+}
+
+message User {
+    string ID = 1;
+    string JWT = 2;
+    UserType type = 3;
+    UserName username = 4;
+    VerifLogin phone = 5;
+    VerifLogin email = 6;
+    Facebook facebook = 7;
+    repeated Group groups = 8;
+    repeated Device devices = 9;
+    string created = 10;
+    string lastUpdated = 11;
+}
+
+message GetDetailsReq {
+    string APIKey = 1;
+    string JWT = 2;
+    string userID = 3;
+}
