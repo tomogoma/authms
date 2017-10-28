@@ -37,6 +37,7 @@ type Auth interface {
 	VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (string, error)
 	VerifyDBT(loginType, forAddr string, dbt []byte) (*model.VerifLogin, error)
 	Login(loginType, identifier string, password []byte) (*model.User, error)
+	GetUserDetails(JWT, userID string) (*model.User, error)
 }
 
 type Guard interface {
@@ -114,6 +115,10 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/reset_password").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleResetPass))))
+
+	r.PathPrefix("/users/{" + keyUserID + "}").
+		Methods(http.MethodGet).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUserDetails)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
@@ -233,6 +238,34 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		CanonicalName: config.CanonicalWebName(),
 		NeedRegSuper:  canRegFrst,
 	}, http.StatusOK, err)
+}
+
+/**
+ * @api {get} /users/:userID User Details
+ * @apiName UserDetails
+ * @apiVersion 0.1.1
+ * @apiGroup Auth
+ * @apiPermission owner|^staff
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (URL Path Component) {String} :userID The ID of the <a href="#api-Objects-User">User</a> whose details are sort.
+ *
+ * @apiParam (URL Query) {String} token The JWT provided during auth.
+ *
+ * @apiSuccess (200) {JSON} body The details of the <a href="#api-Objects-User">User</a> in JSON format.
+ *
+ */
+func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
+	req := struct {
+		UserID string `json:"userID"`
+		JWT string `json:"token"`
+	} {
+		UserID: mux.Vars(r)[keyUserID],
+		JWT:  r.URL.Query().Get(keyToken),
+	}
+	usr, err := s.auth.GetUserDetails(req.JWT, req.UserID)
+	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
 /**

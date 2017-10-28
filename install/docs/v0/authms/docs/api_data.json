@@ -455,6 +455,68 @@
     "groupTitle": "Auth"
   },
   {
+    "type": "get",
+    "url": "/users/:userID",
+    "title": "User Details",
+    "name": "UserDetails",
+    "version": "0.1.1",
+    "group": "Auth",
+    "permission": [
+      {
+        "name": "owner|^staff"
+      }
+    ],
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "URL Path Component": [
+          {
+            "group": "URL Path Component",
+            "type": "String",
+            "optional": false,
+            "field": ":userID",
+            "description": "<p>The ID of the <a href=\"#api-Objects-User\">User</a> whose details are sort.</p>"
+          }
+        ],
+        "URL Query": [
+          {
+            "group": "URL Query",
+            "type": "String",
+            "optional": false,
+            "field": "token",
+            "description": "<p>The JWT provided during auth.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "200": [
+          {
+            "group": "200",
+            "type": "JSON",
+            "optional": false,
+            "field": "body",
+            "description": "<p>The details of the <a href=\"#api-Objects-User\">User</a> in JSON format.</p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
     "type": "POST",
     "url": "/:loginType/verify/:OTP?extend=:extend",
     "title": "Verify OTP",
