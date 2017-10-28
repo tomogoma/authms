@@ -662,6 +662,30 @@ func (a *Authentication) Login(loginType, identifier string, password []byte) (*
 	return usr, nil
 }
 
+func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error) {
+	clms := new(JWTClaim)
+	if _, err := a.jwter.Validate(JWT, clms); err != nil {
+		return nil, err
+	}
+	if clms.UsrID != userID {
+		if clms.StrongestGroup == nil {
+			return nil, errors.NewForbiddenf("lack sufficient privilege to access this resource")
+		}
+		if clms.StrongestGroup.AccessLevel > AccessLevelStaff {
+			return nil, errors.NewForbiddenf("lack sufficient privilege to access this resource")
+		}
+	}
+	usr, _, err := a.db.User(userID)
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("fetch user: %v", err)
+	}
+
+	return usr, nil
+}
+
 func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) error {
 	if fetchErr == nil {
 		return errors.NewClientf("%s not available", loginType)
