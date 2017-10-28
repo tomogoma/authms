@@ -15,5 +15,5 @@ automatic_scaling:
 # For SQL v2 instances, this should be in the form of "project:region:instance".
 # Cloud SQL v1 instances are not supported.
 beta_settings:
-  cloud_sql_instances: INSTANCE_CONNECTION_NAME
+  cloud_sql_instances: chumz-test:europe-west3:chumz
 #[END cloudsql_settings]
