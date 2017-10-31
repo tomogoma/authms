@@ -594,7 +594,7 @@ func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData in
 	}
 	if s.auth.IsNotFoundError(err) || s.IsNotFoundError(err) {
 		log.Warnf("Not found: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 	if s.auth.IsNotImplementedError(err) || s.IsNotImplementedError(err) {
