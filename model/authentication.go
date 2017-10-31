@@ -92,10 +92,7 @@ type Mailer interface {
 // Authentication has the methods for performing auth. Use NewAuthentication()
 // to construct.
 type Authentication struct {
-	errors.AuthErrCheck
-	errors.ClErrCheck
-	errors.NotImplErrCheck
-	errors.NotFoundErrCheck
+	errors.AllErrCheck
 	// mandatory parameters
 	db            AuthStore
 	jwter         JWTEr
