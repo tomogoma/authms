@@ -115,7 +115,8 @@ func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.M
 	}
 
 	if !emailCl.IsNotFoundError(err) {
-		logging.LogFatalOnError(lg, err, "Check email API configured")
+		logging.LogWarnOnError(lg, err, "Check email API configured")
+		return emailCl
 	}
 
 	pass, err := readFile(conf.PasswordFile)
