@@ -15,6 +15,7 @@ type Service struct {
 	MasterAPIKey       string        `json:"masterAPIKey,omitempty" yaml:"masterAPIKey"`
 	AllowedOrigins     []string      `json:"allowedOrigins" yaml:"allowedOrigins"`
 	AppName            string        `json:"appName" yaml:"appName"`
+	WebAppURL          string        `json:"webAppURL" yaml:"webAppURL"`
 }
 
 type Twilio struct {

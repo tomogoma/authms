@@ -44,6 +44,13 @@ serviceConfig:
   # "null" or "" or left empty
   allowedOrigins:
 
+  # webAppURL - root URL to the webapp for which action messages
+  # (verification, invite, etc) will be redirected for action. The URL
+  # can have a path segment to prevent conflict with the webapp's internal
+  # URL paths.
+  # e.g. http://localhost:8000/auth
+  webAppURL:
+
 
 
 # database contains configuration values for accessing CockroachDB as the

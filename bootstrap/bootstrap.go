@@ -170,6 +170,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	authOpts = append(
 		authOpts,
 		model.WithAppName(conf.Service.AppName),
+		model.WithWebAppURL(conf.Service.WebAppURL),
 		model.WithDevLockedToUser(conf.Authentication.LockDevsToUsers),
 		model.WithSelfRegAllowed(conf.Authentication.AllowSelfReg),
 	)
