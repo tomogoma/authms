@@ -66,7 +66,7 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblGroups + ` (
 		` + ColID + ` BIGSERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColName + ` VARCHAR(56) UNIQUE NOT NULL CHECK (` + ColName + ` != ''),
-		` + ColAccessLevel + ` FLOAT UNIQUE NOT NULL CHECK (` + ColAccessLevel + ` BETWEEN 0 AND 10),
+		` + ColAccessLevel + ` FLOAT NOT NULL CHECK (` + ColAccessLevel + ` BETWEEN 0 AND 10),
 		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
 	);
