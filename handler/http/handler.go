@@ -58,17 +58,17 @@ type handler struct {
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
 
-	keyLoginType  = "loginType"
-	keySelfReg    = "selfReg"
-	keyAPIKey     = "x-api-key"
-	keyToken      = "token"
-	keyOTP        = "OTP"
-	keyExtend     = "extend"
-	keyIdentifier = "identifier"
-	keyUserID     = "userID"
+	keyLoginType = "loginType"
+	keySelfReg   = "selfReg"
+	keyAPIKey    = "x-api-key"
+	keyToken     = "token"
+	keyOTP       = "OTP"
+	keyExtend    = "extend"
+	keyOffset    = "offset"
+	keyCount     = "count"
+	keyUserID    = "userID"
 
-	ctxtKeyBody = contextKey("id")
-	ctxKeyLog   = contextKey("log")
+	ctxKeyLog = contextKey("log")
 
 	valTrue   = "true"
 	valDevice = "device"
@@ -106,15 +106,19 @@ func (s handler) handleRoute(r *mux.Router) {
 
 	r.PathPrefix("/first_user").
 		Methods(http.MethodPut).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegisterFirst))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleRegisterFirst)))
 
 	r.PathPrefix("/reset_password/send_otp").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleSendPassResetCode))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSendPassResetCode)))
 
 	r.PathPrefix("/reset_password").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleResetPass))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleResetPass)))
+
+	r.PathPrefix("/groups").
+		Methods(http.MethodGet).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleGroups)))
 
 	r.PathPrefix("/users/{" + keyUserID + "}").
 		Methods(http.MethodGet).
@@ -122,23 +126,23 @@ func (s handler) handleRoute(r *mux.Router) {
 
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleRegistration))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleRegistration)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/verify/{" + keyOTP + "}").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleVerifyCode))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/verify").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleSendVerifCode))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSendVerifCode)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/login").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleLogin))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleLogin)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/update").
 		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.readReqBody(s.handleUpdate))))
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUpdate)))
 
 	r.PathPrefix("/" + config.DocsPath).
 		Handler(http.FileServer(http.Dir(config.DefaultDocsDir())))
@@ -179,28 +183,19 @@ func (s *handler) guardRoute(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func (s *handler) readReqBody(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		defer r.Body.Close()
-		dataB, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			err = errors.NewClientf("Failed to read request body: %v", err)
-			s.handleError(w, r, nil, err)
-			return
-		}
-		ctx := context.WithValue(r.Context(), ctxtKeyBody, dataB)
-		next.ServeHTTP(w, r.WithContext(ctx))
-	}
-}
-
 // unmarshalJSONOrRespondError returns true if json is extracted from
 // data into req successfully, otherwise, it writes an error response into
 // w and returns false.
 // The Context in r should contain a logging.Logger with key ctxKeyLog
 // for logging in case of error
-func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, data []byte, req interface{}) bool {
-	err := json.Unmarshal(data, req)
+func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Request, req interface{}) bool {
+	dataB, err := ioutil.ReadAll(r.Body)
 	if err != nil {
+		err = errors.NewClientf("Failed to read request body: %v", err)
+		s.handleError(w, r, nil, err)
+		return false
+	}
+	if err = json.Unmarshal(dataB, req); err != nil {
 		err = errors.NewClientf("failed to unmarshal JSON request from body: %v", err)
 		s.handleError(w, r, nil, err)
 		return false
@@ -249,7 +244,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam (URL Param) {String} :userID The ID of the
+ * @apiParam (URL Parameters) {String} :userID The ID of the
 	<a href="#api-Objects-User">User</a> whose details are sort.
  *
  * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
@@ -267,6 +262,38 @@ func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
 	}
 	usr, err := s.auth.GetUserDetails(req.JWT, req.UserID)
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
+}
+
+/**
+ * @api {get} /groups Get Groups
+ * @apiName GetGroups
+ * @apiVersion 0.1.1
+ * @apiGroup Auth
+ * @apiPermission ^admin
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (URL Query Parameters) {String} token the JWT accessed during auth.
+ * @apiParam (URL Query Parameters) {Number} [offset=0] The beginning index to fetch groups.
+ * @apiParam (URL Query Parameters) {Number} [count=10] The maximum number of groups to fetch.
+ *
+ * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
+ *
+ * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-Group">groups</a>
+ *
+ */
+func (s *handler) handleGroups(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	req := struct {
+		JWT    string `json:"token"`
+		Offset string `json:"offset"`
+		Count  string `json:"count"`
+	}{
+		JWT:    q.Get(keyToken),
+		Offset: q.Get(keyOffset),
+		Count:  q.Get(keyCount),
+	}
+	s.respondOn(w, r, req, req, http.StatusOK, errors.NewNotImplemented())
 }
 
 /**
@@ -288,14 +315,13 @@ func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
 		UserType   string `json:"userType"`
 		LT         string `json:"loginType"`
 		Identifier string `json:"identifier"`
 		Secret     string `json:"secret"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
 	usr, err := s.auth.RegisterFirst(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
@@ -330,7 +356,6 @@ func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
 		UserType   string `json:"userType"`
 		Identifier string `json:"identifier"`
@@ -340,7 +365,7 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 		LT         string `json:"loginType"`
 		SelfReg    string `json:"selfReg"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
 	vars := mux.Vars(r)
@@ -418,13 +443,12 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
 		Identifier string `json:"identifier"`
 		LT         string `json:"loginType"`
 		JWT        string `json:"token"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
 	vars := mux.Vars(r)
@@ -453,13 +477,12 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
 		LT     string `json:"loginType"`
 		ToAddr string `json:"identifier"`
 		JWT    string `json:"token"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
 	vars := mux.Vars(r)
@@ -492,14 +515,13 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := &struct {
 		Identifier string `json:"identifier"`
 		LT         string `json:"loginType"`
 		DBT        string `json:"OTP"`
 		Extend     string `json:"extend"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, req) {
+	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
 	vars := mux.Vars(r)
@@ -540,12 +562,11 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
  *
  */
 func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := struct {
 		LT     string `json:"loginType"`
 		ToAddr string `json:"identifier"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {
+	if !s.unmarshalJSONOrRespondError(w, r, &req) {
 		return
 	}
 	dbtStatus, err := s.auth.SendPassResetCode(req.LT, req.ToAddr)
@@ -570,14 +591,13 @@ func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request
  *
  */
 func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {
-	dataB := r.Context().Value(ctxtKeyBody).([]byte)
 	req := struct {
 		LT        string `json:"loginType"`
 		OnAddress string `json:"identifier"`
 		DBT       string `json:"OTP"`
 		NewSecret string `json:"newSecret"`
 	}{}
-	if !s.unmarshalJSONOrRespondError(w, r, dataB, &req) {
+	if !s.unmarshalJSONOrRespondError(w, r, &req) {
 		return
 	}
 	vl, err := s.auth.SetPassword(req.LT, req.OnAddress, []byte(req.DBT), []byte(req.NewSecret))

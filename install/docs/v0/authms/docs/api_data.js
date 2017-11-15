@@ -1,5 +1,74 @@
 define({ "api": [
   {
+    "type": "get",
+    "url": "/groups",
+    "title": "Get Groups",
+    "name": "GetGroups",
+    "version": "0.1.1",
+    "group": "Auth",
+    "permission": [
+      {
+        "name": "^admin"
+      }
+    ],
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "optional": false,
+            "field": "token",
+            "description": "<p>the JWT accessed during auth.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "Number",
+            "optional": true,
+            "field": "offset",
+            "defaultValue": "0",
+            "description": "<p>The beginning index to fetch groups.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "Number",
+            "optional": true,
+            "field": "count",
+            "defaultValue": "10",
+            "description": "<p>The maximum number of groups to fetch.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "json-body",
+            "description": "<p>JSON array of <a href=\"#api-Objects-Group\">groups</a></p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
     "type": "POST",
     "url": "/:loginType/login",
     "title": "Login",
@@ -702,9 +771,9 @@ define({ "api": [
     },
     "parameter": {
       "fields": {
-        "URL Param": [
+        "URL Parameters": [
           {
-            "group": "URL Param",
+            "group": "URL Parameters",
             "type": "String",
             "optional": false,
             "field": ":userID",
