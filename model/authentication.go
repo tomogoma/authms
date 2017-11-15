@@ -671,6 +671,9 @@ func (a *Authentication) Users(JWT string, q UsersQuery, offset, count string) (
 	if err := a.jwtHasAccess(JWT, AccessLevelAdmin); err != nil {
 		return nil, err
 	}
+	if err := q.Process(); err != nil {
+		return nil, err
+	}
 	return nil, errors.NewNotImplemented()
 }
 

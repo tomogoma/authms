@@ -259,11 +259,11 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  * @apiParam (URL Query Parameters) {Number} [count=10] The maximum number of groups to fetch.
  * @apiParam (URL Query Parameters) {String} [group] Filter by group name. one can have multiple groups e.g. ?group=admin&group=staff
  * @apiParam (URL Query Parameters) {String{0-10}=gt[number],lt[number],eq[number]} [acl] Filter by access levels:
- * - gt[number] - access level greater than number e.g. gt5
- * - lt[number] - access level less than number e.g. lt5
+ * - gt_[number] - access level greater than number e.g. gt_5
+ * - lt_[number] - access level less than number e.g. lt_5
  * - [number] - access level equal to number e.g. 5
- * - gteq[number] - access level greater than or equal to number e.g. gteq5
- * - gteq[number] - access level less than or equal to  number e.g. lteq5
+ * - gteq_[number] - access level greater than or equal to number e.g. gteq_5
+ * - gteq_[number] - access level less than or equal to  number e.g. lteq_5
  * - one can have multiple filters e.g. ?acl=gt5&acl=lt9&acl=9.5 to get acl in (acl==9.5 || 5 < acl < 9)
  *
  * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
