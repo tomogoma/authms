@@ -28,7 +28,7 @@ type VerifLogin struct {
 	ID         string `json:"ID,omitempty"`
 	UserID     string `json:"userID,omitempty"`
 	Address    string `json:"value,omitempty"`
-	Verified   bool   `json:"verified,omitempty"`
+	Verified   bool   `json:"verified"`
 	CreateDate string `json:"created,omitempty"`
 	UpdateDate string `json:"lastUpdated,omitempty"`
 }
