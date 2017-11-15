@@ -864,6 +864,9 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
 	}
+	if groupID == "" {
+		return nil, errors.NewClientf("new user's group ID was not specified")
+	}
 	usrGroup, err := a.db.Group(groupID)
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
@@ -871,7 +874,7 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 		}
 		return nil, errors.Newf("get group by ID: %v", err)
 	}
-	if regerLrgstGrp.AccessLevel < usrGroup.AccessLevel {
+	if regerLrgstGrp.AccessLevel > usrGroup.AccessLevel {
 		return nil, errors.NewForbiddenf("You do not have enough rights to perform this operation")
 	}
 	id, err = rcf(id)
