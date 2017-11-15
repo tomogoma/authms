@@ -38,6 +38,7 @@ type Auth interface {
 	VerifyDBT(loginType, forAddr string, dbt []byte) (*model.VerifLogin, error)
 	Login(loginType, identifier string, password []byte) (*model.User, error)
 	GetUserDetails(JWT, userID string) (*model.User, error)
+	Groups(JWT, offset, count string) ([]model.Group, error)
 }
 
 type Guard interface {
@@ -157,10 +158,8 @@ func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
 			WithField(logging.FieldTransID, uuid.New())
 
 		log.WithFields(map[string]interface{}{
-			logging.FieldURL:            r.URL,
-			logging.FieldHost:           r.Host,
-			logging.FieldMethod:         r.Method,
-			logging.FieldRequestHandler: "HTTP",
+			logging.FieldURL:        r.URL.Path,
+			logging.FieldHTTPMethod: r.Method,
 		}).Info("new request")
 
 		ctx := context.WithValue(r.Context(), ctxKeyLog, log)
@@ -293,7 +292,8 @@ func (s *handler) handleGroups(w http.ResponseWriter, r *http.Request) {
 		Offset: q.Get(keyOffset),
 		Count:  q.Get(keyCount),
 	}
-	s.respondOn(w, r, req, req, http.StatusOK, errors.NewNotImplemented())
+	grps, err := s.auth.Groups(req.JWT, req.Offset, req.Count)
+	s.respondOn(w, r, req, NewGroups(grps), http.StatusOK, err)
 }
 
 /**

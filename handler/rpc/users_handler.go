@@ -23,7 +23,7 @@ type UsersModel interface {
 
 type UsersHandler struct {
 	errors.AllErrCheck
-	guard Guard
+	guard  Guard
 	usersM UsersModel
 }
 
@@ -49,7 +49,7 @@ func LogWrapper(next server.HandlerFunc) server.HandlerFunc {
 		log.WithFields(logrus.Fields{
 			logging.FieldTransID:        uuid.New(),
 			logging.FieldService:        req.Service(),
-			logging.FieldMethod:         req.Method(),
+			logging.FieldRPCMethod:      req.Method(),
 			logging.FieldRequestHandler: "RPC",
 		}).Info("new request")
 		ctx = context.WithValue(ctx, ctxKeyLog, log)

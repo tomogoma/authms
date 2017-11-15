@@ -164,6 +164,7 @@ var (
 	errorBadCreds      = errors.NewUnauthorized("invalid credentials")
 	errorNoneDeviceReg = errors.NewForbidden("registration closed to the public unless from accepted device")
 	errorFbNotAvail    = errors.NewNotImplementedf("facebook registration not available")
+	errorInsufPriv     = errors.NewForbiddenf("lack sufficient privilege to access this resource")
 )
 
 // NewAuthentication constructs an Authentication structs or returns an error
@@ -665,11 +666,8 @@ func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error
 		return nil, err
 	}
 	if clms.UsrID != userID {
-		if clms.StrongestGroup == nil {
-			return nil, errors.NewForbiddenf("lack sufficient privilege to access this resource")
-		}
-		if clms.StrongestGroup.AccessLevel > AccessLevelStaff {
-			return nil, errors.NewForbiddenf("lack sufficient privilege to access this resource")
+		if err := claimsHaveAccess(*clms, AccessLevelStaff); err != nil {
+			return nil, err
 		}
 	}
 	usr, _, err := a.db.User(userID)
@@ -681,6 +679,13 @@ func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error
 	}
 
 	return usr, nil
+}
+
+func (a *Authentication) Groups(JWT, offset, count string) ([]Group, error) {
+	if err := a.jwtHasAccess(JWT, AccessLevelStaff); err != nil {
+		return nil, err
+	}
+	return nil, errors.NewNotImplemented()
 }
 
 func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) error {
@@ -1254,6 +1259,24 @@ func (a *Authentication) validateFbToken(fbToken string) (string, error) {
 		return "", errors.Newf("validate facebook token: %v", err)
 	}
 	return fbUsrID, nil
+}
+
+func (a *Authentication) jwtHasAccess(JWT string, acl float32) error {
+	clms := new(JWTClaim)
+	if _, err := a.jwter.Validate(JWT, clms); err != nil {
+		return err
+	}
+	return claimsHaveAccess(*clms, acl)
+}
+
+func claimsHaveAccess(clms JWTClaim, acl float32) error {
+	if clms.StrongestGroup == nil {
+		return errorInsufPriv
+	}
+	if clms.StrongestGroup.AccessLevel > acl {
+		return errorInsufPriv
+	}
+	return nil
 }
 
 func passwordValid(hashed, password []byte) error {
