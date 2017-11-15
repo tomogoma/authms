@@ -15,3 +15,12 @@ type User struct {
 	CreateDate time.Time
 	UpdateDate time.Time
 }
+
+func (u User) HasValue() bool {
+	return u.ID != ""
+}
+
+type UsersQuery struct {
+	AccessLevelsIn []string
+	GroupNamesIn   []string
+}

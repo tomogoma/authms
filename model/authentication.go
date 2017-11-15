@@ -667,6 +667,13 @@ func (a *Authentication) Login(loginType, identifier string, password []byte) (*
 	return usr, nil
 }
 
+func (a *Authentication) Users(JWT string, q UsersQuery, offset, count string) ([]User, error) {
+	if err := a.jwtHasAccess(JWT, AccessLevelAdmin); err != nil {
+		return nil, err
+	}
+	return nil, errors.NewNotImplemented()
+}
+
 func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error) {
 	clms := new(JWTClaim)
 	if _, err := a.jwter.Validate(JWT, clms); err != nil {
@@ -709,10 +716,10 @@ func (a *Authentication) Groups(JWT, offsetStr, countStr string) ([]Group, error
 
 func (a *Authentication) preparePrerequisiteGroups() ([]Group, error) {
 	defs := map[string]float32{
-		GroupSuper: AccessLevelSuper,
-		GroupAdmin: AccessLevelAdmin,
-		GroupStaff: AccessLevelStaff,
-		GroupUser: AccessLevelUser,
+		GroupSuper:   AccessLevelSuper,
+		GroupAdmin:   AccessLevelAdmin,
+		GroupStaff:   AccessLevelStaff,
+		GroupUser:    AccessLevelUser,
 		GroupVisitor: AccessLevelVisitor,
 	}
 	var grps []Group

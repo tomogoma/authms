@@ -54,7 +54,7 @@ type User struct {
 }
 
 func NewUser(user *model.User) *User {
-	if user == nil {
+	if user == nil || !user.HasValue() {
 		return nil
 	}
 	return &User{
@@ -70,4 +70,22 @@ func NewUser(user *model.User) *User {
 		CreateDate: user.CreateDate.Format(config.TimeFormat),
 		UpdateDate: user.UpdateDate.Format(config.TimeFormat),
 	}
+}
+
+func NewUsers(usrs []model.User) []User {
+	if len(usrs) == 0 {
+		return nil
+	}
+	var rtUsrs []User
+	for _, usr := range usrs {
+		rtUsr := NewUser(&usr)
+		if rtUsr == nil {
+			continue
+		}
+		rtUsrs = append(rtUsrs, *rtUsr)
+	}
+	if len(rtUsrs) == 0 {
+		return nil
+	}
+	return rtUsrs
 }

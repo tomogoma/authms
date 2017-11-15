@@ -19,25 +19,30 @@ import (
 type contextKey string
 
 type Auth interface {
-	IsNotFoundError(error) bool
-	IsNotImplementedError(error) bool
-	IsClientError(error) bool
-	IsForbiddenError(error) bool
-	IsAuthError(error) bool
+	errors.AllErrChecker
+
 	RegisterFirst(loginType, userType, id string, secret []byte) (*model.User, error)
 	CanRegisterFirst() (bool, error)
 	RegisterSelf(loginType, userType, id string, secret []byte) (*model.User, error)
 	RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*model.User, error)
 	RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error)
+
 	UpdateIdentifier(JWT, loginType, newId string) (*model.User, error)
+
 	UpdatePassword(JWT string, old, newPass []byte) error
 	SetPassword(loginType, onAddr string, dbt, pass []byte) (*model.VerifLogin, error)
+
 	SendVerCode(JWT, loginType, toAddr string) (*model.DBTStatus, error)
 	SendPassResetCode(loginType, toAddr string) (*model.DBTStatus, error)
+
 	VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (string, error)
 	VerifyDBT(loginType, forAddr string, dbt []byte) (*model.VerifLogin, error)
+
 	Login(loginType, identifier string, password []byte) (*model.User, error)
+
+	Users(JWT string, q model.UsersQuery, offset, count string) ([]model.User, error)
 	GetUserDetails(JWT, userID string) (*model.User, error)
+
 	Groups(JWT, offset, count string) ([]model.Group, error)
 }
 
@@ -281,7 +286,12 @@ func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {
 		Groups: q[keyGroup],
 		ACLs:   q[keyAcl],
 	}
-	s.respondOn(w, r, req, nil, http.StatusOK, errors.NewNotImplemented())
+	uq := model.UsersQuery{
+		AccessLevelsIn: req.ACLs,
+		GroupNamesIn: req.Groups,
+	}
+	usrs, err := s.auth.Users(req.JWT, uq, req.Offset, req.Count)
+	s.respondOn(w, r, req, NewUsers(usrs), http.StatusOK, err)
 }
 
 /**
