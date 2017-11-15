@@ -48,6 +48,7 @@ func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
 			INNER JOIN ` + TblGroups + `
 				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
 			WHERE ` + TblUserGroupsJoin + `.` + ColUserID + `=$1
+			ORDER BY ` + ColAccessLevel + ` ASC
 	`
 	rows, err := r.db.Query(q, usrID)
 	if err != nil {
@@ -67,7 +68,40 @@ func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
 		return nil, errors.Newf("iterating result set: %v", err)
 	}
 	if len(grps) == 0 {
-		return nil, errors.NewNotFound("no devices found for user")
+		return nil, errors.NewNotFound("no groups found for user")
+	}
+	return grps, nil
+}
+
+func (r *Roach) Groups(offset, count int64) ([]model.Group, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
+	cols := ColDesc(ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
+	q := `
+		SELECT ` + cols + ` FROM ` + TblGroups + `
+			ORDER BY ` + ColAccessLevel + ` ASC
+			LIMIT $1 OFFSET $2
+	`
+	rows, err := r.db.Query(q, count, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var grps []model.Group
+	for rows.Next() {
+		grp := model.Group{}
+		err := rows.Scan(&grp.ID, &grp.Name, &grp.AccessLevel, &grp.CreateDate, &grp.UpdateDate)
+		if err != nil {
+			return nil, errors.Newf("scan result set row: %v", err)
+		}
+		grps = append(grps, grp)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Newf("iterating result set: %v", err)
+	}
+	if len(grps) == 0 {
+		return nil, errors.NewNotFound("no groups found")
 	}
 	return grps, nil
 }

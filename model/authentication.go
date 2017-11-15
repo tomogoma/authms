@@ -15,6 +15,7 @@ import (
 	"github.com/dgrijalva/jwt-go"
 	errors "github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
+	"strconv"
 )
 
 type AuthStore interface {
@@ -24,6 +25,7 @@ type AuthStore interface {
 	InsertGroup(name string, acl float32) (*Group, error)
 	Group(string) (*Group, error)
 	GroupByName(string) (*Group, error)
+	Groups(offset, count int64) ([]Group, error)
 
 	InsertUserType(name string) (*UserType, error)
 	UserTypeByName(string) (*UserType, error)
@@ -118,15 +120,17 @@ type regConditions func(id string) (string, error)
 type regFunc func(tx *sql.Tx, actionType, id string, usr *User) error
 
 const (
-	GroupSuper  = "super"
-	GroupAdmin  = "admin"
-	GroupStaff  = "staff"
-	GroupPublic = "public"
+	GroupSuper   = "super"
+	GroupAdmin   = "admin"
+	GroupStaff   = "staff"
+	GroupUser    = "user"
+	GroupVisitor = "visitor"
 
-	AccessLevelSuper  = 1
-	AccessLevelAdmin  = 3
-	AccessLevelStaff  = 7
-	AccessLevelPublic = 9
+	AccessLevelSuper   = 1
+	AccessLevelAdmin   = 3
+	AccessLevelStaff   = 7
+	AccessLevelUser    = 9
+	AccessLevelVisitor = 9.5
 
 	UserTypeIndividual = "individual"
 	UserTypeCompany    = "company"
@@ -152,6 +156,9 @@ const (
 	LoginTypePhone    = "phones"
 	LoginTypeFacebook = "facebook"
 	LoginTypeDev      = "devices"
+
+	defaultOffset = 0
+	defaultCount  = 10
 )
 
 var (
@@ -681,11 +688,43 @@ func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error
 	return usr, nil
 }
 
-func (a *Authentication) Groups(JWT, offset, count string) ([]Group, error) {
+func (a *Authentication) Groups(JWT, offsetStr, countStr string) ([]Group, error) {
 	if err := a.jwtHasAccess(JWT, AccessLevelStaff); err != nil {
 		return nil, err
 	}
-	return nil, errors.NewNotImplemented()
+	offset, count, err := unpackOffsetCount(offsetStr, countStr)
+	if err != nil {
+		return nil, err
+	}
+	if _, err := a.preparePrerequisiteGroups(); err != nil {
+		return nil, errors.Newf("prepare pre-requisite groups: %v", err)
+	}
+	grps, err := a.db.Groups(offset, count)
+	if err != nil {
+		// not checking not found because pre-requisite groups need exist in db
+		return nil, errors.Newf("fetch groups: %v", err)
+	}
+	return grps, nil
+}
+
+func (a *Authentication) preparePrerequisiteGroups() ([]Group, error) {
+	defs := map[string]float32{
+		GroupSuper: AccessLevelSuper,
+		GroupAdmin: AccessLevelAdmin,
+		GroupStaff: AccessLevelStaff,
+		GroupUser: AccessLevelUser,
+		GroupVisitor: AccessLevelVisitor,
+	}
+	var grps []Group
+	for name, acl := range defs {
+		grp, err := a.getOrCreateGroup(name, acl)
+		if err != nil {
+			return nil, errors.Newf("get or create group '%s' with acl %f: %v",
+				name, acl, err)
+		}
+		grps = append(grps, *grp)
+	}
+	return grps, nil
 }
 
 func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) error {
@@ -831,7 +870,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 		return nil, err
 	}
 
-	grp, err := a.getOrCreateGroup(GroupPublic, AccessLevelPublic)
+	grp, err := a.getOrCreateGroup(GroupUser, AccessLevelUser)
 	if err != nil {
 		return nil, err
 	}
@@ -1267,6 +1306,43 @@ func (a *Authentication) jwtHasAccess(JWT string, acl float32) error {
 		return err
 	}
 	return claimsHaveAccess(*clms, acl)
+}
+
+func unpackOffsetCount(offsetStr, countStr string) (int64, int64, error) {
+	offset, err := unpackOffset(offsetStr)
+	if err != nil {
+		return offset, defaultCount, err
+	}
+	count, err := unpackCount(countStr)
+	return offset, count, err
+}
+
+func unpackOffset(offsetStr string) (int64, error) {
+	if offsetStr == "" {
+		return defaultOffset, nil
+	}
+	offset, err := strconv.ParseInt(offsetStr, 10, 64)
+	if err != nil {
+		return defaultOffset, errors.NewClientf("invalid offset: %v", err)
+	}
+	if offset < 0 {
+		return defaultOffset, errors.NewClientf("invalid offset: must be >= 0")
+	}
+	return offset, nil
+}
+
+func unpackCount(countStr string) (int64, error) {
+	if countStr == "" {
+		return defaultCount, nil
+	}
+	count, err := strconv.ParseInt(countStr, 10, 64)
+	if err != nil {
+		return defaultCount, errors.NewClientf("invalid count: %v", err)
+	}
+	if count < 1 {
+		return defaultCount, errors.NewClientf("invalid count: must be > 0")
+	}
+	return count, nil
 }
 
 func claimsHaveAccess(clms JWTClaim, acl float32) error {
