@@ -68,6 +68,8 @@ const (
 	keyOffset    = "offset"
 	keyCount     = "count"
 	keyUserID    = "userID"
+	keyAcl       = "acl"
+	keyGroup     = "group"
 
 	ctxKeyLog = contextKey("log")
 
@@ -124,6 +126,10 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/users/{" + keyUserID + "}").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUserDetails)))
+
+	r.PathPrefix("/users").
+		Methods(http.MethodGet).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUsers)))
 
 	r.PathPrefix("/{" + keyLoginType + "}/register").
 		Methods(http.MethodPut).
@@ -232,6 +238,50 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 		CanonicalName: config.CanonicalWebName(),
 		NeedRegSuper:  canRegFrst,
 	}, http.StatusOK, err)
+}
+
+/**
+ * @api {get} /users Get Users
+ * @apiName GetUsers
+ * @apiVersion 0.1.1
+ * @apiGroup Auth
+ * @apiPermission ^admin
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (URL Query Parameters) {String} token the JWT accessed during auth.
+ * @apiParam (URL Query Parameters) {Number} [offset=0] The beginning index to fetch groups.
+ * @apiParam (URL Query Parameters) {Number} [count=10] The maximum number of groups to fetch.
+ * @apiParam (URL Query Parameters) {String} [group] Filter by group name. one can have multiple groups e.g. ?group=admin&group=staff
+ * @apiParam (URL Query Parameters) {String{0-10}=gt[number],lt[number],eq[number]} [acl] Filter by access levels:
+ * - gt[number] - access level greater than number e.g. gt5
+ * - lt[number] - access level less than number e.g. lt5
+ * - [number] - access level equal to number e.g. 5
+ * - gteq[number] - access level greater than or equal to number e.g. gteq5
+ * - gteq[number] - access level less than or equal to  number e.g. lteq5
+ * - one can have multiple filters e.g. ?acl=gt5&acl=lt9&acl=9.5 to get acl in (acl==9.5 || 5 < acl < 9)
+ *
+ * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
+ *
+ * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-Group">groups</a>
+ *
+ */
+func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	req := struct {
+		JWT    string   `json:"token"`
+		Offset string   `json:"offset"`
+		Count  string   `json:"count"`
+		Groups []string `json:"group"`
+		ACLs   []string `json:"acl"`
+	}{
+		JWT:    q.Get(keyToken),
+		Offset: q.Get(keyOffset),
+		Count:  q.Get(keyCount),
+		Groups: q[keyGroup],
+		ACLs:   q[keyAcl],
+	}
+	s.respondOn(w, r, req, nil, http.StatusOK, errors.NewNotImplemented())
 }
 
 /**

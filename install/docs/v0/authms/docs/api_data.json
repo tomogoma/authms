@@ -69,6 +69,95 @@
     "groupTitle": "Auth"
   },
   {
+    "type": "get",
+    "url": "/users",
+    "title": "Get Users",
+    "name": "GetUsers",
+    "version": "0.1.1",
+    "group": "Auth",
+    "permission": [
+      {
+        "name": "^admin"
+      }
+    ],
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "optional": false,
+            "field": "token",
+            "description": "<p>the JWT accessed during auth.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "Number",
+            "optional": true,
+            "field": "offset",
+            "defaultValue": "0",
+            "description": "<p>The beginning index to fetch groups.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "Number",
+            "optional": true,
+            "field": "count",
+            "defaultValue": "10",
+            "description": "<p>The maximum number of groups to fetch.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "optional": true,
+            "field": "group",
+            "description": "<p>Filter by group name. one can have multiple groups e.g. ?group=admin&amp;group=staff</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "size": "0-10",
+            "allowedValues": [
+              "gt[number]",
+              "lt[number]",
+              "eq[number]"
+            ],
+            "optional": true,
+            "field": "acl",
+            "description": "<p>Filter by access levels:</p> <ul> <li>gt[number] - access level greater than number e.g. gt5</li> <li>lt[number] - access level less than number e.g. lt5</li> <li>[number] - access level equal to number e.g. 5</li> <li>gteq[number] - access level greater than or equal to number e.g. gteq5</li> <li>gteq[number] - access level less than or equal to  number e.g. lteq5</li> <li>one can have multiple filters e.g. ?acl=gt5&amp;acl=lt9&amp;acl=9.5 to get acl in (acl==9.5 || 5 &lt; acl &lt; 9)</li> </ul>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": false,
+            "field": "json-body",
+            "description": "<p>JSON array of <a href=\"#api-Objects-Group\">groups</a></p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
     "type": "POST",
     "url": "/:loginType/login",
     "title": "Login",
