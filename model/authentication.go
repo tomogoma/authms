@@ -274,7 +274,7 @@ func (a *Authentication) RegisterFirst(loginType, userType, id string, secret []
 	// This bypasses restrictions on registerSelf() e.g.
 	// 1. User can only be a member of the public group.
 	// 2. Self registration may be disabled by config options.
-	return a.registerOther(*superGrp, userType, superGrp.ID, id, secret, regCondF, regF)
+	return a.registerOther(*superGrp, userType, superGrp.ID, id, secret, regCondF, regF, ActionVerify)
 }
 
 // RegisterSelf registers a new user account using id secret combination.
@@ -859,7 +859,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 	return usr, nil
 }
 
-func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, id string, pass []byte, rcf regConditions, f regFunc) (*User, error) {
+func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, id string, pass []byte, rcf regConditions, f regFunc, actionType ...string) (*User, error) {
 
 	if !inStrs(userType, validUserTypes) {
 		return nil, errors.NewClientf("accountType must be one of %+v", validUserTypes)
@@ -901,7 +901,11 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, usrGroup.ID); err != nil {
 			return errors.Newf("add user to group: %v", err)
 		}
-		if err := f(tx, ActionInvite, id, usr); err != nil {
+		aT := ActionInvite
+		if len(actionType) > 0 {
+			aT = actionType[0]
+		}
+		if err := f(tx, aT, id, usr); err != nil {
 			return err
 		}
 		return nil
