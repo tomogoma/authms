@@ -106,7 +106,7 @@ type Authentication struct {
 	fbNilable            FacebookCl
 	smserNilable         SMSer
 	mailerNilable        Mailer
-	webAppURLEmptyable   string
+	webAppURLNilable     *url.URL
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
@@ -201,7 +201,7 @@ func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, 
 		fbNilable:            c.fbNilable,
 		smserNilable:         c.smserNilable,
 		mailerNilable:        c.mailerNilable,
-		webAppURLEmptyable:   c.webAppURLEmptyable,
+		webAppURLNilable:     c.webAppURLNilable,
 		invSubjEmptyable:     c.invSubjEmptyable,
 		verSubjEmptyable:     c.verSubjEmptyable,
 		resPassSubjEmptyable: c.resPassSubjEmptyable,
@@ -748,15 +748,15 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 	expiry := time.Now().Add(validity)
 
 	URL := ""
-	if a.webAppURLEmptyable != "" {
+	if a.webAppURLNilable != nil {
 		tkn, err := a.genAndInsertToken(tx, expiry, loginType, usrID, toAddr)
 		if err != nil {
 			return nil, err
 		}
-		URL, err = a.genURL(action, loginType, usrID, tkn)
-		if err != nil {
-			return nil, err
-		}
+		useURL := new(url.URL)
+		*useURL = *a.webAppURLNilable // make copy so that a.webAppURLNilable remains pristine
+		useURL.Path = path.Join(useURL.Path, action, loginType, toAddr, string(tkn))
+		URL = useURL.String()
 	}
 
 	code, err := a.genAndInsertCode(tx, expiry, loginType, usrID, toAddr)
@@ -1099,15 +1099,6 @@ func (a *Authentication) hashAndInsertToken(tx *sql.Tx, expiry time.Time, loginT
 	}
 
 	return nil
-}
-
-func (a *Authentication) genURL(action, loginType, userID string, dbt []byte) (string, error) {
-	URL, err := url.Parse(a.webAppURLEmptyable)
-	if err != nil {
-		return "", errors.Newf("parsing web app URL: %v", err)
-	}
-	URL.Path = path.Join(URL.Path, action, loginType, userID, string(dbt))
-	return URL.String(), nil
 }
 
 func (a *Authentication) sendEmail(toAddr, subj string, t *template.Template, data interface{}) error {

@@ -7,6 +7,7 @@ import (
 
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/generator"
+	"net/url"
 )
 
 // Option is used by NewAuthentication to pass additional configuration. Use
@@ -125,8 +126,9 @@ func WithEmailCl(cl Mailer) Option {
 // TODO document types of request and URL endpoints that will be suffixed
 func WithWebAppURL(URL string) Option {
 	return func(c *authenticationConfig) error {
-		c.webAppURLEmptyable = URL
-		return nil
+		var err error
+		c.webAppURLNilable, err = url.Parse(URL)
+		return err
 	}
 }
 
@@ -264,7 +266,7 @@ type authenticationConfig struct {
 	fbNilable            FacebookCl
 	smserNilable         SMSer
 	mailerNilable        Mailer
-	webAppURLEmptyable   string
+	webAppURLNilable     *url.URL
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
