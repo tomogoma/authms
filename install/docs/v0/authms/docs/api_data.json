@@ -20,32 +20,126 @@
             "group": "Header",
             "optional": false,
             "field": "Authorization",
-            "description": "<p>Basic auth containing identifier/secret, both provided during <a href=\"#api-Auth-Register\">Registration</a></p>"
+            "description": "<p>Basic auth containing loginType's identifier and password in the format 'Basic: base64Of(identifier:password)'</p>"
           }
         ]
       }
     },
-    "success": {
+    "parameter": {
       "fields": {
-        "200": [
+        "URL Parameters": [
           {
-            "group": "200",
-            "type": "Object",
+            "group": "URL Parameters",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
             "optional": false,
-            "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-User\">User</a>.</p>"
+            "field": "loginType",
+            "description": "<p>type of identifier in Authorization header.</p>"
           }
         ]
       }
     },
     "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    "groupTitle": "Auth",
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "ID",
+            "description": "<p>Unique ID of the user (can be cast to long Integer).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "type",
+            "description": "<p>The <a href=\"#api-Objects-UserType\">UserType</a> of this user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "created",
+            "description": "<p>The date the user was created.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "lastUpdated",
+            "description": "<p>date the user was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": true,
+            "field": "JWT",
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "username",
+            "description": "<p>The user's <a href=\"#api-Objects-Username\">username</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "phone",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">phone</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "email",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">email</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "facebook",
+            "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": true,
+            "field": "groups",
+            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "device",
+            "description": "<p>The <a href=\"#api-Objects-Device\">device</a> this user is attached to, if any.</p>"
+          }
+        ]
+      }
+    }
   },
   {
     "type": "put",
-    "url": "/:loginType/register?selfReg=:selfReg",
+    "url": "/:loginType/register",
     "title": "Register",
-    "description": "<p>Register new user. Registration can be:</p> <ul> <li>self registration - provide URL param selfReg=true</li> <li>self registration by unique device ID - provide URL param selfReg=device</li> <li>or other user (by admin) - don't provide URL params</li> </ul> <p>loginType is what the user will be logging in by, can be one of:</p> <ul> <li>usernames</li> <li>emails</li> <li>phones</li> <li>facebook</li> </ul>",
+    "description": "<p>Register new user.</p>",
+    "permission": [
+      {
+        "name": "^admin for registering other"
+      }
+    ],
     "name": "Register",
     "version": "0.1.0",
     "group": "Auth",
@@ -63,54 +157,86 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "URL Parameters": [
           {
-            "group": "Parameter",
-            "type": "Enum",
+            "group": "URL Parameters",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier in JSON Body</p>"
+          }
+        ],
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "allowedValues": [
+              "true",
+              "device"
+            ],
+            "optional": false,
+            "field": "selfReg",
+            "description": "<p>Whether registering self or not:</p> <ul> <li>true for self registration</li> <li>device for self registration by unique device ID</li> <li>not-provided for admin to register any other user</li> </ul>"
+          }
+        ],
+        "JSON Request Body": [
+          {
+            "group": "JSON Request Body",
+            "type": "String",
+            "allowedValues": [
+              "individual",
+              "company"
+            ],
             "optional": false,
             "field": "userType",
-            "description": "<p>Type of user [individual|company]</p>"
+            "description": "<p>Type of user.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
-            "description": "<p>The 'username' corresponding to loginType</p>"
+            "description": "<p>The 'username' corresponding to loginType.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
-            "optional": false,
+            "optional": true,
             "field": "secret",
-            "description": "<p>The users password</p>"
+            "description": "<p>The user's password - required when selfReg not set.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
-            "optional": false,
+            "optional": true,
             "field": "groupID",
-            "description": "<p>[only if selfReg not set or false] groupID to add this user to</p>"
+            "description": "<p>groupID to add this user to - required when selfReg not set.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
-            "optional": false,
+            "optional": true,
             "field": "deviceID",
-            "description": "<p>[only if selfReg set to device] the unique device ID for the user</p>"
+            "description": "<p>the unique device ID for the user - required when selfReg=device.</p>"
           }
         ]
       }
     },
     "success": {
       "fields": {
-        "201": [
+        "Success 201": [
           {
-            "group": "201",
+            "group": "Success 201",
             "type": "Object",
             "optional": false,
             "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-User\">User</a>.</p>"
+            "description": "<p>See <a href=\"#api-Objects-User\">User</a> for details.</p>"
           }
         ]
       }
@@ -122,7 +248,7 @@
     "type": "POST",
     "url": "/reset_password",
     "title": "Reset password",
-    "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
+    "description": "<p>Reset a user's password.</p>",
     "name": "ResetPassword",
     "version": "0.1.0",
     "group": "Auth",
@@ -140,30 +266,36 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "JSON Request Body": [
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
             "optional": false,
             "field": "loginType",
-            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>"
+            "description": "<p>type of identifier for which password reset is sort.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
-            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for identifier options.</p>"
+            "description": "<p>the loginType's unique identifier for which password reset is sort.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "OTP",
             "description": "<p>The password reset code sent to user during <a href=\"#api-Auth-SendPasswordResetOTP\">SendPasswordResetOTP</a>.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "newSecret",
@@ -172,27 +304,62 @@
         ]
       }
     },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth",
     "success": {
       "fields": {
-        "200": [
+        "Success 200": [
           {
-            "group": "200",
-            "type": "Object",
+            "group": "Success 200",
+            "type": "String",
             "optional": false,
-            "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+            "field": "ID",
+            "description": "<p>Unique ID of the verifiable login (can be cast to long Integer).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "userID",
+            "description": "<p>ID for user who owns this verifiable login.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "value",
+            "description": "<p>The unique verifiable login string value.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Boolean",
+            "optional": false,
+            "field": "verified",
+            "description": "<p>True if this login is verified, false otherwise.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "created",
+            "description": "<p>ISO8601 date the verifiable login was created.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "lastUpdated",
+            "description": "<p>ISO8601 date the verifiable login was last updated.</p>"
           }
         ]
       }
-    },
-    "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    }
   },
   {
     "type": "POST",
     "url": "/reset_password/send_otp",
     "title": "Send Password Reset OTP",
-    "description": "<p>Send Password reset Code (OTP) to identifier of type loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType and identifier options.</p>",
+    "description": "<p>Send Password reset Code (OTP) to identifier of type loginType.</p>",
     "name": "SendPasswordResetOTP",
     "version": "0.1.0",
     "group": "Auth",
@@ -210,45 +377,58 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "JSON Request Body": [
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
             "optional": false,
             "field": "loginType",
-            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>"
+            "description": "<p>type of identifier to send OTP to.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
-            "description": "<p>See <a href=\"#api-Auth-Register\">Register</a> for identifier options.</p>"
-          }
-        ]
-      }
-    },
-    "success": {
-      "fields": {
-        "200": [
-          {
-            "group": "200",
-            "type": "Object",
-            "optional": false,
-            "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
+            "description": "<p>The loginType's unique identifier for which to send password reset code to.</p>"
           }
         ]
       }
     },
     "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    "groupTitle": "Auth",
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "obfuscatedAddress",
+            "description": "<p>Obfuscated address to which OTP was sent.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "expiresAt",
+            "description": "<p>ISO8601 expiry date of OTP.</p>"
+          }
+        ]
+      }
+    }
   },
   {
     "type": "POST",
-    "url": "/:loginType/verify?token=:JWT",
+    "url": "/:loginType/verify",
     "title": "Send Verification Code",
-    "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier. See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>",
+    "description": "<p>Send OTP to identifier of type loginType for purpose of verifying identifier.</p>",
     "name": "SendVerificationCode",
     "version": "0.2.0",
     "group": "Auth",
@@ -266,9 +446,33 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "URL Parameters": [
           {
-            "group": "Parameter",
+            "group": "URL Parameters",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier in JSON Body</p>"
+          }
+        ],
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "optional": false,
+            "field": "token",
+            "description": "<p>the JWT provided during login.</p>"
+          }
+        ],
+        "JSON Request Body": [
+          {
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
@@ -277,21 +481,28 @@
         ]
       }
     },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth",
     "success": {
       "fields": {
-        "200": [
+        "Success 200": [
           {
-            "group": "200",
-            "type": "Object",
+            "group": "Success 200",
+            "type": "String",
             "optional": false,
-            "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
+            "field": "obfuscatedAddress",
+            "description": "<p>Obfuscated address to which OTP was sent.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "expiresAt",
+            "description": "<p>ISO8601 expiry date of OTP.</p>"
           }
         ]
       }
-    },
-    "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    }
   },
   {
     "type": "POST",
@@ -363,37 +574,37 @@
     },
     "success": {
       "fields": {
-        "200": [
+        "Success 200": [
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "name",
             "description": "<p>Micro-service name.</p>"
           },
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "version",
             "description": "<p>Current running version.</p>"
           },
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "description",
             "description": "<p>Short description of the micro-service.</p>"
           },
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "canonicalName",
             "description": "<p>Canonical name of the micro-service.</p>"
           },
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "needRegSuper",
@@ -406,10 +617,10 @@
     "groupTitle": "Auth"
   },
   {
-    "type": "POST",
-    "url": "/:loginType/update?token=:JWT",
-    "title": "Update Identifier",
-    "description": "<p>Update (or set for first time) the identifier details for loginType. See <a href=\"#api-Auth-Register\">Register</a> for loginType. See <a href=\"#api-Objects-User\">User</a> for how to access the JWT.</p>",
+    "type": "",
+    "url": "User",
+    "title": "",
+    "description": "<p>Update (or set for first time) the identifier details for loginType.</p>",
     "name": "UpdateIdentifier",
     "version": "0.1.0",
     "group": "Auth",
@@ -427,26 +638,37 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "URL Parameters": [
           {
-            "group": "Parameter",
+            "group": "URL Parameters",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier in JSON Body</p>"
+          }
+        ],
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "optional": false,
+            "field": "token",
+            "description": "<p>the JWT provided during login.</p>"
+          }
+        ],
+        "JSON Request Body": [
+          {
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
-            "description": "<p>The new 'username' corresponding to loginType</p>"
-          }
-        ]
-      }
-    },
-    "success": {
-      "fields": {
-        "200": [
-          {
-            "group": "200",
-            "type": "Object",
-            "optional": false,
-            "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-User\">User</a>.</p>"
+            "description": "<p>The new loginType's unique identifier.</p>"
           }
         ]
       }
@@ -480,18 +702,18 @@
     },
     "parameter": {
       "fields": {
-        "URL Path Component": [
+        "URL Param": [
           {
-            "group": "URL Path Component",
+            "group": "URL Param",
             "type": "String",
             "optional": false,
             "field": ":userID",
             "description": "<p>The ID of the <a href=\"#api-Objects-User\">User</a> whose details are sort.</p>"
           }
         ],
-        "URL Query": [
+        "URL Query Parameters": [
           {
-            "group": "URL Query",
+            "group": "URL Query Parameters",
             "type": "String",
             "optional": false,
             "field": "token",
@@ -500,25 +722,95 @@
         ]
       }
     },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth",
     "success": {
       "fields": {
-        "200": [
+        "Success 200": [
           {
-            "group": "200",
-            "type": "JSON",
+            "group": "Success 200",
+            "type": "String",
             "optional": false,
-            "field": "body",
-            "description": "<p>The details of the <a href=\"#api-Objects-User\">User</a> in JSON format.</p>"
+            "field": "ID",
+            "description": "<p>Unique ID of the user (can be cast to long Integer).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "type",
+            "description": "<p>The <a href=\"#api-Objects-UserType\">UserType</a> of this user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "created",
+            "description": "<p>The date the user was created.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "lastUpdated",
+            "description": "<p>date the user was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": true,
+            "field": "JWT",
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "username",
+            "description": "<p>The user's <a href=\"#api-Objects-Username\">username</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "phone",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">phone</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "email",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">email</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "facebook",
+            "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": true,
+            "field": "groups",
+            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "device",
+            "description": "<p>The <a href=\"#api-Objects-Device\">device</a> this user is attached to, if any.</p>"
           }
         ]
       }
-    },
-    "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    }
   },
   {
     "type": "POST",
-    "url": "/:loginType/verify/:OTP?extend=:extend",
+    "url": "/:loginType/verify/:OTP",
     "title": "Verify OTP",
     "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType options. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
     "name": "VerifyOTP",
@@ -538,9 +830,36 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "URL Parameters": [
           {
-            "group": "Parameter",
+            "group": "URL Parameters",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier to verify.</p>"
+          }
+        ],
+        "URL Query Parameters": [
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "allowedValues": [
+              "true"
+            ],
+            "optional": false,
+            "field": "extend",
+            "description": "<p>set true to return an extended expiry period OTP.</p>"
+          }
+        ],
+        "JSON Request Body": [
+          {
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
@@ -551,20 +870,13 @@
     },
     "success": {
       "fields": {
-        "200": [
+        "Success 200": [
           {
-            "group": "200",
+            "group": "Success 200",
             "type": "String",
-            "optional": false,
+            "optional": true,
             "field": "OTP",
-            "description": "<p>[if extending OTP] the new OTP with extended expiry</p>"
-          },
-          {
-            "group": "200",
-            "type": "Object",
-            "optional": false,
-            "field": "json-body",
-            "description": "<p>[if not extending OTP] see <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
+            "description": "<p>(if extending OTP) the new OTP with extended expiry</p>"
           }
         ]
       }
@@ -782,6 +1094,8 @@
     "name": "OTPStatus",
     "version": "0.1.0",
     "group": "Objects",
+    "filename": "handler/http/dbt_status.go",
+    "groupTitle": "Objects",
     "success": {
       "fields": {
         "Success 200": [
@@ -801,17 +1115,17 @@
           }
         ]
       }
-    },
-    "filename": "handler/http/dbt_status.go",
-    "groupTitle": "Objects"
+    }
   },
   {
-    "type": "NULL",
+    "type": "JSON",
     "url": "User",
     "title": "User",
     "name": "User",
     "version": "0.1.0",
     "group": "Objects",
+    "filename": "handler/http/user.go",
+    "groupTitle": "Objects",
     "success": {
       "fields": {
         "Success 200": [
@@ -824,59 +1138,17 @@
           },
           {
             "group": "Success 200",
-            "type": "String",
-            "optional": false,
-            "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
-          },
-          {
-            "group": "Success 200",
             "type": "Object",
             "optional": false,
-            "field": "username",
-            "description": "<p>See <a href=\"#api-Objects-Username\">Username</a>.</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object",
-            "optional": false,
-            "field": "phone",
-            "description": "<p>See <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object",
-            "optional": false,
-            "field": "email",
-            "description": "<p>See <a href=\"#api-Objects-VerifLogin\">VerifLogin</a>.</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object",
-            "optional": false,
-            "field": "facebook",
-            "description": "<p>See <a href=\"#api-Objects-FacebookID\">FacebookID</a>.</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object",
-            "optional": false,
-            "field": "group",
-            "description": "<p>See <a href=\"#api-Objects-Group\">Group</a>.</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object",
-            "optional": false,
-            "field": "device",
-            "description": "<p>See <a href=\"#api-Objects-Device\">Device</a>.</p>"
+            "field": "type",
+            "description": "<p>The <a href=\"#api-Objects-UserType\">UserType</a> of this user.</p>"
           },
           {
             "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
-            "description": "<p>Date the user was created.</p>"
+            "description": "<p>The date the user was created.</p>"
           },
           {
             "group": "Success 200",
@@ -884,12 +1156,59 @@
             "optional": false,
             "field": "lastUpdated",
             "description": "<p>date the user was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": true,
+            "field": "JWT",
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "username",
+            "description": "<p>The user's <a href=\"#api-Objects-Username\">username</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "phone",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">phone</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "email",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">email</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "facebook",
+            "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": true,
+            "field": "groups",
+            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "device",
+            "description": "<p>The <a href=\"#api-Objects-Device\">device</a> this user is attached to, if any.</p>"
           }
         ]
       }
-    },
-    "filename": "handler/http/user.go",
-    "groupTitle": "Objects"
+    }
   },
   {
     "type": "NULL",
@@ -993,6 +1312,8 @@
     "name": "VerifLogin",
     "version": "0.1.0",
     "group": "Objects",
+    "filename": "handler/http/verifiable_login.go",
+    "groupTitle": "Objects",
     "success": {
       "fields": {
         "Success 200": [
@@ -1040,15 +1361,18 @@
           }
         ]
       }
-    },
-    "filename": "handler/http/verifiable_login.go",
-    "groupTitle": "Objects"
+    }
   },
   {
     "type": "put",
     "url": "/first_user",
     "title": "First User",
     "description": "<p>Register the first super-user (super admin)</p>",
+    "permission": [
+      {
+        "name": "anyone"
+      }
+    ],
     "name": "FirstUser",
     "version": "0.1.0",
     "group": "Setup",
@@ -1066,30 +1390,40 @@
     },
     "parameter": {
       "fields": {
-        "Parameter": [
+        "JSON Request Body": [
           {
-            "group": "Parameter",
-            "type": "Enum",
+            "group": "JSON Request Body",
+            "type": "String",
+            "allowedValues": [
+              "individual",
+              "company"
+            ],
             "optional": false,
             "field": "userType",
-            "description": "<p>Type of user [individual|company]</p>"
+            "description": "<p>Type of user.</p>"
           },
           {
-            "group": "Parameter",
-            "type": "Enum",
+            "group": "JSON Request Body",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "phones",
+              "emails",
+              "facebook"
+            ],
             "optional": false,
             "field": "loginType",
-            "description": "<p>Type of identifier [usernames|emails|phones|facebook]</p>"
+            "description": "<p>Type of identifier.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "identifier",
-            "description": "<p>The 'username' corresponding to loginType</p>"
+            "description": "<p>The user's unique loginType identifier.</p>"
           },
           {
-            "group": "Parameter",
+            "group": "JSON Request Body",
             "type": "String",
             "optional": false,
             "field": "secret",
@@ -1100,13 +1434,13 @@
     },
     "success": {
       "fields": {
-        "201": [
+        "Success 201": [
           {
-            "group": "201",
+            "group": "Success 201",
             "type": "Object",
             "optional": false,
             "field": "json-body",
-            "description": "<p>See <a href=\"#api-Objects-User\">User</a>.</p>"
+            "description": "<p>See <a href=\"#api-Objects-User\">User</a> for details.</p>"
           }
         ]
       }

@@ -216,11 +216,11 @@ func (s *handler) unmarshalJSONOrRespondError(w http.ResponseWriter, r *http.Req
  *
  * @apiHeader x-api-key the api key
  *
- * @apiSuccess (200) {String} name Micro-service name.
- * @apiSuccess (200)  {String} version Current running version.
- * @apiSuccess (200)  {String} description Short description of the micro-service.
- * @apiSuccess (200)  {String} canonicalName Canonical name of the micro-service.
- * @apiSuccess (200)  {String} needRegSuper true if a super-user has been registered, false otherwise.
+ * @apiSuccess {String} name Micro-service name.
+ * @apiSuccess  {String} version Current running version.
+ * @apiSuccess {String} description Short description of the micro-service.
+ * @apiSuccess {String} canonicalName Canonical name of the micro-service.
+ * @apiSuccess {String} needRegSuper true if a super-user has been registered, false otherwise.
  *
  */
 func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -249,20 +249,21 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam (URL Path Component) {String} :userID The ID of the <a href="#api-Objects-User">User</a> whose details are sort.
+ * @apiParam (URL Param) {String} :userID The ID of the
+	<a href="#api-Objects-User">User</a> whose details are sort.
  *
- * @apiParam (URL Query) {String} token The JWT provided during auth.
+ * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
  *
- * @apiSuccess (200) {JSON} body The details of the <a href="#api-Objects-User">User</a> in JSON format.
+ * @apiUse User
  *
  */
 func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		UserID string `json:"userID"`
-		JWT string `json:"token"`
-	} {
+		JWT    string `json:"token"`
+	}{
 		UserID: mux.Vars(r)[keyUserID],
-		JWT:  r.URL.Query().Get(keyToken),
+		JWT:    r.URL.Query().Get(keyToken),
 	}
 	usr, err := s.auth.GetUserDetails(req.JWT, req.UserID)
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
@@ -271,18 +272,19 @@ func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
 /**
  * @api {put} /first_user First User
  * @apiDescription Register the first super-user (super admin)
+ * @apiPermission anyone
  * @apiName FirstUser
  * @apiVersion 0.1.0
  * @apiGroup Setup
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {Enum} userType Type of user [individual|company]
- * @apiParam {Enum} loginType Type of identifier [usernames|emails|phones|facebook]
- * @apiParam {String} identifier The 'username' corresponding to loginType
- * @apiParam {String} secret The users password
+ * @apiParam (JSON Request Body) {String=individual,company} userType Type of user.
+ * @apiParam (JSON Request Body) {String=usernames,phones,emails,facebook} loginType Type of identifier.
+ * @apiParam (JSON Request Body) {String} identifier The user's unique loginType identifier.
+ * @apiParam (JSON Request Body) {String} secret The users password
  *
- * @apiSuccess (201) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ * @apiSuccess (Success 201) {Object} json-body See <a href="#api-Objects-User">User</a> for details.
  *
  */
 func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
@@ -302,32 +304,29 @@ func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {put} /:loginType/register?selfReg=:selfReg Register
+ * @api {put} /:loginType/register Register
  * @apiDescription  Register new user.
- * Registration can be:
- * - self registration - provide URL param selfReg=true
- * - self registration by unique device ID - provide URL param selfReg=device
- * - or other user (by admin) - don't provide URL params
- *
- * loginType is what the user will be logging in by, can be one of:
- * - usernames
- * - emails
- * - phones
- * - facebook
- *
+ * @apiPermission ^admin for registering other
  * @apiName Register
  * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {Enum} userType Type of user [individual|company]
- * @apiParam {String} identifier The 'username' corresponding to loginType
- * @apiParam {String} secret The users password
- * @apiParam {String} groupID [only if selfReg not set or false] groupID to add this user to
- * @apiParam {String} deviceID [only if selfReg set to device] the unique device ID for the user
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
  *
- * @apiSuccess (201) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ * @apiParam (URL Query Parameters) {String=true,device,} selfReg Whether registering self or not:
+ * - true for self registration
+ * - device for self registration by unique device ID
+ * - not-provided for admin to register any other user
+ *
+ * @apiParam (JSON Request Body) {String=individual,company} userType Type of user.
+ * @apiParam (JSON Request Body) {String} identifier The 'username' corresponding to loginType.
+ * @apiParam (JSON Request Body) {String} [secret] The user's password - required when selfReg not set.
+ * @apiParam (JSON Request Body) {String} [groupID] groupID to add this user to - required when selfReg not set.
+ * @apiParam (JSON Request Body) {String} [deviceID] the unique device ID for the user - required when selfReg=device.
+ *
+ * @apiSuccess (Success 201) {Object} json-body See <a href="#api-Objects-User">User</a> for details.
  *
  */
 func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
@@ -371,9 +370,14 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
- * @apiHeader Authorization Basic auth containing identifier/secret, both provided during <a href="#api-Auth-Register">Registration</a>
+ * @apiHeader Authorization Basic auth containing loginType's identifier and password in the format
+	'Basic: base64Of(identifier:password)'
  *
- * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in Authorization header.
+ *
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
+ *
+ * @apiUse User
  *
  */
 func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -396,19 +400,21 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /:loginType/update?token=:JWT Update Identifier
+ * @api {POST} /:loginType/update Update Identifier
  * @apiDescription Update (or set for first time) the identifier details for loginType.
- * See <a href="#api-Auth-Register">Register</a> for loginType.
- * See <a href="#api-Objects-User">User</a> for how to access the JWT.
  * @apiName UpdateIdentifier
  * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {String} identifier The new 'username' corresponding to loginType
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
  *
- * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-User">User</a>.
+ * @apiParam (URL Query Parameters) {String} token the JWT provided during login.
+ *
+ * @apiParam (JSON Request Body) {String} identifier The new loginType's unique identifier.
+ *
+ * @api User
  *
  */
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
@@ -429,18 +435,21 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /:loginType/verify?token=:JWT Send Verification Code
+ * @api {POST} /:loginType/verify Send Verification Code
  * @apiDescription Send OTP to identifier of type loginType for purpose of verifying identifier.
- * See <a href="#api-Auth-Register">Register</a> for loginType options.
  * @apiName SendVerificationCode
  * @apiVersion 0.2.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {String} identifier The loginType's address to be verified.
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
  *
- * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-OTPStatus">OTPStatus</a>.
+ * @apiParam (URL Query Parameters) {String} token the JWT provided during login.
+ *
+ * @apiParam (JSON Request Body) {String} identifier The loginType's address to be verified.
+ *
+ * @apiUse OTPStatus
  *
  */
 func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
@@ -461,7 +470,7 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /:loginType/verify/:OTP?extend=:extend Verify OTP
+ * @api {POST} /:loginType/verify/:OTP Verify OTP
  * @apiDescription Verify OTP.
  * See <a href="#api-Auth-Register">Register</a> for loginType options.
  * extend can be set to "true" if intent on extending the expiry of the OTP.
@@ -471,11 +480,15 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {String} identifier The loginType's address to whom the OTP was sent.
+ * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier to verify.
  *
- * @apiSuccess (200) {String} OTP [if extending OTP] the new OTP with extended expiry
+ * @apiParam (URL Query Parameters) {String=true,} extend set true to return an extended expiry period OTP.
  *
- * @apiSuccess (200) {Object} json-body [if not extending OTP] see <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ * @apiParam (JSON Request Body) {String} identifier The loginType's address to whom the OTP was sent.
+ *
+ * @apiSuccess {String} [OTP] (if extending OTP) the new OTP with extended expiry
+ *
+ * @apiUseSuccess {Object} json-body (if not extending OTP) The verified <a href="#api-Objects-VerifLogin">loginType identifier</a>.
  *
  */
 func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
@@ -514,17 +527,16 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 /**
  * @api {POST} /reset_password/send_otp Send Password Reset OTP
  * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
- * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
  * @apiName SendPasswordResetOTP
  * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {String} loginType See <a href="#api-Auth-Register">Register</a> for loginType options.
- * @apiParam {String} identifier See <a href="#api-Auth-Register">Register</a> for identifier options.
+ * @apiParam (JSON Request Body) {String=usernames,emails,phones,facebook} loginType type of identifier to send OTP to.
+ * @apiParam (JSON Request Body) {String} identifier The loginType's unique identifier for which to send password reset code to.
  *
- * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-OTPStatus">OTPStatus</a>.
+ * @apiUse OTPStatus
  *
  */
 func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request) {
@@ -542,20 +554,19 @@ func (s *handler) handleSendPassResetCode(w http.ResponseWriter, r *http.Request
 
 /**
  * @api {POST} /reset_password Reset password
- * @apiDescription Send Password reset Code (OTP) to identifier of type loginType.
- * See <a href="#api-Auth-Register">Register</a> for loginType and identifier options.
+ * @apiDescription Reset a user's password.
  * @apiName ResetPassword
  * @apiVersion 0.1.0
  * @apiGroup Auth
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam {String} loginType See <a href="#api-Auth-Register">Register</a> for loginType options.
- * @apiParam {String} identifier See <a href="#api-Auth-Register">Register</a> for identifier options.
- * @apiParam {String} OTP The password reset code sent to user during <a href="#api-Auth-SendPasswordResetOTP">SendPasswordResetOTP</a>.
- * @apiParam {String} newSecret The new password.
+ * @apiParam (JSON Request Body) {String=usernames,emails,phones,facebook} loginType type of identifier for which password reset is sort.
+ * @apiParam (JSON Request Body) {String} identifier the loginType's unique identifier for which password reset is sort.
+ * @apiParam (JSON Request Body) {String} OTP The password reset code sent to user during <a href="#api-Auth-SendPasswordResetOTP">SendPasswordResetOTP</a>.
+ * @apiParam (JSON Request Body) {String} newSecret The new password.
  *
- * @apiSuccess (200) {Object} json-body See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
+ * @apiUse VerifLogin
  *
  */
 func (s *handler) handleResetPass(w http.ResponseWriter, r *http.Request) {

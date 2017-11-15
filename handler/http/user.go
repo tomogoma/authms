@@ -6,23 +6,38 @@ import (
 )
 
 /**
- * @api {NULL} User User
+@apiDefine User
+@apiVersion 0.1.0
+
+@apiSuccess {String} ID				Unique ID of the user
+	(can be cast to long Integer).
+@apiSuccess {Object} type			The
+	<a href="#api-Objects-UserType">UserType</a> of this user.
+@apiSuccess {String} created		The date the user was created.
+@apiSuccess {String} lastUpdated	date the user was last updated.
+@apiSuccess {String} [JWT]			JSON Web Token for accessing services.
+	This is only provided during <a href="#api-Auth-Login">Login</a>.
+@apiSuccess {Object} [username]		The user's
+	<a href="#api-Objects-Username">username</a> (if this user has one).
+@apiSuccess {Object} [phone]		The user's
+	<a href="#api-Objects-VerifLogin">phone</a> (if this user has one).
+@apiSuccess {Object} [email]		The user's
+	<a href="#api-Objects-VerifLogin">email</a> (if this user has one).
+@apiSuccess {Object} [facebook] 	The user's
+	<a href="#api-Objects-FacebookID">facebook ID</a> (if this user has one).
+@apiSuccess {Object[]} [groups]		Array of
+	<a href="#api-Objects-Group">groups</a> the user belongs to, if any.
+@apiSuccess {Object} [device]		The
+	<a href="#api-Objects-Device">device</a> this user is attached to, if any.
+ */
+
+/**
+ * @api {JSON} User User
  * @apiName User
  * @apiVersion 0.1.0
  * @apiGroup Objects
  *
- * @apiSuccess {String} ID Unique ID of the user (can be cast to long Integer).
- * @apiSuccess {String} JWT JSON Web Token for accessing services. This is only provided during <a href="#api-Auth-Login">Login</a>.
- * @use {Object} type See <a href="#api-Objects-UserType">UserType</a>.
- * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
- * @apiSuccess {Object} username See <a href="#api-Objects-Username">Username</a>.
- * @apiSuccess {Object} phone See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
- * @apiSuccess {Object} email See <a href="#api-Objects-VerifLogin">VerifLogin</a>.
- * @apiSuccess {Object} facebook See <a href="#api-Objects-FacebookID">FacebookID</a>.
- * @apiSuccess {Object} group See <a href="#api-Objects-Group">Group</a>.
- * @apiSuccess {Object} device See <a href="#api-Objects-Device">Device</a>.
- * @apiSuccess {String} created Date the user was created.
- * @apiSuccess {String} lastUpdated date the user was last updated.
+ * @apiUse User
  */
 type User struct {
 	ID         string      `json:"ID,omitempty"`
