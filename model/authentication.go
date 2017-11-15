@@ -755,7 +755,7 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 		}
 		useURL := new(url.URL)
 		*useURL = *a.webAppURLNilable // make copy so that a.webAppURLNilable remains pristine
-		useURL.Path = path.Join(useURL.Path, action, loginType, toAddr, string(tkn))
+		useURL.Path = path.Join(useURL.Path, action, loginType, url.PathEscape(toAddr), string(tkn))
 		URL = useURL.String()
 	}
 
