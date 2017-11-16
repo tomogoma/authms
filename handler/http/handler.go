@@ -73,6 +73,7 @@ const (
 	keyOffset       = "offset"
 	keyCount        = "count"
 	keyUserID       = "userID"
+	keyGroupID      = "groupID"
 	keyAcl          = "acl"
 	keyGroup        = "group"
 	keyMatchAllACLs = "matchAllACLs"
@@ -129,6 +130,10 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/groups").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleGroups)))
+
+	r.PathPrefix("/users/{" + keyUserID + "}/set_group/{" + keyGroupID + "}").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleSetUserGroup)))
 
 	r.PathPrefix("/users/{" + keyUserID + "}").
 		Methods(http.MethodGet).
@@ -532,6 +537,38 @@ func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req.UserID = mux.Vars(r)[keyUserID]
 	usr, err := s.auth.UpdateIdentifier(req.JWT, req.UserID, req.LT, req.Identifier)
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
+}
+
+/**
+ * @api {POST} /users/:userID/set_group/:groupID Set User's Group
+ * @apiDescription Assign group to user.
+ * @apiName SetUserGroup
+ * @apiVersion 0.1.0
+ * @apiPermission ^admin
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (URL Parameters) {String} userID The ID of the <a href="#api-Objects-User">user</a> to update.
+ * @apiParam (URL Parameters) {String} groupID The ID of the <a href="#api-Objects-Group">group</a> to assign the user to.
+ *
+ * @apiParam (URL Query Parameters) {String} token the JWT provided during login.
+ *
+ * @apiUse User
+ *
+ */
+func (s *handler) handleSetUserGroup(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	req := &struct {
+		UserID  string `json:"userID"`
+		GroupID string `json:"groupID"`
+		JWT     string `json:"token"`
+	}{
+		UserID:  vars[keyUserID],
+		GroupID: vars[keyGroupID],
+		JWT:     r.URL.Query().Get(keyToken),
+	}
+	s.respondOn(w, r, req, nil, http.StatusOK, errors.NewNotImplemented())
 }
 
 /**
