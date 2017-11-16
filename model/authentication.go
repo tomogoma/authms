@@ -765,9 +765,9 @@ func (a *Authentication) preparePrerequisiteGroups() ([]Group, error) {
 	return grps, nil
 }
 
-func (a *Authentication) usrIdentifierAvail(loginType string, fetchErr error) error {
+func (a *Authentication) usrIdentifierAvail(loginType, addr string, fetchErr error) error {
 	if fetchErr == nil {
-		return errors.NewClientf("%s not available", loginType)
+		return errors.NewClientf("(%s) %s not available", loginType, addr)
 	}
 	if !a.db.IsNotFoundError(fetchErr) {
 		return errors.Newf("user by %s: %v", loginType, fetchErr)
@@ -1007,7 +1007,7 @@ func (a *Authentication) regUsernameConditions(username string) (string, error) 
 		return "", errors.NewClient("username cannot be empty")
 	}
 	_, _, err := a.db.UserByUsername(username)
-	return username, a.usrIdentifierAvail(LoginTypeUsername, err)
+	return username, a.usrIdentifierAvail(LoginTypeUsername, username, err)
 }
 
 func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, usr *User) error {
@@ -1021,7 +1021,7 @@ func (a *Authentication) regUsername(tx *sql.Tx, actionType, username string, us
 
 func (a *Authentication) regDevConditions(devID string) (string, error) {
 	_, _, err := a.db.UserByDeviceID(devID)
-	return devID, a.usrIdentifierAvail(LoginTypeDev, err)
+	return devID, a.usrIdentifierAvail(LoginTypeDev, devID, err)
 }
 
 func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *User) error {
@@ -1039,7 +1039,7 @@ func (a *Authentication) regPhoneConditions(number string) (string, error) {
 		return "", err
 	}
 	_, _, err = a.db.UserByPhone(number)
-	return number, a.usrIdentifierAvail(LoginTypePhone, err)
+	return number, a.usrIdentifierAvail(LoginTypePhone, number, err)
 }
 
 func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *User) error {
@@ -1060,7 +1060,7 @@ func (a *Authentication) regEmailConditions(email string) (string, error) {
 		return "", errors.NewClient("email address cannot be empty")
 	}
 	_, _, err := a.db.UserByEmail(email)
-	return email, a.usrIdentifierAvail(LoginTypeEmail, err)
+	return email, a.usrIdentifierAvail(LoginTypeEmail, email, err)
 }
 
 func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *User) error {
@@ -1085,7 +1085,7 @@ func (a *Authentication) regFacebookConditions(fbToken string) (string, error) {
 		return "", err
 	}
 	_, err = a.db.UserByFacebook(fbID)
-	return fbID, a.usrIdentifierAvail(LoginTypeFacebook, err)
+	return fbID, a.usrIdentifierAvail(LoginTypeFacebook, fbID, err)
 }
 
 func (a *Authentication) regFacebook(tx *sql.Tx, actionType, fbID string, usr *User) error {
@@ -1117,7 +1117,7 @@ func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string
 		return nil, err
 	}
 	_, _, err = a.db.UserByPhone(newNum)
-	if err = a.usrIdentifierAvail(LoginTypePhone, err); err != nil {
+	if err = a.usrIdentifierAvail(LoginTypePhone, newNum, err); err != nil {
 		return nil, err
 	}
 
@@ -1158,7 +1158,7 @@ func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string
 func (a *Authentication) updateEmail(usrID string, old VerifLogin, newAddr string) (*VerifLogin, error) {
 
 	_, _, err := a.db.UserByEmail(newAddr)
-	if err = a.usrIdentifierAvail(LoginTypeEmail, err); err != nil {
+	if err = a.usrIdentifierAvail(LoginTypeEmail, newAddr, err); err != nil {
 		return nil, err
 	}
 
