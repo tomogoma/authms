@@ -13,6 +13,8 @@ import (
 	(can be cast to long Integer).
 @apiSuccess {Object} type			The
 	<a href="#api-Objects-UserType">UserType</a> of this user.
+@apiSuccess {Object} group		The
+	<a href="#api-Objects-Group">group</a> the user belongs to.
 @apiSuccess {String} created		The date the user was created.
 @apiSuccess {String} lastUpdated	date the user was last updated.
 @apiSuccess {String} [JWT]			JSON Web Token for accessing services.
@@ -25,8 +27,6 @@ import (
 	<a href="#api-Objects-VerifLogin">email</a> (if this user has one).
 @apiSuccess {Object} [facebook] 	The user's
 	<a href="#api-Objects-FacebookID">facebook ID</a> (if this user has one).
-@apiSuccess {Object[]} [groups]		Array of
-	<a href="#api-Objects-Group">groups</a> the user belongs to, if any.
 @apiSuccess {Object} [device]		The
 	<a href="#api-Objects-Device">device</a> this user is attached to, if any.
  */
@@ -47,7 +47,7 @@ type User struct {
 	Phone      *VerifLogin `json:"phone,omitempty"`
 	Email      *VerifLogin `json:"email,omitempty"`
 	Facebook   *Facebook   `json:"facebook,omitempty"`
-	Groups     []Group     `json:"groups,omitempty"`
+	Group      *Group      `json:"group,omitempty"`
 	Devices    []Device    `json:"devices,omitempty"`
 	CreateDate string      `json:"created,omitempty"`
 	UpdateDate string      `json:"lastUpdated,omitempty"`
@@ -65,7 +65,7 @@ func NewUser(user *model.User) *User {
 		Phone:      NewVerifLogin(&user.Phone),
 		Email:      NewVerifLogin(&user.Email),
 		Facebook:   NewFacebook(user.Facebook),
-		Groups:     NewGroups([]model.Group{user.Group}),
+		Group:      NewGroup(user.Group),
 		Devices:    NewDevices(user.Devices),
 		CreateDate: user.CreateDate.Format(config.TimeFormat),
 		UpdateDate: user.UpdateDate.Format(config.TimeFormat),

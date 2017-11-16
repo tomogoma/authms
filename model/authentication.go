@@ -382,7 +382,7 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 
 	// clm.StrongestGroup cannot panic because we validate that JWT claims
 	// to be in either admin or super groups or both.
-	return a.registerOther(clm.StrongestGroup, userType, groupID, id, pass, regCondF, regF)
+	return a.registerOther(clm.Group, userType, groupID, id, pass, regCondF, regF)
 }
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
@@ -1497,7 +1497,7 @@ func unpackCount(countStr string) (int64, error) {
 }
 
 func claimsHaveAccess(clms JWTClaim, acl float32) error {
-	if clms.StrongestGroup.AccessLevel > acl {
+	if clms.Group.AccessLevel > acl {
 		return errorInsufPriv
 	}
 	return nil

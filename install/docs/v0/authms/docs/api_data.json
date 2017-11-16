@@ -175,7 +175,7 @@
             "type": "Object[]",
             "optional": false,
             "field": "json-body",
-            "description": "<p>JSON array of <a href=\"#api-Objects-Group\">groups</a></p>"
+            "description": "<p>JSON array of <a href=\"#api-Objects-User\">users</a></p>"
           }
         ]
       }
@@ -249,6 +249,13 @@
           },
           {
             "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "group",
+            "description": "<p>The <a href=\"#api-Objects-Group\">group</a> the user belongs to.</p>"
+          },
+          {
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
@@ -295,13 +302,6 @@
             "optional": true,
             "field": "facebook",
             "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object[]",
-            "optional": true,
-            "field": "groups",
-            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
           },
           {
             "group": "Success 200",
@@ -812,6 +812,13 @@
           },
           {
             "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "group",
+            "description": "<p>The <a href=\"#api-Objects-Group\">group</a> the user belongs to.</p>"
+          },
+          {
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
@@ -858,13 +865,6 @@
             "optional": true,
             "field": "facebook",
             "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object[]",
-            "optional": true,
-            "field": "groups",
-            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
           },
           {
             "group": "Success 200",
@@ -1025,6 +1025,13 @@
           },
           {
             "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "group",
+            "description": "<p>The <a href=\"#api-Objects-Group\">group</a> the user belongs to.</p>"
+          },
+          {
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
@@ -1071,13 +1078,6 @@
             "optional": true,
             "field": "facebook",
             "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object[]",
-            "optional": true,
-            "field": "groups",
-            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
           },
           {
             "group": "Success 200",
@@ -1157,6 +1157,13 @@
           },
           {
             "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "group",
+            "description": "<p>The <a href=\"#api-Objects-Group\">group</a> the user belongs to.</p>"
+          },
+          {
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
@@ -1203,13 +1210,6 @@
             "optional": true,
             "field": "facebook",
             "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object[]",
-            "optional": true,
-            "field": "groups",
-            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
           },
           {
             "group": "Success 200",
@@ -1559,6 +1559,13 @@
           },
           {
             "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "group",
+            "description": "<p>The <a href=\"#api-Objects-Group\">group</a> the user belongs to.</p>"
+          },
+          {
+            "group": "Success 200",
             "type": "String",
             "optional": false,
             "field": "created",
@@ -1605,13 +1612,6 @@
             "optional": true,
             "field": "facebook",
             "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
-          },
-          {
-            "group": "Success 200",
-            "type": "Object[]",
-            "optional": true,
-            "field": "groups",
-            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
           },
           {
             "group": "Success 200",

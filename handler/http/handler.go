@@ -283,7 +283,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 	operator, otherwise uses the OR operator.
  * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
  *
- * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-Group">groups</a>
+ * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-User">users</a>
  *
  */
 func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {

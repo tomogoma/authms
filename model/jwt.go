@@ -9,7 +9,6 @@ import (
 
 type JWTClaim struct {
 	UsrID          string
-	StrongestGroup Group
 	Group         Group
 	jwt.StandardClaims
 }
@@ -20,7 +19,6 @@ func newJWTClaim(usrID string, group Group) *JWTClaim {
 	return &JWTClaim{
 		UsrID:          usrID,
 		Group:         group,
-		StrongestGroup: group,
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  issue.Unix(),
 			ExpiresAt: expiry.Unix(),
