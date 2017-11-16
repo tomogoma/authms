@@ -6,7 +6,6 @@ import (
 	"html/template"
 	"net/url"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
@@ -16,6 +15,8 @@ import (
 	errors "github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
+	"github.com/ttacon/libphonenumber"
+	"fmt"
 )
 
 type AuthStore interface {
@@ -138,7 +139,8 @@ const (
 	UserTypeIndividual = "individual"
 	UserTypeCompany    = "company"
 
-	rePhoneChars = `[0-9]+`
+	// Kenya's region code for parsing phone numbers
+	RegionCodeKE = "KE"
 
 	minPassLen = 8
 	genPassLen = 32
@@ -165,7 +167,6 @@ const (
 )
 
 var (
-	rePhone        = regexp.MustCompile(rePhoneChars)
 	validUserTypes = []string{UserTypeIndividual, UserTypeCompany}
 
 	actionNotSupportedErrorF    = "action not supported for request: %s"
@@ -1507,24 +1508,15 @@ func inStrs(needle string, haystack []string) bool {
 	return false
 }
 
-func formatValidPhone(number string) (string, error) {
-	number = formatPhone(number)
-	if number == "" {
-		return "", errors.NewClient("phone number was empty")
+func formatValidPhone(n string) (string, error) {
+	num, err := libphonenumber.Parse(n, RegionCodeKE)
+	if err != nil {
+		return "", errors.Newf("parse phone number: %v", err)
 	}
-	return number, nil
-}
-
-func formatPhone(phone string) string {
-	parts := rePhone.FindAllString(phone, -1)
-	formatted := ""
-	if strings.HasPrefix(phone, "+") {
-		formatted = "+"
+	if !libphonenumber.IsValidNumber(num) {
+		return "", errors.Newf("invalid phone number %s", n)
 	}
-	for _, part := range parts {
-		formatted = formatted + part
-	}
-	return formatted
+	return fmt.Sprintf("%d%d", num.GetCountryCode(), num.GetNationalNumber()), nil
 }
 
 func obfuscatePhone(num string) string {
