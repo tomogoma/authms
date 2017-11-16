@@ -123,20 +123,46 @@
             "type": "String",
             "optional": true,
             "field": "group",
-            "description": "<p>Filter by group name. one can have multiple groups e.g. ?group=admin&amp;group=staff</p>"
+            "description": "<p>Filter by group name. one can have multiple groups e.g. ?group=admin&amp;group=staff, multiple group names are always filtered using the OR operator.</p>"
           },
           {
             "group": "URL Query Parameters",
             "type": "String",
             "size": "0-10",
             "allowedValues": [
-              "gt[number]",
-              "lt[number]",
-              "eq[number]"
+              "gt_[number]",
+              "lt_[number]",
+              "[number]",
+              "gteq_[number]",
+              "lteq_[number]"
             ],
             "optional": true,
             "field": "acl",
-            "description": "<p>Filter by access levels:</p> <ul> <li>gt[number] - access level greater than number e.g. gt5</li> <li>lt[number] - access level less than number e.g. lt5</li> <li>[number] - access level equal to number e.g. 5</li> <li>gteq[number] - access level greater than or equal to number e.g. gteq5</li> <li>gteq[number] - access level less than or equal to  number e.g. lteq5</li> <li>one can have multiple filters e.g. ?acl=gt5&amp;acl=lt9&amp;acl=9.5 to get acl in (acl==9.5 || 5 &lt; acl &lt; 9)</li> </ul>"
+            "description": "<p>Filter by access levels:</p> <ul> <li>gt_[number] - access level greater than number e.g. gt_5</li> <li>lt_[number] - access level less than number e.g. lt_5</li> <li>[number] - access level equal to number e.g. 5</li> <li>gteq_[number] - access level greater than or equal to number e.g. gteq_5</li> <li>lteq_[number] - access level less than or equal to  number e.g. lteq_5</li> <li>one can have multiple filters e.g. ?acl=gt_5&amp;acl=lteq_9&amp;matchAllACLs=true to get acl in (5 &lt; acl &lt;= 9)</li> </ul>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "allowedValues": [
+              "true",
+              "false"
+            ],
+            "optional": true,
+            "field": "matchAllACLs",
+            "defaultValue": "false",
+            "description": "<p>Setting this to true will force all acl's provided to be matched using the AND operator, otherwise uses the OR operator.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "allowedValues": [
+              "true",
+              "false"
+            ],
+            "optional": true,
+            "field": "matchAll",
+            "defaultValue": "false",
+            "description": "<p>Setting this to true will force acl,group filters to be matched using the AND operator, otherwise uses the OR operator.</p>"
           }
         ]
       }

@@ -27,6 +27,10 @@ type Roach struct {
 	isDBInit      bool
 }
 
+type scanner interface {
+	Scan(dest ...interface{}) error
+}
+
 type inserter interface {
 	QueryRow(query string, args ...interface{}) *sql.Row
 	Exec(query string, args ...interface{}) (sql.Result, error)

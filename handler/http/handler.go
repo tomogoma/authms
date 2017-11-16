@@ -64,17 +64,19 @@ type handler struct {
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
 
-	keyLoginType = "loginType"
-	keySelfReg   = "selfReg"
-	keyAPIKey    = "x-api-key"
-	keyToken     = "token"
-	keyOTP       = "OTP"
-	keyExtend    = "extend"
-	keyOffset    = "offset"
-	keyCount     = "count"
-	keyUserID    = "userID"
-	keyAcl       = "acl"
-	keyGroup     = "group"
+	keyLoginType    = "loginType"
+	keySelfReg      = "selfReg"
+	keyAPIKey       = "x-api-key"
+	keyToken        = "token"
+	keyOTP          = "OTP"
+	keyExtend       = "extend"
+	keyOffset       = "offset"
+	keyCount        = "count"
+	keyUserID       = "userID"
+	keyAcl          = "acl"
+	keyGroup        = "group"
+	keyMatchAllACLs = "matchAllACLs"
+	keyMatchAll     = "matchAll"
 
 	ctxKeyLog = contextKey("log")
 
@@ -257,15 +259,22 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  * @apiParam (URL Query Parameters) {String} token the JWT accessed during auth.
  * @apiParam (URL Query Parameters) {Number} [offset=0] The beginning index to fetch groups.
  * @apiParam (URL Query Parameters) {Number} [count=10] The maximum number of groups to fetch.
- * @apiParam (URL Query Parameters) {String} [group] Filter by group name. one can have multiple groups e.g. ?group=admin&group=staff
- * @apiParam (URL Query Parameters) {String{0-10}=gt[number],lt[number],eq[number]} [acl] Filter by access levels:
+ * @apiParam (URL Query Parameters) {String} [group] Filter by group name.
+	one can have multiple groups e.g. ?group=admin&group=staff,
+	multiple group names are always filtered using the OR operator.
+ * @apiParam (URL Query Parameters) {String{0-10}=gt_[number],lt_[number],[number],gteq_[number],lteq_[number]} [acl] Filter by access levels:
  * - gt_[number] - access level greater than number e.g. gt_5
  * - lt_[number] - access level less than number e.g. lt_5
  * - [number] - access level equal to number e.g. 5
  * - gteq_[number] - access level greater than or equal to number e.g. gteq_5
- * - gteq_[number] - access level less than or equal to  number e.g. lteq_5
- * - one can have multiple filters e.g. ?acl=gt5&acl=lt9&acl=9.5 to get acl in (acl==9.5 || 5 < acl < 9)
- *
+ * - lteq_[number] - access level less than or equal to  number e.g. lteq_5
+ * - one can have multiple filters e.g. ?acl=gt_5&acl=lteq_9&matchAllACLs=true to get acl in (5 < acl <= 9)
+ * @apiParam (URL Query Parameters) {String=true,false} [matchAllACLs=false] Setting
+	this to true will force all acl's provided to be matched using
+	the AND operator, otherwise uses the OR operator.
+ * @apiParam (URL Query Parameters) {String=true,false} [matchAll=false]
+	Setting this to true will force acl,group filters to be matched using the AND
+	operator, otherwise uses the OR operator.
  * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
  *
  * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-Group">groups</a>
@@ -274,21 +283,27 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
 func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	req := struct {
-		JWT    string   `json:"token"`
-		Offset string   `json:"offset"`
-		Count  string   `json:"count"`
-		Groups []string `json:"group"`
-		ACLs   []string `json:"acl"`
+		JWT          string   `json:"token"`
+		Offset       string   `json:"offset"`
+		Count        string   `json:"count"`
+		Groups       []string `json:"group"`
+		ACLs         []string `json:"acl"`
+		MatchAllACLs string   `json:"matchAllACLs"`
+		MatchAll     string   `json:"matchAll"`
 	}{
-		JWT:    q.Get(keyToken),
-		Offset: q.Get(keyOffset),
-		Count:  q.Get(keyCount),
-		Groups: q[keyGroup],
-		ACLs:   q[keyAcl],
+		JWT:          q.Get(keyToken),
+		Offset:       q.Get(keyOffset),
+		Count:        q.Get(keyCount),
+		MatchAllACLs: q.Get(keyMatchAllACLs),
+		MatchAll:     q.Get(keyMatchAll),
+		Groups:       q[keyGroup],
+		ACLs:         q[keyAcl],
 	}
 	uq := model.UsersQuery{
 		AccessLevelsIn: req.ACLs,
-		GroupNamesIn: req.Groups,
+		MatchAllACLs:   strings.EqualFold(req.MatchAllACLs, valTrue),
+		GroupNamesIn:   req.Groups,
+		MatchAll:       strings.EqualFold(req.MatchAll, valTrue),
 	}
 	usrs, err := s.auth.Users(req.JWT, uq, req.Offset, req.Count)
 	s.respondOn(w, r, req, NewUsers(usrs), http.StatusOK, err)

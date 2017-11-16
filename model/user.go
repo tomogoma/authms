@@ -36,6 +36,8 @@ type UsersQuery struct {
 	AccessLevelsIn []string
 	ProcessedACLs  []NumericQuery
 	GroupNamesIn   []string
+	MatchAll       bool
+	MatchAllACLs   bool
 }
 
 func (uq *UsersQuery) Process() error {

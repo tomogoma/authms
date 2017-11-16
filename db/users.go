@@ -7,6 +7,19 @@ import (
 	"github.com/lib/pq"
 	"github.com/tomogoma/authms/model"
 	errors "github.com/tomogoma/go-typed-errors"
+	"fmt"
+	"strings"
+)
+
+var (
+	stdUsrCols = ColDesc(
+		colDescTbl(TblUsers, ColID, ColPassword, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblUserTypes, ColID, ColName, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblUserNames, ColID, ColUserName, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblEmails, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblPhones, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblFacebookIDs, ColID, ColFacebookID, ColVerified, ColCreateDate, ColUpdateDate),
+	)
 )
 
 func (r *Roach) HasUsers(groupID string) error {
@@ -94,6 +107,123 @@ func (r *Roach) UserByFacebook(fbID string) (*model.User, error) {
 	return usr, err
 }
 
+func (r *Roach) Users(uq model.UsersQuery, offset, count int64) ([]model.User, error) {
+	if err := r.InitDBIfNot(); err != nil {
+		return nil, err
+	}
+
+	qOp := "OR"
+	if uq.MatchAll {
+		qOp = "AND"
+	}
+	where := ""
+	var whereArgs []interface{}
+	i := 1
+
+	if len(uq.GroupNamesIn) > 0 {
+		in := "("
+		for _, groupName := range uq.GroupNamesIn {
+			in = fmt.Sprintf("%s$%d,", in, i)
+			whereArgs = append(whereArgs, groupName)
+			i++
+		}
+		in = strings.TrimSuffix(in, ",") + ")"
+		where = fmt.Sprintf("%s %s.%s IN %s %s",
+			where, TblGroups, ColName, in, qOp)
+	}
+
+	if len(uq.ProcessedACLs) > 0 {
+
+		aclOp := "OR"
+		if uq.MatchAllACLs {
+			aclOp = "AND"
+		}
+
+		aclWhere := "("
+		for _, aclQ := range uq.ProcessedACLs {
+			comp := ""
+			// LT and GT are mutually exclusive
+			if aclQ.IsLT {
+				comp = "<"
+			} else if aclQ.IsGT {
+				comp = ">"
+			}
+			// EQ can be exclusive or appended to either LT or GT
+			if aclQ.IsEq {
+				comp = comp + "="
+			}
+			// default if no comparator provided
+			if comp == "" {
+				comp = "="
+			}
+			aclWhere = fmt.Sprintf("%s %s.%s %s $%d %s",
+				aclWhere, TblGroups, ColAccessLevel, comp, i, aclOp)
+			whereArgs = append(whereArgs, aclQ.CheckVal)
+			i++
+		}
+
+		aclWhere = strings.TrimSuffix(aclWhere, aclOp) + ")"
+		where = fmt.Sprintf("%s %s %s", where, aclWhere, qOp)
+	}
+
+	where = strings.TrimSuffix(where, qOp)
+	if where != "" {
+		where = fmt.Sprintf("WHERE %s", where)
+	}
+
+	limitStr := fmt.Sprintf("$%d", i)
+	whereArgs = append(whereArgs, count)
+	i++
+
+	offsetStr := fmt.Sprintf("$%d", i)
+	whereArgs = append(whereArgs, offset)
+	i++
+
+	q := `
+		SELECT ` + stdUsrCols + `
+			FROM ` + TblUsers + `
+			INNER JOIN ` + TblUserTypes + `
+				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
+			LEFT JOIN ` + TblUserNames + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblUserNames + `.` + ColUserID + `
+			LEFT JOIN ` + TblEmails + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblEmails + `.` + ColUserID + `
+			LEFT JOIN ` + TblPhones + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblPhones + `.` + ColUserID + `
+			LEFT JOIN ` + TblFacebookIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblFacebookIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblDeviceIDs + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblDeviceIDs + `.` + ColUserID + `
+			LEFT JOIN ` + TblUserGroupsJoin + `
+				ON ` + TblUsers + `.` + ColID + `=` + TblUserGroupsJoin + `.` + ColUserID + `
+			LEFT JOIN ` + TblGroups + `
+				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
+			` + where + `
+			ORDER BY ` + TblGroups + `.` + ColAccessLevel + ` ASC
+			LIMIT ` + limitStr + ` OFFSET ` + offsetStr + `
+	`
+	rows, err := r.db.Query(q, whereArgs...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var usrs []model.User
+	for rows.Next() {
+		usr, _, err := scanStdUser(rows)
+		if err != nil {
+			return nil, errors.Newf("scan result set row: %v", err)
+		}
+		usrs = append(usrs, *usr)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, errors.Newf("iterating result set: %v", err)
+	}
+	if len(usrs) == 0 {
+		return nil, errors.NewNotFound("no users found")
+	}
+	return usrs, nil
+}
+
 // AddUserToGroupAtomic associates groupID (from TblGroups) with userID if not
 // already associated, otherwise returns an error.
 func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
@@ -114,16 +244,8 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 	if err := r.InitDBIfNot(); err != nil {
 		return nil, nil, err
 	}
-	cols := ColDesc(
-		colDescTbl(TblUsers, ColID, ColPassword, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblUserTypes, ColID, ColName, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblUserNames, ColID, ColUserName, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblEmails, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblPhones, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
-		colDescTbl(TblFacebookIDs, ColID, ColFacebookID, ColVerified, ColCreateDate, ColUpdateDate),
-	)
 	q := `
-	SELECT ` + cols + `
+	SELECT ` + stdUsrCols + `
 		FROM ` + TblUsers + `
 			INNER JOIN ` + TblUserTypes + `
 				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
@@ -139,14 +261,38 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 				ON ` + TblUsers + `.` + ColID + `=` + TblDeviceIDs + `.` + ColUserID + `
 		WHERE ` + where
 
-	usr := model.User{}
+	usr, pass, err := scanStdUser(r.db.QueryRow(q, whereArgs...))
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil, errors.NewNotFound("user not found")
+		}
+		return nil, nil, err
+	}
+
+	usr.Devices, err = r.UserDevicesByUserID(usr.ID)
+	if err != nil && !r.IsNotFoundError(err) {
+		return nil, nil, errors.Newf("get device IDs for user: %v", err)
+	}
+
+	usr.Groups, err = r.GroupsByUserID(usr.ID)
+	if err != nil && !r.IsNotFoundError(err) {
+		return nil, nil, errors.Newf("get device IDs for user: %v", err)
+	}
+
+	return usr, pass, nil
+}
+
+func scanStdUser(sc scanner) (*model.User, []byte, error) {
+
+	usr := &model.User{}
 	var pass []byte
 	var usernameID, emailID, phoneID, fbID sql.NullString
 	var usernameVal, emailVal, phoneVal, fbVal sql.NullString
 	var emailVerified, phoneVerified, fbVerified sql.NullBool
 	var usernameCD, emailCD, phoneCD, fbCD pq.NullTime
 	var usernameUD, emailUD, phoneUD, fbUD pq.NullTime
-	err := r.db.QueryRow(q, whereArgs...).Scan(
+
+	err := sc.Scan(
 		&usr.ID, &pass, &usr.CreateDate, &usr.UpdateDate,
 		&usr.Type.ID, &usr.Type.Name, &usr.Type.CreateDate, &usr.Type.UpdateDate,
 		&usernameID, &usernameVal, &usernameCD, &usernameUD,
@@ -155,9 +301,6 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 		&fbID, &fbVal, &fbVerified, &fbCD, &fbUD,
 	)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil, errors.NewNotFound("User not found")
-		}
 		return nil, nil, err
 	}
 
@@ -193,17 +336,7 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 		usr.Facebook.UpdateDate = fbUD.Time
 	}
 
-	usr.Devices, err = r.UserDevicesByUserID(usr.ID)
-	if err != nil && !r.IsNotFoundError(err) {
-		return nil, nil, errors.Newf("get device IDs for user: %v", err)
-	}
-
-	usr.Groups, err = r.GroupsByUserID(usr.ID)
-	if err != nil && !r.IsNotFoundError(err) {
-		return nil, nil, errors.Newf("get device IDs for user: %v", err)
-	}
-
-	return &usr, pass, nil
+	return usr, pass, nil
 }
 
 func updatePassword(i inserter, userID string, password []byte) error {

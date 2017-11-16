@@ -40,6 +40,7 @@ type AuthStore interface {
 	UserByPhone(phone string) (*User, []byte, error)
 	UserByEmail(email string) (*User, []byte, error)
 	UserByFacebook(facebookID string) (*User, error)
+	Users(q UsersQuery, offset, count int64) ([]User, error)
 
 	AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error
 
@@ -667,14 +668,25 @@ func (a *Authentication) Login(loginType, identifier string, password []byte) (*
 	return usr, nil
 }
 
-func (a *Authentication) Users(JWT string, q UsersQuery, offset, count string) ([]User, error) {
+func (a *Authentication) Users(JWT string, q UsersQuery, offsetStr, countStr string) ([]User, error) {
 	if err := a.jwtHasAccess(JWT, AccessLevelAdmin); err != nil {
+		return nil, err
+	}
+	offset, count, err := unpackOffsetCount(offsetStr, countStr)
+	if err != nil {
 		return nil, err
 	}
 	if err := q.Process(); err != nil {
 		return nil, err
 	}
-	return nil, errors.NewNotImplemented()
+	usrs, err := a.db.Users(q, offset, count)
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("fetch users: %v", err)
+	}
+	return usrs, nil
 }
 
 func (a *Authentication) GetUserDetails(JWT string, userID string) (*User, error) {
