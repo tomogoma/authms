@@ -15,7 +15,7 @@ type User struct {
 	Phone      VerifLogin
 	Email      VerifLogin
 	Facebook   Facebook
-	Groups     []Group
+	Group      Group
 	Devices    []Device
 	CreateDate time.Time
 	UpdateDate time.Time

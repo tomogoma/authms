@@ -44,10 +44,10 @@ func (r *Roach) GroupsByUserID(usrID string) ([]model.Group, error) {
 	cols := colDescTbl(TblGroups, ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate)
 	q := `
 		SELECT ` + cols + `
-			FROM ` + TblUserGroupsJoin + `
+			FROM ` + TblUsers + `
 			INNER JOIN ` + TblGroups + `
-				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
-			WHERE ` + TblUserGroupsJoin + `.` + ColUserID + `=$1
+				ON ` + TblUsers + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
+			WHERE ` + TblUsers + `.` + ColID + `=$1
 			ORDER BY ` + ColAccessLevel + ` ASC
 	`
 	rows, err := r.db.Query(q, usrID)

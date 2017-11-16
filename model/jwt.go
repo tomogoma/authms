@@ -9,24 +9,18 @@ import (
 
 type JWTClaim struct {
 	UsrID          string
-	StrongestGroup *Group
-	Groups         []Group
+	StrongestGroup Group
+	Group         Group
 	jwt.StandardClaims
 }
 
-func newJWTClaim(usrID string, groups []Group) *JWTClaim {
-	var strongestGrp *Group
-	for _, grp := range groups {
-		if strongestGrp == nil || grp.AccessLevel < strongestGrp.AccessLevel {
-			strongestGrp = &grp
-		}
-	}
+func newJWTClaim(usrID string, group Group) *JWTClaim {
 	issue := time.Now()
 	expiry := issue.Add(tokenValidity)
 	return &JWTClaim{
 		UsrID:          usrID,
-		Groups:         groups,
-		StrongestGroup: strongestGrp,
+		Group:         group,
+		StrongestGroup: group,
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  issue.Unix(),
 			ExpiresAt: expiry.Unix(),

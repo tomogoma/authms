@@ -107,7 +107,7 @@ func packageUser(usr *model.User, resp *api.User) {
 	packageVerifLogin(&usr.Phone, resp.Phone)
 	packageVerifLogin(&usr.Email, resp.Email)
 	packageFacebook(&usr.Facebook, resp.Facebook)
-	packageGroups(usr.Groups, resp.Groups)
+	packageGroups([]model.Group{usr.Group}, resp.Groups)
 	packageDevices(usr.Devices, resp.Devices)
 }
 

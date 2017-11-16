@@ -9,7 +9,6 @@ const (
 	TblUserTypes      = "userTypes"
 	TblGroups         = "groups"
 	TblUsers          = "users"
-	TblUserGroupsJoin = "userGroupsJoin"
 	TblAPIKeys        = "apiKeys"
 	TblDeviceIDs      = "deviceIDs"
 	TblUserNames      = "userNames"
@@ -75,19 +74,10 @@ const (
 	CREATE TABLE IF NOT EXISTS ` + TblUsers + ` (
 		` + ColID + ` BIGSERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
 		` + ColTypeID + ` BIGINT NOT NULL REFERENCES ` + TblUserTypes + ` (` + ColID + `),
+		` + ColGroupID + ` BIGINT NOT NULL REFERENCES ` + TblGroups + ` (` + ColID + `),
 		` + ColPassword + ` BYTEA NOT NULL CHECK ( LENGTH(` + ColPassword + `) >= 8 ),
 		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL
-	);
-	`
-	TblDescUsersGroupsJoin = `
-	CREATE TABLE IF NOT EXISTS ` + TblUserGroupsJoin + ` (
-		` + ColID + ` BIGSERIAL PRIMARY KEY NOT NULL CHECK (` + ColID + `>0),
-		` + ColUserID + ` BIGINT NOT NULL REFERENCES ` + TblUsers + ` (` + ColID + `),
-		` + ColGroupID + ` BIGINT NOT NULL REFERENCES ` + TblGroups + ` (` + ColID + `),
-		` + ColCreateDate + ` TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		` + ColUpdateDate + ` TIMESTAMPTZ NOT NULL,
-		UNIQUE (` + ColUserID + `,` + ColGroupID + `)
 	);
 	`
 	TblDescAPIKeys = `
@@ -189,7 +179,6 @@ var AllTableDescs = []string{
 	TblDescUserTypes,
 	TblDescGroups,
 	TblDescUsers,
-	TblDescUsersGroupsJoin,
 	TblDescAPIKeys,
 	TblDescDeviceIDs,
 	TblDescUserNames,
@@ -208,7 +197,6 @@ var AllTableNames = []string{
 	TblUserTypes,
 	TblGroups,
 	TblUsers,
-	TblUserGroupsJoin,
 	TblAPIKeys,
 	TblDeviceIDs,
 	TblUserNames,

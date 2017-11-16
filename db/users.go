@@ -19,6 +19,7 @@ var (
 		colDescTbl(TblEmails, ColID, ColEmail, ColVerified, ColCreateDate, ColUpdateDate),
 		colDescTbl(TblPhones, ColID, ColPhone, ColVerified, ColCreateDate, ColUpdateDate),
 		colDescTbl(TblFacebookIDs, ColID, ColFacebookID, ColVerified, ColCreateDate, ColUpdateDate),
+		colDescTbl(TblGroups, ColID, ColName, ColAccessLevel, ColCreateDate, ColUpdateDate),
 	)
 )
 
@@ -27,8 +28,8 @@ func (r *Roach) HasUsers(groupID string) error {
 		return err
 	}
 	q := `
-		SELECT COUNT(` + ColUserID + `)
-			FROM ` + TblUserGroupsJoin + `
+		SELECT COUNT(` + ColID + `)
+			FROM ` + TblUsers + `
 			WHERE ` + ColGroupID + `=$1`
 	var numUsers int
 	err := r.db.QueryRow(q, groupID).Scan(&numUsers)
@@ -42,21 +43,21 @@ func (r *Roach) HasUsers(groupID string) error {
 }
 
 // InsertUserType inserts into the database returning calculated values.
-func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
+func (r *Roach) InsertUserAtomic(tx *sql.Tx, t model.UserType, g model.Group, password []byte) (*model.User, error) {
 	if err := r.InitDBIfNot(); err != nil {
 		return nil, err
 	}
 	if tx == nil || reflect.ValueOf(tx).IsNil() {
 		return nil, errorNilTx
 	}
-	u := model.User{Type: t}
-	insCols := ColDesc(ColTypeID, ColPassword, ColUpdateDate)
+	u := model.User{Type: t, Group: g}
+	insCols := ColDesc(ColTypeID, ColGroupID, ColPassword, ColUpdateDate)
 	retCols := ColDesc(ColID, ColCreateDate, ColUpdateDate)
 	q := `
 	INSERT INTO ` + TblUsers + ` (` + insCols + `)
-		VALUES ($1,$2,CURRENT_TIMESTAMP)
+		VALUES ($1,$2,$3,CURRENT_TIMESTAMP)
 		RETURNING ` + retCols
-	err := tx.QueryRow(q, t.ID, password).Scan(&u.ID, &u.CreateDate, &u.UpdateDate)
+	err := tx.QueryRow(q, t.ID, g.ID, password).Scan(&u.ID, &u.CreateDate, &u.UpdateDate)
 	if err != nil {
 		return nil, err
 	}
@@ -184,6 +185,8 @@ func (r *Roach) Users(uq model.UsersQuery, offset, count int64) ([]model.User, e
 			FROM ` + TblUsers + `
 			INNER JOIN ` + TblUserTypes + `
 				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
+			INNER JOIN ` + TblGroups + `
+				ON ` + TblUsers + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
 			LEFT JOIN ` + TblUserNames + `
 				ON ` + TblUsers + `.` + ColID + `=` + TblUserNames + `.` + ColUserID + `
 			LEFT JOIN ` + TblEmails + `
@@ -194,10 +197,6 @@ func (r *Roach) Users(uq model.UsersQuery, offset, count int64) ([]model.User, e
 				ON ` + TblUsers + `.` + ColID + `=` + TblFacebookIDs + `.` + ColUserID + `
 			LEFT JOIN ` + TblDeviceIDs + `
 				ON ` + TblUsers + `.` + ColID + `=` + TblDeviceIDs + `.` + ColUserID + `
-			LEFT JOIN ` + TblUserGroupsJoin + `
-				ON ` + TblUsers + `.` + ColID + `=` + TblUserGroupsJoin + `.` + ColUserID + `
-			LEFT JOIN ` + TblGroups + `
-				ON ` + TblUserGroupsJoin + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
 			` + where + `
 			ORDER BY ` + TblGroups + `.` + ColAccessLevel + ` ASC
 			LIMIT ` + limitStr + ` OFFSET ` + offsetStr + `
@@ -224,20 +223,18 @@ func (r *Roach) Users(uq model.UsersQuery, offset, count int64) ([]model.User, e
 	return usrs, nil
 }
 
-// AddUserToGroupAtomic associates groupID (from TblGroups) with userID if not
+// SetUserGroup associates groupID (from TblGroups) with userID if not
 // already associated, otherwise returns an error.
-func (r *Roach) AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error {
-	if tx == nil || reflect.ValueOf(tx).IsNil() {
-		return errorNilTx
+func (r *Roach) SetUserGroup(userID, groupID string) error {
+	if err := r.InitDBIfNot(); err != nil {
+		return err
 	}
-	cols := ColDesc(ColUserID, ColGroupID, ColUpdateDate)
-	q := `
-	INSERT INTO ` + TblUserGroupsJoin + `(` + cols + `)
-		VALUES ($1, $2, CURRENT_TIMESTAMP)
-		ON CONFLICT (` + ColUserID + `, ` + ColGroupID + `) DO NOTHING
-	`
-	_, err := tx.Exec(q, userID, groupID)
-	return err
+	q := `UPDATE ` + TblUsers + ` SET ` + ColGroupID + ` = $1 WHERE ` + ColID + ` = $2`
+	rslt, err := r.db.Exec(q, userID, groupID)
+	if err == sql.ErrNoRows {
+		return errors.NewNotFound("user not found")
+	}
+	return checkRowsAffected(rslt, err, 1)
 }
 
 func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, []byte, error) {
@@ -249,6 +246,8 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 		FROM ` + TblUsers + `
 			INNER JOIN ` + TblUserTypes + `
 				ON ` + TblUsers + `.` + ColTypeID + `=` + TblUserTypes + `.` + ColID + `
+			INNER JOIN ` + TblGroups + `
+				ON ` + TblUsers + `.` + ColGroupID + `=` + TblGroups + `.` + ColID + `
 			LEFT JOIN ` + TblUserNames + `
 				ON ` + TblUsers + `.` + ColID + `=` + TblUserNames + `.` + ColUserID + `
 			LEFT JOIN ` + TblEmails + `
@@ -274,11 +273,6 @@ func (r *Roach) userWhere(where string, whereArgs ...interface{}) (*model.User, 
 		return nil, nil, errors.Newf("get device IDs for user: %v", err)
 	}
 
-	usr.Groups, err = r.GroupsByUserID(usr.ID)
-	if err != nil && !r.IsNotFoundError(err) {
-		return nil, nil, errors.Newf("get device IDs for user: %v", err)
-	}
-
 	return usr, pass, nil
 }
 
@@ -298,7 +292,8 @@ func scanStdUser(sc scanner) (*model.User, []byte, error) {
 		&usernameID, &usernameVal, &usernameCD, &usernameUD,
 		&emailID, &emailVal, &emailVerified, &emailCD, &emailUD,
 		&phoneID, &phoneVal, &phoneVerified, &phoneCD, &phoneUD,
-		&fbID, &fbVal, &fbVerified, &fbCD, &fbUD,
+		&fbID, &fbVal, &fbVerified, &fbCD, &fbUD, &usr.Group.ID, &usr.Group.Name,
+		&usr.Group.AccessLevel, &usr.Group.CreateDate, &usr.Group.UpdateDate,
 	)
 	if err != nil {
 		return nil, nil, err

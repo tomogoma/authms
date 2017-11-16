@@ -65,7 +65,7 @@ func NewUser(user *model.User) *User {
 		Phone:      NewVerifLogin(&user.Phone),
 		Email:      NewVerifLogin(&user.Email),
 		Facebook:   NewFacebook(user.Facebook),
-		Groups:     NewGroups(user.Groups),
+		Groups:     NewGroups([]model.Group{user.Group}),
 		Devices:    NewDevices(user.Devices),
 		CreateDate: user.CreateDate.Format(config.TimeFormat),
 		UpdateDate: user.UpdateDate.Format(config.TimeFormat),

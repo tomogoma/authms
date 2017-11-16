@@ -32,7 +32,7 @@ type AuthStore interface {
 	UserTypeByName(string) (*UserType, error)
 
 	HasUsers(groupID string) error
-	InsertUserAtomic(tx *sql.Tx, t UserType, password []byte) (*User, error)
+	InsertUserAtomic(tx *sql.Tx, t UserType, g Group, password []byte) (*User, error)
 	UpdatePassword(userID string, password []byte) error
 	UpdatePasswordAtomic(tx *sql.Tx, userID string, password []byte) error
 	User(id string) (*User, []byte, error)
@@ -43,7 +43,7 @@ type AuthStore interface {
 	UserByFacebook(facebookID string) (*User, error)
 	Users(q UsersQuery, offset, count int64) ([]User, error)
 
-	AddUserToGroupAtomic(tx *sql.Tx, userID, groupID string) error
+	SetUserGroup(userID, groupID string) error
 
 	InsertUserDeviceAtomic(tx *sql.Tx, userID, devID string) (*Device, error)
 
@@ -347,16 +347,12 @@ func (a *Authentication) RegisterSelfByLockedPhone(userType, devID, number strin
 }
 
 func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID string) (*User, error) {
-	adminGrp, err := a.getOrCreateGroup(GroupAdmin, AccessLevelAdmin)
-	if err != nil {
+
+	clm := JWTClaim{}
+	if _, err := a.jwter.Validate(JWT, &clm); err != nil {
 		return nil, err
 	}
-	superGroup, err := a.getOrCreateGroup(GroupSuper, AccessLevelSuper)
-	if err != nil {
-		return nil, err
-	}
-	clm, err := a.validateJWTInOneOf(JWT, *adminGrp, *superGroup)
-	if err != nil {
+	if err := claimsHaveAccess(clm, AccessLevelAdmin); err != nil {
 		return nil, err
 	}
 
@@ -386,7 +382,7 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 
 	// clm.StrongestGroup cannot panic because we validate that JWT claims
 	// to be in either admin or super groups or both.
-	return a.registerOther(*clm.StrongestGroup, userType, groupID, id, pass, regCondF, regF)
+	return a.registerOther(clm.StrongestGroup, userType, groupID, id, pass, regCondF, regF)
 }
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
@@ -677,7 +673,7 @@ func (a *Authentication) Login(loginType, identifier string, password []byte) (*
 		return nil, err
 	}
 
-	usr.JWT, err = a.jwter.Generate(newJWTClaim(usr.ID, usr.Groups))
+	usr.JWT, err = a.jwter.Generate(newJWTClaim(usr.ID, usr.Group))
 	if err != nil {
 		return nil, errors.Newf("generate JWT: %v", err)
 	}
@@ -920,12 +916,9 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 
 	usr := new(User)
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		usr, err = a.db.InsertUserAtomic(tx, *ut, passH)
+		usr, err = a.db.InsertUserAtomic(tx, *ut, *grp, passH)
 		if err != nil {
 			return errors.Newf("insert user: %v", err)
-		}
-		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, grp.ID); err != nil {
-			return errors.Newf("add user to group: %v", err)
 		}
 		if err := rf(tx, ActionVerify, id, usr); err != nil {
 			return err
@@ -936,7 +929,7 @@ func (a *Authentication) registerSelf(userType string, id string, password []byt
 		return nil, err
 	}
 
-	usr.Groups = []Group{*grp}
+	usr.Group = *grp
 	usr.Type = *ut
 
 	return usr, nil
@@ -977,12 +970,9 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 
 	usr := new(User)
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
-		usr, err = a.db.InsertUserAtomic(tx, *ut, passH)
+		usr, err = a.db.InsertUserAtomic(tx, *ut, *usrGroup, passH)
 		if err != nil {
 			return errors.Newf("insert user: %v", err)
-		}
-		if err := a.db.AddUserToGroupAtomic(tx, usr.ID, usrGroup.ID); err != nil {
-			return errors.Newf("add user to group: %v", err)
 		}
 		aT := ActionInvite
 		if len(actionType) > 0 {
@@ -997,7 +987,7 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 		return nil, err
 	}
 
-	usr.Groups = []Group{*usrGroup}
+	usr.Group = *usrGroup
 	usr.Type = *ut
 
 	return usr, nil
@@ -1353,23 +1343,6 @@ func (a *Authentication) getOrCreateUserType(name string) (*UserType, error) {
 	return ut, nil
 }
 
-func (a *Authentication) validateJWTInOneOf(JWT string, gs ...Group) (JWTClaim, error) {
-	clm := JWTClaim{}
-	if JWT == "" {
-		return clm, errors.NewUnauthorizedf("JWT must be provided")
-	}
-	_, err := a.jwter.Validate(JWT, &clm)
-	if err != nil {
-		return clm, errors.NewForbidden("invalid JWT")
-	}
-	for _, g := range gs {
-		if inGroups(g, clm.Groups) {
-			return clm, nil
-		}
-	}
-	return clm, errors.NewForbidden("invalid JWT")
-}
-
 func (a *Authentication) loginFacebook(fbToken string) (*User, error) {
 	if a.fbNilable == nil {
 		return nil, errorFbNotAvail
@@ -1459,9 +1432,6 @@ func unpackCount(countStr string) (int64, error) {
 }
 
 func claimsHaveAccess(clms JWTClaim, acl float32) error {
-	if clms.StrongestGroup == nil {
-		return errorInsufPriv
-	}
 	if clms.StrongestGroup.AccessLevel > acl {
 		return errorInsufPriv
 	}
@@ -1488,15 +1458,6 @@ func hashIfValid(password []byte) ([]byte, error) {
 		return nil, errors.NewClientf("password must be at least %d characters", minPassLen)
 	}
 	return hash(password)
-}
-
-func inGroups(needle Group, haystack []Group) bool {
-	for _, straw := range haystack {
-		if straw.ID == needle.ID {
-			return true
-		}
-	}
-	return false
 }
 
 func inStrs(needle string, haystack []string) bool {
