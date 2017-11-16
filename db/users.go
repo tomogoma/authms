@@ -230,7 +230,7 @@ func (r *Roach) SetUserGroup(userID, groupID string) error {
 		return err
 	}
 	q := `UPDATE ` + TblUsers + ` SET ` + ColGroupID + ` = $1 WHERE ` + ColID + ` = $2`
-	rslt, err := r.db.Exec(q, userID, groupID)
+	rslt, err := r.db.Exec(q, groupID, userID)
 	if err == sql.ErrNoRows {
 		return errors.NewNotFound("user not found")
 	}
