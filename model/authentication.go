@@ -130,11 +130,11 @@ const (
 	GroupUser    = "user"
 	GroupVisitor = "visitor"
 
-	AccessLevelSuper   = 1
-	AccessLevelAdmin   = 3
-	AccessLevelStaff   = 7
-	AccessLevelUser    = 9
-	AccessLevelVisitor = 9.5
+	AccessLevelSuper   = float32(1)
+	AccessLevelAdmin   = float32(3)
+	AccessLevelStaff   = float32(7)
+	AccessLevelUser    = float32(9)
+	AccessLevelVisitor = float32(9.5)
 
 	UserTypeIndividual = "individual"
 	UserTypeCompany    = "company"
@@ -457,6 +457,67 @@ func (a *Authentication) UpdatePassword(JWT string, old, newPass []byte) error {
 	}
 
 	return nil
+}
+
+func (a *Authentication) SetUserGroup(JWT, userID, newGrpID string) (*User, error) {
+
+	if newGrpID == "" {
+		return nil, errors.NewClientf("new group ID cannot be empty")
+	}
+	if userID == "" {
+		return nil, errors.NewClientf("user ID cannot be empty")
+	}
+
+	newGrp, err := a.db.Group(newGrpID)
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("get group: %v", err)
+	}
+
+	checkACL := AccessLevelAdmin
+	// access level of updater must be less than or equal to the new Groups Access Level
+	if newGrp.AccessLevel < checkACL {
+		checkACL = newGrp.AccessLevel
+	}
+	if err := a.jwtHasAccess(JWT, checkACL); err != nil {
+		return nil, err
+	}
+
+	usr, _, err := a.db.User(userID)
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("get user: %v", err)
+	}
+
+	if usr.Group.ID == newGrpID {
+		return nil, errors.NewClientf("new group ID is current user's group ID")
+	}
+
+	if usr.Group.AccessLevel == AccessLevelSuper {
+		// TODO only query verified users to prevent locking out on
+		// the basis of user lost password and has no verification means.
+		superUsrsQ := UsersQuery{GroupNamesIn: []string{GroupSuper}}
+		superUsrs, err := a.db.Users(superUsrsQ,0, 2)
+		if err != nil {
+			return nil, errors.Newf("fetch users:" +
+				" currently in super user's group (expected at least one): %v", err)
+		}
+		if len(superUsrs) < 2 {
+			return nil, errors.NewClientf("the last super user cannot be" +
+				" removed from super group, need assign another before relegating")
+		}
+	}
+
+	if err := a.db.SetUserGroup(userID, newGrpID); err != nil {
+		return nil, errors.Newf("set user group: %v", err)
+	}
+	usr.Group = *newGrp
+
+	return usr, nil
 }
 
 // SetPassword updates a user account's password following a SendPassResetCode()

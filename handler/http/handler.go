@@ -42,6 +42,7 @@ type Auth interface {
 
 	Users(JWT string, q model.UsersQuery, offset, count string) ([]model.User, error)
 	GetUserDetails(JWT, userID string) (*model.User, error)
+	SetUserGroup(JWT, userID, groupID string) (*model.User, error)
 
 	Groups(JWT, offset, count string) ([]model.Group, error)
 }
@@ -568,7 +569,8 @@ func (s *handler) handleSetUserGroup(w http.ResponseWriter, r *http.Request) {
 		GroupID: vars[keyGroupID],
 		JWT:     r.URL.Query().Get(keyToken),
 	}
-	s.respondOn(w, r, req, nil, http.StatusOK, errors.NewNotImplemented())
+	usr, err := s.auth.SetUserGroup(req.JWT, req.UserID, req.GroupID)
+	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 
 /**
