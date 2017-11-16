@@ -802,7 +802,7 @@ define({ "api": [
   },
   {
     "type": "POST",
-    "url": "/:loginType/update",
+    "url": "/users/:userID",
     "title": "Update Identifier",
     "description": "<p>Update (or set for first time) the identifier details for loginType.</p>",
     "name": "UpdateIdentifier",
@@ -826,15 +826,9 @@ define({ "api": [
           {
             "group": "URL Parameters",
             "type": "String",
-            "allowedValues": [
-              "usernames",
-              "emails",
-              "phones",
-              "facebook"
-            ],
             "optional": false,
-            "field": "loginType",
-            "description": "<p>type of identifier in JSON Body</p>"
+            "field": "userID",
+            "description": "<p>The ID of the <a href=\"#api-Objects-User\">user</a> to update.</p>"
           }
         ],
         "URL Query Parameters": [
@@ -847,6 +841,19 @@ define({ "api": [
           }
         ],
         "JSON Request Body": [
+          {
+            "group": "JSON Request Body",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier in JSON Body</p>"
+          },
           {
             "group": "JSON Request Body",
             "type": "String",
