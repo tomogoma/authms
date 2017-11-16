@@ -95,11 +95,13 @@ func InstantiateSMSer(conf config.SMS) (model.SMSer, error) {
 		return nil, fmt.Errorf("invalid API selected can be %s or %s",
 			config.SMSAPIAfricasTalking, config.SMSAPITwilio)
 	}
-	var testMessage string
-	host := hostname()
-	testMessage = fmt.Sprintf("The SMS API is being used on %s", host)
-	if err := s.SMS(conf.TestNumber, testMessage); err != nil {
-		return s, fmt.Errorf("test SMS: %v", err)
+	if conf.TestNumber != "" {
+		var testMessage string
+		host := hostname()
+		testMessage = fmt.Sprintf("The SMS API is being used on %s", host)
+		if err := s.SMS(conf.TestNumber, testMessage); err != nil {
+			return s, fmt.Errorf("test SMS: %v", err)
+		}
 	}
 	return s, nil
 }
