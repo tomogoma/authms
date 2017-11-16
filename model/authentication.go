@@ -785,6 +785,10 @@ func (a *Authentication) verifyDBT(loginType, forAddr string, dbt []byte) (*Veri
 		updateLoginFunc = a.db.UpdateUserEmail
 		usr, _, err = a.db.UserByEmail(forAddr)
 	case LoginTypePhone:
+		forAddr, err = formatValidPhone(forAddr)
+		if err != nil {
+			return nil, err
+		}
 		tokensFetchFunc = a.db.PhoneTokens
 		updateLoginFunc = a.db.UpdateUserPhone
 		usr, _, err = a.db.UserByPhone(forAddr)
