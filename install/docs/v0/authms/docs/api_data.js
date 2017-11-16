@@ -801,9 +801,9 @@ define({ "api": [
     "groupTitle": "Auth"
   },
   {
-    "type": "",
-    "url": "User",
-    "title": "",
+    "type": "POST",
+    "url": "/:loginType/update",
+    "title": "Update Identifier",
     "description": "<p>Update (or set for first time) the identifier details for loginType.</p>",
     "name": "UpdateIdentifier",
     "version": "0.1.0",
@@ -858,7 +858,90 @@ define({ "api": [
       }
     },
     "filename": "handler/http/handler.go",
-    "groupTitle": "Auth"
+    "groupTitle": "Auth",
+    "success": {
+      "fields": {
+        "Success 200": [
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "ID",
+            "description": "<p>Unique ID of the user (can be cast to long Integer).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": false,
+            "field": "type",
+            "description": "<p>The <a href=\"#api-Objects-UserType\">UserType</a> of this user.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "created",
+            "description": "<p>The date the user was created.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": false,
+            "field": "lastUpdated",
+            "description": "<p>date the user was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "String",
+            "optional": true,
+            "field": "JWT",
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "username",
+            "description": "<p>The user's <a href=\"#api-Objects-Username\">username</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "phone",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">phone</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "email",
+            "description": "<p>The user's <a href=\"#api-Objects-VerifLogin\">email</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "facebook",
+            "description": "<p>The user's <a href=\"#api-Objects-FacebookID\">facebook ID</a> (if this user has one).</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object[]",
+            "optional": true,
+            "field": "groups",
+            "description": "<p>Array of <a href=\"#api-Objects-Group\">groups</a> the user belongs to, if any.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "device",
+            "description": "<p>The <a href=\"#api-Objects-Device\">device</a> this user is attached to, if any.</p>"
+          }
+        ]
+      }
+    }
   },
   {
     "type": "get",

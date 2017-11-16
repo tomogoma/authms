@@ -514,7 +514,7 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
  *
  * @apiParam (JSON Request Body) {String} identifier The new loginType's unique identifier.
  *
- * @api User
+ * @apiUse User
  *
  */
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
