@@ -27,7 +27,7 @@ type Auth interface {
 	RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*model.User, error)
 	RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error)
 
-	UpdateIdentifier(JWT, loginType, newId string) (*model.User, error)
+	UpdateIdentifier(JWT, forUserID, loginType, newId string) (*model.User, error)
 
 	UpdatePassword(JWT string, old, newPass []byte) error
 	SetPassword(loginType, onAddr string, dbt, pass []byte) (*model.VerifLogin, error)
@@ -134,6 +134,10 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUserDetails)))
 
+	r.PathPrefix("/users/{" + keyUserID + "}").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUpdate)))
+
 	r.PathPrefix("/users").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUsers)))
@@ -153,10 +157,6 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/{" + keyLoginType + "}/login").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleLogin)))
-
-	r.PathPrefix("/{" + keyLoginType + "}/update").
-		Methods(http.MethodPost).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUpdate)))
 
 	r.PathPrefix("/" + config.DocsPath).
 		Handler(http.FileServer(http.Dir(config.DefaultDocsDir())))
@@ -500,7 +500,7 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 /**
- * @api {POST} /:loginType/update Update Identifier
+ * @api {POST} /users/:userID Update Identifier
  * @apiDescription Update (or set for first time) the identifier details for loginType.
  * @apiName UpdateIdentifier
  * @apiVersion 0.1.0
@@ -508,10 +508,11 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
  *
  * @apiHeader x-api-key the api key
  *
- * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
+ * @apiParam (URL Parameters) {String} userID The ID of the <a href="#api-Objects-User">user</a> to update.
  *
  * @apiParam (URL Query Parameters) {String} token the JWT provided during login.
  *
+ * @apiParam (JSON Request Body) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
  * @apiParam (JSON Request Body) {String} identifier The new loginType's unique identifier.
  *
  * @apiUse User
@@ -520,16 +521,16 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 func (s *handler) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	req := &struct {
 		Identifier string `json:"identifier"`
+		UserID     string `json:"userID"`
 		LT         string `json:"loginType"`
 		JWT        string `json:"token"`
 	}{}
 	if !s.unmarshalJSONOrRespondError(w, r, req) {
 		return
 	}
-	vars := mux.Vars(r)
-	req.LT = vars[keyLoginType]
 	req.JWT = r.URL.Query().Get(keyToken)
-	usr, err := s.auth.UpdateIdentifier(req.JWT, req.LT, req.Identifier)
+	req.UserID = mux.Vars(r)[keyUserID]
+	usr, err := s.auth.UpdateIdentifier(req.JWT, req.UserID, req.LT, req.Identifier)
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
 }
 

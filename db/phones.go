@@ -48,6 +48,21 @@ func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []b
 	return insertPhoneToken(tx, userID, phone, dbt, isUsed, expiry)
 }
 
+func (r *Roach) DeletePhoneTokensAtomic(tx *sql.Tx, phone string) error {
+	if tx == nil {
+		return errors.Newf("tx was nil")
+	}
+	q := `DELETE FROM ` + TblPhoneTokens + ` WHERE ` + ColPhone + `=$1`
+	_, err := tx.Exec(q, phone)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.NewNotFound("no phone token found")
+		}
+		return err
+	}
+	return nil
+}
+
 // PhoneTokens fetches phone tokens for userID starting with the none-used, newest.
 func (r *Roach) PhoneTokens(userID string, offset, count int64) ([]model.DBToken, error) {
 	if err := r.InitDBIfNot(); err != nil {

@@ -48,6 +48,21 @@ func (r *Roach) InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []b
 	return insertEmailToken(tx, userID, email, dbt, isUsed, expiry)
 }
 
+func (r *Roach) DeleteEmailTokensAtomic(tx *sql.Tx, email string) error {
+	if tx == nil {
+		return errors.Newf("tx was nil")
+	}
+	q := `DELETE FROM ` + TblEmailTokens + ` WHERE ` + ColEmail + `=$1`
+	_, err := tx.Exec(q, email)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return errors.NewNotFound("no email token found")
+		}
+		return err
+	}
+	return nil
+}
+
 // EmailTokens fetches email tokens for userID starting with the newest.
 func (r *Roach) EmailTokens(userID string, offset, count int64) ([]model.DBToken, error) {
 	if err := r.InitDBIfNot(); err != nil {

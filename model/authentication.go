@@ -53,6 +53,7 @@ type AuthStore interface {
 	InsertUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
 	UpdateUserPhone(userID, phone string, verified bool) (*VerifLogin, error)
 	UpdateUserPhoneAtomic(tx *sql.Tx, userID, phone string, verified bool) (*VerifLogin, error)
+	DeletePhoneTokensAtomic(tx *sql.Tx, phone string) error
 
 	InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
 	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
@@ -62,6 +63,7 @@ type AuthStore interface {
 	InsertUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
 	UpdateUserEmail(userID, email string, verified bool) (*VerifLogin, error)
 	UpdateUserEmailAtomic(tx *sql.Tx, userID, email string, verified bool) (*VerifLogin, error)
+	DeleteEmailTokensAtomic(tx *sql.Tx, email string) error
 
 	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
 	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
@@ -388,16 +390,20 @@ func (a *Authentication) RegisterOther(JWT, newLoginType, userType, id, groupID 
 
 // UpdateIdentifier updates a user account's visible identifier to newID for
 // loginType.
-func (a *Authentication) UpdateIdentifier(JWT, loginType, newId string) (*User, error) {
-	clm := new(JWTClaim)
-	if _, err := a.jwter.Validate(JWT, clm); err != nil {
+func (a *Authentication) UpdateIdentifier(JWT, forUserID, loginType, newId string) (*User, error) {
+
+	if err := a.jwtBelongsToOrHasAccess(JWT, forUserID, AccessLevelAdmin); err != nil {
 		return nil, err
 	}
 
-	usr, _, err := a.db.User(clm.UsrID)
+	if forUserID == "" {
+		return nil, errors.NewClientf("user ID was empty")
+	}
+
+	usr, _, err := a.db.User(forUserID)
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
-			return nil, errors.Newf("not found user by JWT provided userID: %v", err)
+			return nil, errors.NewNotFound(err)
 		}
 		return nil, errors.Newf("get user: %v", err)
 	}
@@ -406,19 +412,29 @@ func (a *Authentication) UpdateIdentifier(JWT, loginType, newId string) (*User, 
 	case LoginTypeUsername:
 		var usrnm *Username
 		usrnm, err = a.updateUsername(usr.ID, newId)
+		if err != nil {
+			return nil, err
+		}
 		usr.UserName = *usrnm
 	case LoginTypePhone:
 		var phn *VerifLogin
-		phn, err = a.updatePhone(usr.ID, newId)
+		phn, err = a.updatePhone(usr.ID, usr.Phone, newId)
+		if err != nil {
+			return nil, err
+		}
 		usr.Phone = *phn
 	case LoginTypeEmail:
-		err = errors.NewNotImplemented()
+		email, err := a.updateEmail(usr.ID, usr.Email, newId)
+		if err != nil {
+			return nil, err
+		}
+		usr.Email = *email
 	case LoginTypeFacebook:
 		err = errors.NewNotImplemented()
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
-	return usr, err
+	return usr, nil
 }
 
 // UpdatePassword updates a user account's password.
@@ -1094,7 +1110,8 @@ func (a *Authentication) updateUsername(usrID, newUsrName string) (*Username, er
 	return nil, errors.NewNotImplemented()
 }
 
-func (a *Authentication) updatePhone(usrID, newNum string) (*VerifLogin, error) {
+func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string) (*VerifLogin, error) {
+
 	newNum, err := formatValidPhone(newNum)
 	if err != nil {
 		return nil, err
@@ -1103,18 +1120,80 @@ func (a *Authentication) updatePhone(usrID, newNum string) (*VerifLogin, error) 
 	if err = a.usrIdentifierAvail(LoginTypePhone, err); err != nil {
 		return nil, err
 	}
-	phone, err := a.db.UpdateUserPhone(usrID, newNum, false)
-	if err != nil {
-		return nil, errors.Newf("update phone: %v", err)
+
+	var phone *VerifLogin
+	if old.HasValue() {
+		err = a.db.ExecuteTx(func(tx *sql.Tx) error {
+			// TODO archive instead
+			err := a.db.DeletePhoneTokensAtomic(tx, old.Address)
+			if err != nil && !a.db.IsNotFoundError(err) {
+				return errors.Newf("delete prev phone's tokens: %v", err)
+			}
+			phone, err = a.db.UpdateUserPhoneAtomic(tx, usrID, newNum, false)
+			if err != nil {
+				return errors.Newf("update phone: %v", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		phone, err = a.db.InsertUserPhone(usrID, newNum, false)
+		if err != nil {
+			return nil, errors.Newf("insert phone: %v", err)
+		}
 	}
+
 	if a.smserNilable == nil {
 		return phone, nil
 	}
 	_, err = a.genAndSendTokens(nil, ActionVerify, LoginTypePhone, newNum, usrID)
 	if err != nil {
-		return nil, err
+		return phone, err
 	}
 	return phone, nil
+}
+
+func (a *Authentication) updateEmail(usrID string, old VerifLogin, newAddr string) (*VerifLogin, error) {
+
+	_, _, err := a.db.UserByEmail(newAddr)
+	if err = a.usrIdentifierAvail(LoginTypeEmail, err); err != nil {
+		return nil, err
+	}
+
+	var email *VerifLogin
+	if old.HasValue() {
+		err = a.db.ExecuteTx(func(tx *sql.Tx) error {
+			// TODO archive instead
+			err := a.db.DeleteEmailTokensAtomic(tx, old.Address)
+			if err != nil && !a.db.IsNotFoundError(err) {
+				return errors.Newf("delete prev email's tokens: %v", err)
+			}
+			email, err = a.db.UpdateUserEmailAtomic(tx, usrID, newAddr, false)
+			if err != nil {
+				return errors.Newf("update email: %v", err)
+			}
+			return nil
+		})
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		email, err = a.db.InsertUserEmail(usrID, newAddr, false)
+		if err != nil {
+			return nil, errors.Newf("insert email: %v", err)
+		}
+	}
+
+	if a.mailerNilable == nil {
+		return email, nil
+	}
+	_, err = a.genAndSendTokens(nil, ActionVerify, LoginTypeEmail, newAddr, usrID)
+	if err != nil {
+		return email, err
+	}
+	return email, nil
 }
 
 func (a *Authentication) genAndInsertToken(tx *sql.Tx, expiry time.Time, loginType, forUsrID, loginID string) ([]byte, error) {
@@ -1320,6 +1399,17 @@ func (a *Authentication) validateFbToken(fbToken string) (string, error) {
 		return "", errors.Newf("validate facebook token: %v", err)
 	}
 	return fbUsrID, nil
+}
+
+func (a *Authentication) jwtBelongsToOrHasAccess(JWT, userID string, acl float32) error {
+	clms := new(JWTClaim)
+	if _, err := a.jwter.Validate(JWT, clms); err != nil {
+		return err
+	}
+	if clms.UsrID == userID {
+		return nil
+	}
+	return claimsHaveAccess(*clms, acl)
 }
 
 func (a *Authentication) jwtHasAccess(JWT string, acl float32) error {
