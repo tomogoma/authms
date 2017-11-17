@@ -429,7 +429,7 @@ func (s *handler) handleRegisterFirst(w http.ResponseWriter, r *http.Request) {
  *
  * @apiParam (JSON Request Body) {String=individual,company} userType Type of user.
  * @apiParam (JSON Request Body) {String} identifier The 'username' corresponding to loginType.
- * @apiParam (JSON Request Body) {String} [secret] The user's password - required when selfReg not set.
+ * @apiParam (JSON Request Body) {String} [secret] The user's password - required when selfReg set to true or device.
  * @apiParam (JSON Request Body) {String} [groupID] groupID to add this user to - required when selfReg not set.
  * @apiParam (JSON Request Body) {String} [deviceID] the unique device ID for the user - required when selfReg=device.
  *
