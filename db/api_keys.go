@@ -3,6 +3,7 @@ package db
 import (
 	"github.com/tomogoma/authms/api"
 	errors "github.com/tomogoma/go-typed-errors"
+	"strconv"
 )
 
 // InsertAPIKey inserts an API key for the userID.
@@ -25,9 +26,13 @@ func (r *Roach) InsertAPIKey(userID, key string) (*api.Key, error) {
 }
 
 // APIKeysByUserID returns API keys for the provided userID starting with the newest.
-func (r *Roach) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
+func (r *Roach) APIKeysByUserID(usrID string, offset, count int64) ([]api.Key, error) {
 	if err := r.InitDBIfNot(); err != nil {
 		return nil, err
+	}
+	userID, err := strconv.ParseInt(usrID, 10, 64)
+	if err != nil {
+		return nil, errors.NewNotFound("only numeric IDs stored here")
 	}
 	cols := ColDesc(ColID, ColUserID, ColKey, ColCreateDate, ColUpdateDate)
 	q := `
