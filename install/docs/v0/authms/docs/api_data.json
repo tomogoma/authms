@@ -393,7 +393,7 @@
             "type": "String",
             "optional": true,
             "field": "secret",
-            "description": "<p>The user's password - required when selfReg not set.</p>"
+            "description": "<p>The user's password - required when selfReg set to true or device.</p>"
           },
           {
             "group": "JSON Request Body",
