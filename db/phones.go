@@ -48,6 +48,15 @@ func (r *Roach) InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []b
 	return insertPhoneToken(tx, userID, phone, dbt, isUsed, expiry)
 }
 
+func (r *Roach) SetPhoneTokenUsedAtomic(tx *sql.Tx, id string) error {
+	if tx == nil {
+		return errors.Newf("tx was nil")
+	}
+	q := `UPDATE ` + TblPhoneTokens + ` SET ` + ColIsUsed + ` = $1 WHERE ` + ColID + ` = $2`
+	rslt, err := tx.Exec(q, true, id)
+	return checkRowsAffected(rslt, err, 1)
+}
+
 func (r *Roach) DeletePhoneTokensAtomic(tx *sql.Tx, phone string) error {
 	if tx == nil {
 		return errors.Newf("tx was nil")

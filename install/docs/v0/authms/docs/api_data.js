@@ -1223,10 +1223,10 @@ define({ "api": [
     }
   },
   {
-    "type": "POST",
-    "url": "/:loginType/verify/:OTP",
+    "type": "GET",
+    "url": "/users/:userID/:loginType/verify/:OTP",
     "title": "Verify OTP",
-    "description": "<p>Verify OTP. See <a href=\"#api-Auth-Register\">Register</a> for loginType options. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
+    "description": "<p>Verify OTP sent to user's verifiable address e.g. phone, email. See <a href=\"#api-Auth-Register\">Register</a> for loginType options. extend can be set to &quot;true&quot; if intent on extending the expiry of the OTP.</p>",
     "name": "VerifyOTP",
     "version": "0.2.0",
     "group": "Auth",
@@ -1248,6 +1248,13 @@ define({ "api": [
           {
             "group": "URL Parameters",
             "type": "String",
+            "optional": false,
+            "field": "userID",
+            "description": "<p>The user ID of the user who needs verification.</p>"
+          },
+          {
+            "group": "URL Parameters",
+            "type": "String",
             "allowedValues": [
               "usernames",
               "emails",
@@ -1257,6 +1264,13 @@ define({ "api": [
             "optional": false,
             "field": "loginType",
             "description": "<p>type of identifier to verify.</p>"
+          },
+          {
+            "group": "URL Parameters",
+            "type": "String",
+            "optional": false,
+            "field": "OTP",
+            "description": "<p>The One Time Password sent to the user for verification.</p>"
           }
         ],
         "URL Query Parameters": [
@@ -1269,15 +1283,6 @@ define({ "api": [
             "optional": false,
             "field": "extend",
             "description": "<p>set true to return an extended expiry period OTP.</p>"
-          }
-        ],
-        "JSON Request Body": [
-          {
-            "group": "JSON Request Body",
-            "type": "String",
-            "optional": false,
-            "field": "identifier",
-            "description": "<p>The loginType's address to whom the OTP was sent.</p>"
           }
         ]
       }

@@ -57,6 +57,7 @@ type AuthStore interface {
 	DeletePhoneTokensAtomic(tx *sql.Tx, phone string) error
 
 	InsertPhoneToken(userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	SetPhoneTokenUsedAtomic(tx *sql.Tx, id string) error
 	InsertPhoneTokenAtomic(tx *sql.Tx, userID, phone string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
 	PhoneTokens(userID string, offset, count int64) ([]DBToken, error)
 
@@ -67,6 +68,7 @@ type AuthStore interface {
 	DeleteEmailTokensAtomic(tx *sql.Tx, email string) error
 
 	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
+	SetEmailTokenUsedAtomic(tx *sql.Tx, id string)  error
 	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
 	EmailTokens(userID string, offset, count int64) ([]DBToken, error)
 
@@ -501,9 +503,9 @@ func (a *Authentication) SetUserGroup(JWT, userID, newGrpID string) (*User, erro
 		// TODO only query verified users to prevent locking out on
 		// the basis of user lost password and has no verification means.
 		superUsrsQ := UsersQuery{GroupNamesIn: []string{GroupSuper}}
-		superUsrs, err := a.db.Users(superUsrsQ,0, 2)
+		superUsrs, err := a.db.Users(superUsrsQ, 0, 2)
 		if err != nil {
-			return nil, errors.Newf("fetch users:" +
+			return nil, errors.Newf("fetch users:"+
 				" currently in super user's group (expected at least one): %v", err)
 		}
 		if len(superUsrs) < 2 {
@@ -524,20 +526,35 @@ func (a *Authentication) SetUserGroup(JWT, userID, newGrpID string) (*User, erro
 // request. dbt is the token initially sent to the user for verification.
 // loginType should be similar to the one used during SendPassResetCode().
 func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte) (*VerifLogin, error) {
+
 	var tkn *DBToken
 	var err error
 	var updtVerifiedFunc func(*sql.Tx, string, string, bool) (*VerifLogin, error)
+	var setTokenUsedFunc func(*sql.Tx, string) error
+	var fetchTokensFunc func(string, int64, int64) ([]DBToken, error)
+	var fetchUsrFunc func(string) (*User, []byte, error)
 
 	var usr *User
 	switch loginType {
 	case LoginTypeEmail:
-		usr, _, err = a.db.UserByEmail(forAddr)
+		fetchUsrFunc = a.db.UserByEmail
+		fetchTokensFunc = a.db.EmailTokens
+		updtVerifiedFunc = a.db.UpdateUserEmailAtomic
+		setTokenUsedFunc = a.db.SetEmailTokenUsedAtomic
 	case LoginTypePhone:
-		usr, _, err = a.db.UserByPhone(forAddr)
+		forAddr, err = formatValidPhone(forAddr)
+		if err != nil {
+			return nil, errors.NewClient(err)
+		}
+		fetchUsrFunc = a.db.UserByPhone
+		fetchTokensFunc = a.db.PhoneTokens
+		updtVerifiedFunc = a.db.UpdateUserPhoneAtomic
+		setTokenUsedFunc = a.db.SetPhoneTokenUsedAtomic
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
+	usr, _, err = fetchUsrFunc(forAddr)
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
 			return nil, errors.NewNotFound("User not found")
@@ -545,17 +562,7 @@ func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte
 		return nil, errors.Newf("fetch user by %s: %v", loginType, err)
 	}
 
-	switch loginType {
-	case LoginTypeEmail:
-		updtVerifiedFunc = a.db.UpdateUserEmailAtomic
-		tkn, err = a.dbTokenValid(usr.ID, dbt, a.db.EmailTokens)
-	case LoginTypePhone:
-		updtVerifiedFunc = a.db.UpdateUserPhoneAtomic
-		tkn, err = a.dbTokenValid(usr.ID, dbt, a.db.PhoneTokens)
-	default:
-		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
-	}
-
+	tkn, err = a.dbTokenValid(usr.ID, dbt, fetchTokensFunc)
 	if err != nil {
 		return nil, err
 	}
@@ -567,6 +574,9 @@ func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte
 
 	var addr *VerifLogin
 	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
+		if err := setTokenUsedFunc(tx, tkn.ID); err != nil {
+			return errors.Newf("update DBT, set used: %v", err)
+		}
 		err = a.db.UpdatePasswordAtomic(tx, usr.ID, passH)
 		if err != nil {
 			return errors.Newf("update password: %v", err)
@@ -577,10 +587,7 @@ func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte
 		}
 		return nil
 	})
-	if err != nil {
-		return nil, err
-	}
-	return addr, nil
+	return addr, err
 }
 
 // SendVerCode sends a verification code to toAddr to verify the
@@ -588,57 +595,42 @@ func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte
 // subsequent calls to VerifyDBT() or VerifyAndExtendDBT() with the correct code
 // completes the verification.
 func (a *Authentication) SendVerCode(JWT, loginType, toAddr string) (*DBTStatus, error) {
-	clms := new(JWTClaim)
-	if _, err := a.jwter.Validate(JWT, clms); err != nil {
-		return nil, err
-	}
 
 	var err error
 	var usr *User
-	var insFunc func(userID, phone string, verified bool) (*VerifLogin, error)
 	var isMessengerAvail bool
 
 	switch loginType {
 	case LoginTypePhone:
-		insFunc = a.db.InsertUserPhone
+		toAddr, err = formatValidPhone(toAddr)
+		if err != nil {
+			return nil, errors.Newf("%s was invalid: %v", LoginTypePhone, err)
+		}
 		usr, _, err = a.db.UserByPhone(toAddr)
 		isMessengerAvail = a.smserNilable != nil
 	case LoginTypeEmail:
-		insFunc = a.db.InsertUserEmail
 		usr, _, err = a.db.UserByEmail(toAddr)
 		isMessengerAvail = a.mailerNilable != nil
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
+	if err != nil {
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("user by %s: %v", loginType, err)
+	}
+
 	if !isMessengerAvail {
 		return nil, errors.NewNotImplementedf("notification method not available for %s", loginType)
 	}
 
-	if err != nil {
-		if !a.db.IsNotFoundError(err) {
-			return nil, errors.Newf("user by %s: %v", loginType, err)
-		}
-
-		usr, _, err = a.db.User(clms.UsrID)
-		if err != nil {
-			if a.db.IsNotFoundError(err) {
-				return nil, errors.Newf("valid claims with non-exist user found: %+v", clms)
-			}
-			return nil, errors.Newf("get user: %v", err)
-		}
-
-		_, err = insFunc(usr.ID, toAddr, false)
-		if err != nil {
-			return nil, errors.Newf("insert toAddr: %v", err)
-		}
-
-	} else if usr.ID != clms.UsrID {
-		return nil, errors.NewForbiddenf("%s does not belong to you: %v", loginType)
+	if err := a.jwtBelongsToOrHasAccess(JWT, usr.ID, AccessLevelStaff); err != nil {
+		return nil, err
 	}
 
 	return a.genAndSendTokens(nil, ActionVerify, loginType, toAddr, usr.ID)
-
 }
 
 // SendPassResetCode sends a password reset code to toAddr to allow a user
@@ -653,6 +645,10 @@ func (a *Authentication) SendPassResetCode(loginType, toAddr string) (*DBTStatus
 
 	switch loginType {
 	case LoginTypePhone:
+		toAddr, err = formatValidPhone(toAddr)
+		if err != nil {
+			return nil, errors.NewClient(err)
+		}
 		usr, _, err = a.db.UserByPhone(toAddr)
 		isMessengerAvail = a.smserNilable != nil
 	case LoginTypeEmail:
@@ -680,8 +676,8 @@ func (a *Authentication) SendPassResetCode(loginType, toAddr string) (*DBTStatus
 // that can be used to perform actions that would otherwise not be possible on
 // the user's account without a password or a JWT for a limited period of time.
 // See VerifyDBT() for details on verification.
-func (a *Authentication) VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (string, error) {
-	lv, err := a.verifyDBT(lt, forAddr, dbt)
+func (a *Authentication) VerifyAndExtendDBT(lt, userID string, dbt []byte) (string, error) {
+	lv, err := a.verifyDBT(lt, userID, dbt)
 	if err != nil {
 		return "", err
 	}
@@ -696,8 +692,8 @@ func (a *Authentication) VerifyAndExtendDBT(lt, forAddr string, dbt []byte) (str
 // VerifyDBT sets a user's address as verified after successful SendVerCode()
 // and subsequent entry of the code by the user.
 // loginType should be similar to the one used during SendVerCode().
-func (a *Authentication) VerifyDBT(loginType, forAddr string, dbt []byte) (*VerifLogin, error) {
-	return a.verifyDBT(loginType, forAddr, dbt)
+func (a *Authentication) VerifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
+	return a.verifyDBT(loginType, userID, dbt)
 }
 
 // Login validates a user's credentials and returns the user's information
@@ -833,43 +829,55 @@ func (a *Authentication) usrIdentifierAvail(loginType, addr string, fetchErr err
 	return nil
 }
 
-func (a *Authentication) verifyDBT(loginType, forAddr string, dbt []byte) (*VerifLogin, error) {
+func (a *Authentication) verifyDBT(loginType, userID string, dbt []byte) (*VerifLogin, error) {
 
 	var tokensFetchFunc func(string, int64, int64) ([]DBToken, error)
-	var updateLoginFunc func(string, string, bool) (*VerifLogin, error)
+	var updateLoginFunc func(*sql.Tx, string, string, bool) (*VerifLogin, error)
+	var setTokenUsedFunc func(*sql.Tx, string) error
 	var usr *User
 	var err error
 
 	switch loginType {
 	case LoginTypeEmail:
 		tokensFetchFunc = a.db.EmailTokens
-		updateLoginFunc = a.db.UpdateUserEmail
-		usr, _, err = a.db.UserByEmail(forAddr)
+		updateLoginFunc = a.db.UpdateUserEmailAtomic
+		setTokenUsedFunc = a.db.SetEmailTokenUsedAtomic
 	case LoginTypePhone:
-		forAddr, err = formatValidPhone(forAddr)
-		if err != nil {
-			return nil, err
-		}
 		tokensFetchFunc = a.db.PhoneTokens
-		updateLoginFunc = a.db.UpdateUserPhone
-		usr, _, err = a.db.UserByPhone(forAddr)
+		updateLoginFunc = a.db.UpdateUserPhoneAtomic
+		setTokenUsedFunc = a.db.SetPhoneTokenUsedAtomic
 	default:
 		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
+	if userID == "" {
+		return nil, errors.NewClientf("userID was empty")
+	}
+	usr, _, err = a.db.User(userID)
 	if err != nil {
-		return nil, errors.Newf("get user by %s: %v", loginType, err)
+		if a.db.IsNotFoundError(err) {
+			return nil, errors.NewNotFound(err)
+		}
+		return nil, errors.Newf("get user: %v", loginType, err)
 	}
 
 	tkn, err := a.dbTokenValid(usr.ID, dbt, tokensFetchFunc)
 	if err != nil {
 		return nil, err
 	}
-	phone, err := updateLoginFunc(usr.ID, tkn.Address, true)
-	if err != nil {
-		return nil, errors.Newf("update phone to verified: %v", err)
-	}
-	return phone, nil
+
+	var vl *VerifLogin
+	err = a.db.ExecuteTx(func(tx *sql.Tx) error {
+		if err := setTokenUsedFunc(tx, tkn.ID); err != nil {
+			return errors.Newf("update DBT, set used: %v", err)
+		}
+		vl, err = updateLoginFunc(tx, usr.ID, tkn.Address, true)
+		if err != nil {
+			return errors.Newf("update phone to verified: %v", err)
+		}
+		return nil
+	})
+	return vl, err
 }
 
 func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr, usrID string) (*DBTStatus, error) {
@@ -1357,7 +1365,7 @@ resumeFunc:
 	for {
 		codes, err := f(userID, offset, count)
 		if a.db.IsNotFoundError(err) {
-			return nil, errors.NewForbidden("token is invalid")
+			return nil, errors.NewUnauthorized("token is invalid")
 		}
 		if err != nil {
 			return nil, errors.Newf("get phone db tokens: %v", err)

@@ -48,6 +48,15 @@ func (r *Roach) InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []b
 	return insertEmailToken(tx, userID, email, dbt, isUsed, expiry)
 }
 
+func (r *Roach) SetEmailTokenUsedAtomic(tx *sql.Tx, id string) error {
+	if tx == nil {
+		return errors.Newf("tx was nil")
+	}
+	q := `UPDATE ` + TblEmailTokens + ` SET ` + ColIsUsed + ` = $1 WHERE ` + ColID + ` = $2`
+	rslt, err := tx.Exec(q, true, id)
+	return checkRowsAffected(rslt, err, 1)
+}
+
 func (r *Roach) DeleteEmailTokensAtomic(tx *sql.Tx, email string) error {
 	if tx == nil {
 		return errors.Newf("tx was nil")
