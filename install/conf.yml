@@ -44,6 +44,14 @@ serviceConfig:
   # "null" or "" or left empty
   allowedOrigins:
 
+  # URL - root URL to the micro-service.
+  # e.g. when using version 0 of the authms microservice (v0/authms)
+  # http://localhost:8080 if using micro on port 8080
+  # http://localhost/gw if proxying traffic to micro using /gw
+  # https://project-name.appspot.com when directly using appengine
+  # on the default service.
+  URL:
+
   # webAppURL - root URL to the webapp for which action messages
   # (verification, invite, etc) will be redirected for action. The URL
   # can have a path segment to prevent conflict with the webapp's internal

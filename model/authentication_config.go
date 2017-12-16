@@ -132,6 +132,17 @@ func WithWebAppURL(URL string) Option {
 	}
 }
 
+// WithServiceURL sets the micro-service's URL from which this micro-service
+// will be listening for requests.
+// TODO document types of request and URL endpoints that will be suffixed
+func WithServiceURL(URL string) Option {
+	return func(c *authenticationConfig) error {
+		var err error
+		c.serviceURLNilable, err = url.Parse(URL)
+		return err
+	}
+}
+
 // WithInvitationSubject sets the subject to be used when sending invites to a user.
 func WithInvitationSubject(s string) Option {
 	return func(c *authenticationConfig) error {
@@ -267,6 +278,7 @@ type authenticationConfig struct {
 	smserNilable         SMSer
 	mailerNilable        Mailer
 	webAppURLNilable     *url.URL
+	serviceURLNilable     *url.URL
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string

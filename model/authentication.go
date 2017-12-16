@@ -68,7 +68,7 @@ type AuthStore interface {
 	DeleteEmailTokensAtomic(tx *sql.Tx, email string) error
 
 	InsertEmailToken(userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
-	SetEmailTokenUsedAtomic(tx *sql.Tx, id string)  error
+	SetEmailTokenUsedAtomic(tx *sql.Tx, id string) error
 	InsertEmailTokenAtomic(tx *sql.Tx, userID, email string, dbt []byte, isUsed bool, expiry time.Time) (*DBToken, error)
 	EmailTokens(userID string, offset, count int64) ([]DBToken, error)
 
@@ -115,6 +115,7 @@ type Authentication struct {
 	smserNilable         SMSer
 	mailerNilable        Mailer
 	webAppURLNilable     *url.URL
+	serviceURLNilable    *url.URL
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
@@ -216,6 +217,7 @@ func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, 
 		smserNilable:         c.smserNilable,
 		mailerNilable:        c.mailerNilable,
 		webAppURLNilable:     c.webAppURLNilable,
+		serviceURLNilable:    c.serviceURLNilable,
 		invSubjEmptyable:     c.invSubjEmptyable,
 		verSubjEmptyable:     c.verSubjEmptyable,
 		resPassSubjEmptyable: c.resPassSubjEmptyable,
@@ -898,15 +900,28 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 	}
 
 	expiry := time.Now().Add(validity)
-
 	URL := ""
-	if a.webAppURLNilable != nil {
+
+	if action == ActionVerify && a.serviceURLNilable != nil {
 		tkn, err := a.genAndInsertToken(tx, expiry, loginType, usrID, toAddr)
 		if err != nil {
 			return nil, err
 		}
 		useURL := new(url.URL)
-		*useURL = *a.webAppURLNilable // make copy so that a.webAppURLNilable remains pristine
+		*useURL = *a.serviceURLNilable
+		// GET /users/:userID/:loginType/verify/:OTP
+		useURL.Path = path.Join(useURL.Path, "users", usrID, loginType, ActionVerify, string(tkn))
+		useURL.RawQuery = url.Values{"redirectToWebApp": []string{"true"}}.Encode()
+		URL = useURL.String()
+	}
+
+	if action != ActionVerify && a.webAppURLNilable != nil {
+		tkn, err := a.genAndInsertToken(tx, expiry, loginType, usrID, toAddr)
+		if err != nil {
+			return nil, err
+		}
+		useURL := new(url.URL)
+		*useURL = *a.webAppURLNilable
 		useURL.Path = path.Join(useURL.Path, action, loginType, url.PathEscape(toAddr), string(tkn))
 		URL = useURL.String()
 	}

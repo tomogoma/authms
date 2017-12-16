@@ -30,7 +30,7 @@ func main() {
 
 	serverHttpQuitCh := make(chan error)
 	httpHandler, err := http.NewHandler(authentication, APIGuard, log,
-		conf.Service.AllowedOrigins)
+		conf.Service.WebAppURL, conf.Service.AllowedOrigins)
 	logging.LogFatalOnError(log, err, "Instantiate HTTP handler")
 	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
 

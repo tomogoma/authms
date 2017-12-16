@@ -57,28 +57,30 @@ type handler struct {
 	errors.ClErrCheck
 	errors.NotFoundErrCheck
 
-	auth   Auth
-	guard  Guard
-	logger logging.Logger
+	auth      Auth
+	guard     Guard
+	logger    logging.Logger
+	webAppURL string
 }
 
 const (
 	internalErrorMessage = "whoops! Something wicked happened"
 
-	keyLoginType    = "loginType"
-	keySelfReg      = "selfReg"
-	keyAPIKey       = "x-api-key"
-	keyToken        = "token"
-	keyOTP          = "OTP"
-	keyExtend       = "extend"
-	keyOffset       = "offset"
-	keyCount        = "count"
-	keyUserID       = "userID"
-	keyGroupID      = "groupID"
-	keyAcl          = "acl"
-	keyGroup        = "group"
-	keyMatchAllACLs = "matchAllACLs"
-	keyMatchAll     = "matchAll"
+	keyLoginType        = "loginType"
+	keySelfReg          = "selfReg"
+	keyAPIKey           = "x-api-key"
+	keyToken            = "token"
+	keyOTP              = "OTP"
+	keyExtend           = "extend"
+	keyRedirectToWebApp = "redirectToWebApp"
+	keyOffset           = "offset"
+	keyCount            = "count"
+	keyUserID           = "userID"
+	keyGroupID          = "groupID"
+	keyAcl              = "acl"
+	keyGroup            = "group"
+	keyMatchAllACLs     = "matchAllACLs"
+	keyMatchAll         = "matchAll"
 
 	ctxKeyLog = contextKey("log")
 
@@ -86,7 +88,7 @@ const (
 	valDevice = "device"
 )
 
-func NewHandler(a Auth, g Guard, l logging.Logger, allowedOrigins []string) (http.Handler, error) {
+func NewHandler(a Auth, g Guard, l logging.Logger, webAppURL string, allowedOrigins []string) (http.Handler, error) {
 	if a == nil {
 		return nil, errors.New("Auth was nil")
 	}
@@ -98,7 +100,7 @@ func NewHandler(a Auth, g Guard, l logging.Logger, allowedOrigins []string) (htt
 	}
 
 	r := mux.NewRouter().PathPrefix(config.WebRootURL()).Subrouter()
-	handler{auth: a, guard: g, logger: l}.handleRoute(r)
+	handler{auth: a, guard: g, logger: l, webAppURL: webAppURL}.handleRoute(r)
 
 	headersOk := handlers.AllowedHeaders([]string{
 		"X-Requested-With", "Accept", "Content-Type", "Content-Length",
@@ -138,7 +140,7 @@ func (s handler) handleRoute(r *mux.Router) {
 
 	r.PathPrefix("/users/{" + keyUserID + "}/{" + keyLoginType + "}/verify/{" + keyOTP + "}").
 		Methods(http.MethodGet).
-		HandlerFunc(s.prepLogger(s.guardRoute(s.handleVerifyCode)))
+		HandlerFunc(s.prepLogger(s.handleVerifyCode))
 
 	r.PathPrefix("/users/{" + keyUserID + "}").
 		Methods(http.MethodGet).
@@ -623,6 +625,7 @@ func (s *handler) handleSendVerifCode(w http.ResponseWriter, r *http.Request) {
  * @apiParam (URL Parameters) {String} OTP The One Time Password sent to the user for verification.
  *
  * @apiParam (URL Query Parameters) {String=true,} extend set true to return an extended expiry period OTP.
+ * @apiParam (URL Query Parameters) {String=true,} redirectToWebApp set true to redirect user to webApp instead of returning a JSON result.
  *
  * @apiSuccess {String} [OTP] (if extending OTP) the new OTP with extended expiry
  *
@@ -633,15 +636,17 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	q := r.URL.Query()
 	req := &struct {
-		UserID string `json:"userID"`
-		LT     string `json:"loginType"`
-		DBT    string `json:"OTP"`
-		Extend string `json:"extend"`
+		UserID           string `json:"userID"`
+		LT               string `json:"loginType"`
+		DBT              string `json:"OTP"`
+		Extend           string `json:"extend"`
+		RedirectToWebApp string `json:"redirectToWebApp"`
 	}{
-		UserID: vars[keyUserID],
-		LT:     vars[keyLoginType],
-		DBT:    vars[keyOTP],
-		Extend: q.Get(keyExtend),
+		UserID:           vars[keyUserID],
+		LT:               vars[keyLoginType],
+		DBT:              vars[keyOTP],
+		Extend:           q.Get(keyExtend),
+		RedirectToWebApp: q.Get(keyRedirectToWebApp),
 	}
 
 	var resp interface{}
@@ -657,6 +662,13 @@ func (s *handler) handleVerifyCode(w http.ResponseWriter, r *http.Request) {
 		vl, err = s.auth.VerifyDBT(req.LT, req.UserID, []byte(req.DBT))
 		resp = NewVerifLogin(vl)
 	}
+
+	if s.webAppURL != "" &&
+		err == nil && strings.EqualFold(req.RedirectToWebApp, valTrue) {
+		http.Redirect(w, r, s.webAppURL, http.StatusFound)
+		return
+	}
+
 	s.respondOn(w, r, req, resp, http.StatusOK, err)
 }
 

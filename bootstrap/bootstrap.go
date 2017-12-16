@@ -19,6 +19,7 @@ import (
 	"github.com/tomogoma/authms/smtp"
 	"github.com/tomogoma/crdb"
 	token "github.com/tomogoma/jwt"
+	"path"
 )
 
 func InstantiateRoach(lg logging.Logger, conf crdb.Config) *db.Roach {
@@ -169,10 +170,12 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	emailCl := InstantiateSMTP(rdb, lg, conf.SMTP)
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
+	srvcURL := path.Join(conf.Service.URL, config.WebRootURL())
 	authOpts = append(
 		authOpts,
 		model.WithAppName(conf.Service.AppName),
 		model.WithWebAppURL(conf.Service.WebAppURL),
+		model.WithServiceURL(srvcURL),
 		model.WithDevLockedToUser(conf.Authentication.LockDevsToUsers),
 		model.WithSelfRegAllowed(conf.Authentication.AllowSelfReg),
 	)

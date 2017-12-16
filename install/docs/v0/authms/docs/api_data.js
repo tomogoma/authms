@@ -1283,6 +1283,16 @@ define({ "api": [
             "optional": false,
             "field": "extend",
             "description": "<p>set true to return an extended expiry period OTP.</p>"
+          },
+          {
+            "group": "URL Query Parameters",
+            "type": "String",
+            "allowedValues": [
+              "true"
+            ],
+            "optional": false,
+            "field": "redirectToWebApp",
+            "description": "<p>set true to redirect user to webApp instead of returning a JSON result.</p>"
           }
         ]
       }
