@@ -1,0 +1,67 @@
+########################################################
+#                                                      #
+#             Test configuration file                  #
+#  Modify this file with valid CockroachDB/Postgresql  #
+#       configurations in order to run tests.          #
+#                                                      #
+########################################################
+
+
+# user - The user to sign in as
+
+user: root
+
+
+# password - The user's password
+
+password: ""
+
+
+# host - The host to connect to. Values that start with / are for unix domain
+# sockets. (default is localhost)
+
+host:
+
+
+# port - The port to bind to. (default is 5432)
+
+port: 26257
+
+
+# dbname - The name of the database to connect to
+
+dbName: crdb_test
+
+# connect_timeout - Maximum wait for connection, in seconds. Zero or not
+# specified means wait indefinitely.
+
+connectTimeout:
+
+
+# sslmode - Whether or not to use SSL (default is require).
+# Valid values are:
+# disable     - No SSL
+# require     - Always SSL (skip verification)
+# verify-ca   - Always SSL (verify that the certificate presented
+#               by the server was signed by a trusted CA)
+# verify-full - Always SSL (verify that the certification presented by the
+#               server was signed by a trusted CA and the server host name
+#               matches the one in the certificate)
+
+sslMode: verify-ca
+
+
+# sslcert - Cert file location. The file must contain PEM encoded data.
+
+sslCert: /etc/cockroachdb/certs/node.crt
+
+
+# sslkey - Key file location. The file must contain PEM encoded data.
+
+sslKey: /etc/cockroachdb/certs/node.key
+
+
+# sslrootcert - The location of the root certificate file. The file must
+# contain PEM encoded data.
+
+sslRootCert: /etc/cockroachdb/certs/ca.crt
