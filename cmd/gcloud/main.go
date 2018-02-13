@@ -18,7 +18,7 @@ func main() {
 	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(config.DefaultConfPath(), log)
 
 	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, log,
-		conf.Service.AllowedOrigins)
+		conf.Service.WebAppURL, conf.Service.AllowedOrigins)
 	logging.LogFatalOnError(log, err, "Instantiate http Handler")
 
 	http.Handle("/", httpHandler)

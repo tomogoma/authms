@@ -1,4 +1,4 @@
-// +build dev
+
 
 // build.go automates proper versioning of authms binaries
 // and installer scripts.
