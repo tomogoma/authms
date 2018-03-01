@@ -12,7 +12,7 @@ import (
 	"reflect"
 
 	"github.com/dgrijalva/jwt-go"
-	errors "github.com/tomogoma/go-typed-errors"
+	"github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 	"strconv"
 	"github.com/ttacon/libphonenumber"
@@ -606,7 +606,7 @@ func (a *Authentication) SendVerCode(JWT, loginType, toAddr string) (*DBTStatus,
 	case LoginTypePhone:
 		toAddr, err = formatValidPhone(toAddr)
 		if err != nil {
-			return nil, errors.Newf("%s was invalid: %v", LoginTypePhone, err)
+			return nil, errors.NewClient(err)
 		}
 		usr, _, err = a.db.UserByPhone(toAddr)
 		isMessengerAvail = a.smserNilable != nil
@@ -1115,7 +1115,7 @@ func (a *Authentication) regDevice(tx *sql.Tx, actionType, devID string, usr *Us
 func (a *Authentication) regPhoneConditions(number string) (string, error) {
 	number, err := formatValidPhone(number)
 	if err != nil {
-		return "", err
+		return "", errors.NewClient(err)
 	}
 	_, _, err = a.db.UserByPhone(number)
 	return number, a.usrIdentifierAvail(LoginTypePhone, number, err)
@@ -1193,7 +1193,7 @@ func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string
 
 	newNum, err := formatValidPhone(newNum)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewClient(err)
 	}
 	_, _, err = a.db.UserByPhone(newNum)
 	if err = a.usrIdentifierAvail(LoginTypePhone, newNum, err); err != nil {
