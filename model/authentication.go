@@ -1094,11 +1094,6 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 		return nil, err
 	}
 
-	usr.JWT, err = a.jwter.Generate(newJWTClaim(usr.ID, usr.Group))
-	if err != nil {
-		return nil, errors.Newf("generate JWT: %v", err)
-	}
-
 	usr.Group = *usrGroup
 	usr.Type = *ut
 
