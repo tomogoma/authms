@@ -18,7 +18,9 @@ import (
 @apiSuccess {String} created		The date the user was created.
 @apiSuccess {String} lastUpdated	date the user was last updated.
 @apiSuccess {String} [JWT]			JSON Web Token for accessing services.
-	This is only provided during <a href="#api-Auth-Login">Login</a>.
+	This is only provided during <a href="#api-Auth-Login">Login</a>,
+	<a href="#api-Auth-Register">Registration</a>
+	and  <a href="#api-Auth-FirstUser">First User Registration</a>.
 @apiSuccess {Object} [username]		The user's
 	<a href="#api-Objects-Username">username</a> (if this user has one).
 @apiSuccess {Object} [phone]		The user's

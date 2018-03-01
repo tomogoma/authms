@@ -273,7 +273,7 @@ define({ "api": [
             "type": "String",
             "optional": true,
             "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>, <a href=\"#api-Auth-Register\">Registration</a> and  <a href=\"#api-Auth-FirstUser\">First User Registration</a>.</p>"
           },
           {
             "group": "Success 200",
@@ -836,7 +836,7 @@ define({ "api": [
             "type": "String",
             "optional": true,
             "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>, <a href=\"#api-Auth-Register\">Registration</a> and  <a href=\"#api-Auth-FirstUser\">First User Registration</a>.</p>"
           },
           {
             "group": "Success 200",
@@ -1049,7 +1049,7 @@ define({ "api": [
             "type": "String",
             "optional": true,
             "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>, <a href=\"#api-Auth-Register\">Registration</a> and  <a href=\"#api-Auth-FirstUser\">First User Registration</a>.</p>"
           },
           {
             "group": "Success 200",
@@ -1181,7 +1181,7 @@ define({ "api": [
             "type": "String",
             "optional": true,
             "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>, <a href=\"#api-Auth-Register\">Registration</a> and  <a href=\"#api-Auth-FirstUser\">First User Registration</a>.</p>"
           },
           {
             "group": "Success 200",
@@ -1598,7 +1598,7 @@ define({ "api": [
             "type": "String",
             "optional": true,
             "field": "JWT",
-            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>.</p>"
+            "description": "<p>JSON Web Token for accessing services. This is only provided during <a href=\"#api-Auth-Login\">Login</a>, <a href=\"#api-Auth-Register\">Registration</a> and  <a href=\"#api-Auth-FirstUser\">First User Registration</a>.</p>"
           },
           {
             "group": "Success 200",
