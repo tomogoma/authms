@@ -302,50 +302,46 @@ func (a *Authentication) RegisterSelf(loginType, userType, id string, secret []b
 		return nil, errorNoneDeviceReg
 	}
 
-	var regF regFunc
-	var regCondF regConditions
-	switch loginType {
-	case LoginTypeUsername:
-		regCondF = a.regUsernameConditions
-		regF = a.regUsername
-	case LoginTypeEmail:
-		regCondF = a.regEmailConditions
-		regF = a.regEmail
-	case LoginTypePhone:
-		regCondF = a.regPhoneConditions
-		regF = a.regPhone
-	case LoginTypeFacebook:
-		if a.fbNilable == nil {
-			return nil, errorFbNotAvail
-		}
-		var err error
+	regF, regCondF, err := a.regFuncs(loginType)
+	if err != nil {
+		return nil, err
+	}
+	if loginType == LoginTypeFacebook {
 		secret, err = a.passGen.SecureRandomBytes(genPassLen)
 		if err != nil {
-			return nil, errors.Newf("generate password: %v", err)
+			return nil, errors.Newf("generate secret: %v", err)
 		}
-		regCondF = a.regFacebookConditions
-		regF = a.regFacebook
-	default:
-		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
 
 	return a.registerSelf(userType, id, secret, regCondF, regF)
 }
 
-// RegisterSelfByLockedPhone registers a new user account using phone/deviceID/password combination.
-func (a *Authentication) RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*User, error) {
-	return a.registerSelf(userType, number, password,
-		func(number string) (string, error) {
+// RegisterSelfByLockedDevice registers a new user account using phone/deviceID/password combination.
+func (a *Authentication) RegisterSelfByLockedDevice(loginType, userType, devID, identifier string, secret []byte) (*User, error) {
+
+	regF, regCondF, err := a.regFuncs(loginType)
+	if err != nil {
+		return nil, err
+	}
+	if loginType == LoginTypeFacebook {
+		secret, err = a.passGen.SecureRandomBytes(genPassLen)
+		if err != nil {
+			return nil, errors.Newf("generate secret: %v", err)
+		}
+	}
+
+	return a.registerSelf(userType, identifier, secret,
+		func(identifier string) (string, error) {
 			if _, err := a.regDevConditions(devID); err != nil {
 				return "", err
 			}
-			return a.regPhoneConditions(number)
+			return regCondF(identifier)
 		},
 		func(tx *sql.Tx, actionType, number string, usr *User) error {
 			if err := a.regDevice(tx, actionType, devID, usr); err != nil {
 				return err
 			}
-			return a.regPhone(tx, actionType, number, usr)
+			return regF(tx, actionType, number, usr)
 		},
 	)
 }
@@ -971,6 +967,24 @@ func (a *Authentication) genAndSendTokens(tx *sql.Tx, action, loginType, toAddr,
 		ObfuscatedAddress: obfuscateFunc(toAddr),
 		ExpiresAt:         expiry,
 	}, nil
+}
+
+func (a *Authentication) regFuncs(loginType string) (regFunc, regConditions, error) {
+	switch loginType {
+	case LoginTypeUsername:
+		return a.regUsername, a.regUsernameConditions, nil
+	case LoginTypeEmail:
+		return a.regEmail, a.regEmailConditions, nil
+	case LoginTypePhone:
+		return a.regPhone, a.regPhoneConditions, nil
+	case LoginTypeFacebook:
+		if a.fbNilable == nil {
+			return nil, nil, errorFbNotAvail
+		}
+		return a.regFacebook, a.regFacebookConditions, nil
+	default:
+		return nil, nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
+	}
 }
 
 func (a *Authentication) registerSelf(userType string, id string, password []byte, rcf regConditions, rf regFunc) (*User, error) {

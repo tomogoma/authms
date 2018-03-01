@@ -24,7 +24,7 @@ type Auth interface {
 	RegisterFirst(loginType, userType, id string, secret []byte) (*model.User, error)
 	CanRegisterFirst() (bool, error)
 	RegisterSelf(loginType, userType, id string, secret []byte) (*model.User, error)
-	RegisterSelfByLockedPhone(userType, devID, number string, password []byte) (*model.User, error)
+	RegisterSelfByLockedDevice(loginType, userType, devID, number string, password []byte) (*model.User, error)
 	RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error)
 
 	UpdateIdentifier(JWT, forUserID, loginType, newId string) (*model.User, error)
@@ -460,7 +460,7 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
 	case valTrue:
 		usr, err = s.auth.RegisterSelf(req.LT, req.UserType, req.Identifier, []byte(req.Secret))
 	case valDevice:
-		usr, err = s.auth.RegisterSelfByLockedPhone(req.UserType, req.DevID, req.Identifier, []byte(req.Secret))
+		usr, err = s.auth.RegisterSelfByLockedDevice(req.LT, req.UserType, req.DevID, req.Identifier, []byte(req.Secret))
 	default:
 		JWT := r.URL.Query().Get(keyToken)
 		usr, err = s.auth.RegisterOther(JWT, req.LT, req.UserType, req.Identifier, req.GroupID)
