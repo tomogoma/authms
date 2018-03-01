@@ -1154,7 +1154,8 @@ func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *Us
 	if a.smserNilable == nil {
 		return nil
 	}
-	_, err = a.genAndSendTokens(tx, actionType, LoginTypePhone, number, usr.ID)
+	otpSt, err := a.genAndSendTokens(tx, actionType, LoginTypePhone, number, usr.ID)
+	usr.Phone.OTPStatus = *otpSt
 	return err
 }
 
@@ -1175,7 +1176,8 @@ func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *U
 	if a.mailerNilable == nil {
 		return nil
 	}
-	_, err = a.genAndSendTokens(tx, actionType, LoginTypeEmail, address, usr.ID)
+	otpSt, err := a.genAndSendTokens(tx, actionType, LoginTypeEmail, address, usr.ID)
+	usr.Email.OTPStatus = *otpSt
 	return err
 }
 
@@ -1251,10 +1253,11 @@ func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string
 	if a.smserNilable == nil {
 		return phone, nil
 	}
-	_, err = a.genAndSendTokens(nil, ActionVerify, LoginTypePhone, newNum, usrID)
+	otpSt, err := a.genAndSendTokens(nil, ActionVerify, LoginTypePhone, newNum, usrID)
 	if err != nil {
 		return phone, err
 	}
+	phone.OTPStatus = *otpSt
 	return phone, nil
 }
 
@@ -1292,10 +1295,11 @@ func (a *Authentication) updateEmail(usrID string, old VerifLogin, newAddr strin
 	if a.mailerNilable == nil {
 		return email, nil
 	}
-	_, err = a.genAndSendTokens(nil, ActionVerify, LoginTypeEmail, newAddr, usrID)
+	otpSt, err := a.genAndSendTokens(nil, ActionVerify, LoginTypeEmail, newAddr, usrID)
 	if err != nil {
 		return email, err
 	}
+	email.OTPStatus = *otpSt
 	return email, nil
 }
 

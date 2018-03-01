@@ -534,6 +534,13 @@ define({ "api": [
             "optional": false,
             "field": "lastUpdated",
             "description": "<p>ISO8601 date the verifiable login was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "OTPStatus",
+            "description": "<p>The status of a pending verification OTP (if any) for this identifier, see <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
           }
         ]
       }
@@ -1787,6 +1794,13 @@ define({ "api": [
             "optional": false,
             "field": "lastUpdated",
             "description": "<p>ISO8601 date the verifiable login was last updated.</p>"
+          },
+          {
+            "group": "Success 200",
+            "type": "Object",
+            "optional": true,
+            "field": "OTPStatus",
+            "description": "<p>The status of a pending verification OTP (if any) for this identifier, see <a href=\"#api-Objects-OTPStatus\">OTPStatus</a>.</p>"
           }
         ]
       }

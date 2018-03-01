@@ -14,6 +14,8 @@ import (
  * @apiSuccess {Boolean} verified True if this login is verified, false otherwise.
  * @apiSuccess {String} created ISO8601 date the verifiable login was created.
  * @apiSuccess {String} lastUpdated ISO8601 date the verifiable login was last updated.
+ * @apiSuccess {Object} [OTPStatus] The status of a pending verification OTP (if any)
+	for this identifier, see <a href="#api-Objects-OTPStatus">OTPStatus</a>.
  */
 
 /**
@@ -25,12 +27,13 @@ import (
  * @apiUse VerifLogin
  */
 type VerifLogin struct {
-	ID         string `json:"ID,omitempty"`
-	UserID     string `json:"userID,omitempty"`
-	Address    string `json:"value,omitempty"`
-	Verified   bool   `json:"verified"`
-	CreateDate string `json:"created,omitempty"`
-	UpdateDate string `json:"lastUpdated,omitempty"`
+	ID         string     `json:"ID,omitempty"`
+	UserID     string     `json:"userID,omitempty"`
+	Address    string     `json:"value,omitempty"`
+	Verified   bool       `json:"verified"`
+	OTPStatus  *DBTStatus `json:"OTPStatus,omitempty"`
+	CreateDate string     `json:"created,omitempty"`
+	UpdateDate string     `json:"lastUpdated,omitempty"`
 }
 
 func NewVerifLogin(vl *model.VerifLogin) *VerifLogin {
@@ -42,6 +45,7 @@ func NewVerifLogin(vl *model.VerifLogin) *VerifLogin {
 		UserID:     vl.UserID,
 		Address:    vl.Address,
 		Verified:   vl.Verified,
+		OTPStatus:  NewDBTStatus(&vl.OTPStatus),
 		CreateDate: vl.CreateDate.Format(config.TimeFormat),
 		UpdateDate: vl.UpdateDate.Format(config.TimeFormat),
 	}

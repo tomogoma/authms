@@ -7,6 +7,7 @@ type VerifLogin struct {
 	UserID     string
 	Address    string
 	Verified   bool
+	OTPStatus  DBTStatus
 	CreateDate time.Time
 	UpdateDate time.Time
 }

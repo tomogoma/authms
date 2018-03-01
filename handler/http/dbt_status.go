@@ -26,7 +26,7 @@ type DBTStatus struct {
 }
 
 func NewDBTStatus(dbtS *model.DBTStatus) *DBTStatus {
-	if dbtS == nil {
+	if dbtS == nil || !dbtS.HasValue() {
 		return nil
 	}
 	return &DBTStatus{
