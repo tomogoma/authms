@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "Dj+/Vqmxb9pahbBFZ0P0HmUp3qI=",
+			"path": "github.com/badoux/checkmail",
+			"revision": "d0a759655d62bcdc95c50a0676f3e9702ed59453",
+			"revisionTime": "2017-02-03T13:50:05Z"
+		},
+		{
 			"checksumSHA1": "iqKEjY4Grc0IAfPagpbwO0pDSeM=",
 			"path": "github.com/cockroachdb/cockroach-go/crdb",
 			"revision": "c806b484b8611fc587b6abc07f8bb0f7824a78d6",
@@ -337,10 +343,10 @@
 			"revisionTime": "2017-10-19T06:36:46Z"
 		},
 		{
-			"checksumSHA1": "cx76ntX1TqlF8U3z6mmKpZEwIJI=",
+			"checksumSHA1": "BqXoSZ2odOZWs17c55KcFUhv2xY=",
 			"path": "github.com/tomogoma/go-typed-errors",
-			"revision": "d8793eaedeece8bdd362dc69e61f671d1460aed2",
-			"revisionTime": "2018-01-31T11:38:31Z"
+			"revision": "90bfcfeb2851a351d51f490cbc003e0b30c52ce1",
+			"revisionTime": "2018-03-06T11:39:43Z"
 		},
 		{
 			"checksumSHA1": "nearOTzYaEb3YjHKD1nFUF45/QY=",
@@ -425,6 +431,24 @@
 			"path": "golang.org/x/sys/windows",
 			"revision": "d8f5ea21b9295e315e612b4bcf4bedea93454d4d",
 			"revisionTime": "2017-08-03T09:04:06Z"
+		},
+		{
+			"checksumSHA1": "IV4MN7KGBSocu/5NR3le3sxup4Y=",
+			"path": "golang.org/x/text/runes",
+			"revision": "825fc78a2fd6fa0a5447e300189e3219e05e1f25",
+			"revisionTime": "2017-07-19T03:42:41Z"
+		},
+		{
+			"checksumSHA1": "ziMb9+ANGRJSSIuxYdRbA+cDRBQ=",
+			"path": "golang.org/x/text/transform",
+			"revision": "825fc78a2fd6fa0a5447e300189e3219e05e1f25",
+			"revisionTime": "2017-07-19T03:42:41Z"
+		},
+		{
+			"checksumSHA1": "BwRNKgzIMUxk56OScxyr43BV6IE=",
+			"path": "golang.org/x/text/unicode/norm",
+			"revision": "825fc78a2fd6fa0a5447e300189e3219e05e1f25",
+			"revisionTime": "2017-07-19T03:42:41Z"
 		},
 		{
 			"checksumSHA1": "WPEbk80NB3Esdh4Yk0PXr2K7xVU=",

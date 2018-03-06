@@ -106,6 +106,7 @@ type Mailer interface {
 // to construct.
 type Authentication struct {
 	errors.AllErrCheck
+	errors.ErrToHTTP
 	// mandatory parameters
 	db            AuthStore
 	jwter         JWTEr

@@ -1,6 +1,9 @@
 package errors
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
 
 type IsAuthErrChecker interface {
 	IsAuthError(error) bool
@@ -24,12 +27,39 @@ type IsRetryableErrChecker interface {
 	IsRetryableError(error) bool
 }
 
+type IsConflictErrChecker interface {
+	IsConflictError(error) bool
+}
+
 type AllErrChecker interface {
 	IsAuthErrChecker
 	IsNotFoundErrChecker
 	IsNotImplErrChecker
 	IsClErrChecker
 	IsRetryableErrChecker
+	IsConflictErrChecker
+}
+
+type ToHTTPResponser interface {
+	ToHTTPResponse(err error, w http.ResponseWriter) (int, bool)
+}
+
+// ErrToHTTP implements ToHTTPResponser interface. It can be embedded in a struct
+// to give said custom struct the ToHTTPResponse method. e.g:
+//  type Custom struct {
+//      ...
+//      errors.ErrToHTTP
+//  }
+type ErrToHTTP struct {
+}
+
+// ToHTTPResponse attempts to run Error.ToHTTPResponse(w) returning
+// the result if the call was successful, -1 and false otherwise.
+func (e ErrToHTTP) ToHTTPResponse(err error, w http.ResponseWriter) (int, bool) {
+	if err, ok := err.(Error); ok {
+		return err.ToHTTPResponse(w)
+	}
+	return -1, false
 }
 
 // Error implements the Error interface and helps distinguish whether an error
@@ -42,6 +72,7 @@ type Error struct {
 	IsNotFoundErr       bool
 	IsNotImplementedErr bool
 	IsRetryableErr      bool
+	IsConflictErr       bool
 	Data                interface{}
 }
 
@@ -54,6 +85,48 @@ func (e Error) Error() string {
 // Client returns true if this is a client error.
 func (e Error) Client() bool {
 	return e.IsClErr
+}
+
+// ToHTTPResp writes the content of the error to w while setting the HTTP status
+// code to match the type of error received. Returns the HTTP status code
+// assigned and true if error was written, -1 and false otherwise.
+func (e Error) ToHTTPResponse(w http.ResponseWriter) (int, bool) {
+
+	if e.IsAuthErr || e.IsForbiddenErr || e.IsUnauthorizedErr {
+		if e.IsForbiddenErr {
+			http.Error(w, e.Error(), http.StatusForbidden)
+			return http.StatusForbidden, true
+		}
+		http.Error(w, e.Error(), http.StatusUnauthorized)
+		return http.StatusUnauthorized, true
+	}
+
+	if e.IsClErr {
+		http.Error(w, e.Error(), http.StatusBadRequest)
+		return http.StatusBadRequest, true
+	}
+
+	if e.IsNotFoundErr {
+		http.Error(w, e.Error(), http.StatusNotFound)
+		return http.StatusNotFound, true
+	}
+
+	if e.IsNotImplementedErr {
+		http.Error(w, e.Error(), http.StatusNotImplemented)
+		return http.StatusNotImplemented, true
+	}
+
+	if e.IsRetryableErr {
+		http.Error(w, e.Error(), http.StatusServiceUnavailable)
+		return http.StatusServiceUnavailable, true
+	}
+
+	if e.IsConflictErr {
+		http.Error(w, e.Error(), http.StatusConflict)
+		return http.StatusConflict, true
+	}
+
+	return -1, false
 }
 
 // NotImplemented returns true if the functionality requested is not implemented.
@@ -82,10 +155,16 @@ func (e Error) NotFound() bool {
 	return e.IsNotFoundErr
 }
 
-// Retryable returns true if this is error is not permanent and should
+// Retryable returns true if this error is not permanent and should
 // be retried
 func (e Error) Retryable() bool {
 	return e.IsRetryableErr
+}
+
+// Conflict returns true if this error denotes a conflict in resources a la
+// HTTPs 409 error
+func (e Error) Conflict() bool {
+	return e.IsConflictErr
 }
 
 // New creates a new error.
@@ -183,7 +262,18 @@ func NewRetryablef(format string, a ...interface{}) Error {
 	return NewRetryable(data)
 }
 
-// ClErrCheck is a helper struct that can be embedded in a custom struct to
+// NewConflict creates a new Conflict error.
+func NewConflict(data interface{}) Error {
+	return Error{Data: data, IsConflictErr: true}
+}
+
+// NewConflictf creates a new Conflict error with fmt.Printf style formatting.
+func NewConflictf(format string, a ...interface{}) Error {
+	data := fmt.Sprintf(format, a...)
+	return NewConflict(data)
+}
+
+// ClErrCheck implements the ClErrChecker interface. It can be embedded in a custom struct to
 // give the custom struct the extra method IsClientError(err error). e.g:
 //  type Custom struct {
 //      ...
@@ -198,7 +288,7 @@ func (c *ClErrCheck) IsClientError(err error) bool {
 	return ok && errC.Client()
 }
 
-// NotImplErrCheck is a helper struct that can be embedded in a custom struct to
+// NotImplErrCheck implements the NotImplErrChecker interface. It can be embedded in a custom struct to
 // give the custom struct the extra method IsNotFoundError(err error). e.g:
 //  type Custom struct {
 //      ...
@@ -213,7 +303,7 @@ func (c *NotImplErrCheck) IsNotImplementedError(err error) bool {
 	return ok && errC.NotImplemented()
 }
 
-// AuthErrCheck is a helper struct that can be embedded in a custom struct to
+// AuthErrCheck implements the AuthErrChecker interface. It can be embedded in a custom struct to
 // give the custom struct the extra methods IsAuthError(err error),
 // IsForbiddenError(err error) and IsUnauthorizedErr(err error) . e.g:
 //  type Custom struct {
@@ -244,8 +334,9 @@ func (c *AuthErrCheck) IsUnauthorizedError(err error) bool {
 	return ok && errC.Unauthorized()
 }
 
-// NotFoundErrCheck is a helper struct that can be embedded in a custom struct to
-// give the custom struct the extra method IsNotFoundError(err error). e.g:
+// NotFoundErrCheck implements the NotFoundErrChecker interface. It can be
+// embedded in a custom struct to give the custom struct the extra
+// method IsNotFoundError(err error). e.g:
 //  type Custom struct {
 //      ...
 //      errors.NotFoundErrCheck
@@ -259,7 +350,7 @@ func (c *NotFoundErrCheck) IsNotFoundError(err error) bool {
 	return ok && errC.NotFound()
 }
 
-// RetryableErrCheck is a helper struct that can be embedded in a custom struct to
+// RetryableErrCheck implements the RetryableErrChecker interface. It can be embedded in a custom struct to
 // give the custom struct the extra method IsRetryableError(err error). e.g:
 //  type Custom struct {
 //      ...
@@ -274,7 +365,22 @@ func (c *RetryableErrCheck) IsRetryableError(err error) bool {
 	return ok && errC.Retryable()
 }
 
-// AllErrCheck is a helper struct that can be embedded in a custom struct to
+// ConflictErrCheck implements the ConflictErrChecker interface. It can be embedded in a custom struct to
+// give the custom struct the extra method IsConflictError(err error). e.g:
+//  type Custom struct {
+//      ...
+//      errors.ConflictErrCheck
+//  }
+type ConflictErrCheck struct {
+}
+
+// IsConflictError returns true if the supplied error is a Conflict error, false otherwise.
+func (c *ConflictErrCheck) IsConflictError(err error) bool {
+	errC, ok := err.(Error)
+	return ok && errC.Conflict()
+}
+
+// AllErrCheck implements the AllErrChecker interface. It can be embedded in a custom struct to
 // give said custom struct the extra Is...Error(err error) methods. e.g:
 //  type Custom struct {
 //      ...
@@ -286,4 +392,5 @@ type AllErrCheck struct {
 	NotImplErrCheck
 	ClErrCheck
 	RetryableErrCheck
+	ConflictErrCheck
 }

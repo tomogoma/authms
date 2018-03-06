@@ -13,13 +13,13 @@ import (
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/model"
-	errors "github.com/tomogoma/go-typed-errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 type contextKey string
 
 type Auth interface {
-	errors.AllErrChecker
+	errors.ToHTTPResponser
 
 	RegisterFirst(loginType, userType, id string, secret []byte) (*model.User, error)
 	CanRegisterFirst() (bool, error)
@@ -734,32 +734,14 @@ func (s *handler) handleError(w http.ResponseWriter, r *http.Request, reqData in
 	reqDataB, _ := json.Marshal(reqData)
 	log := r.Context().Value(ctxKeyLog).(logging.Logger).
 		WithField(logging.FieldRequest, string(reqDataB))
-	if s.auth.IsAuthError(err) || s.IsAuthError(err) {
-		if s.auth.IsForbiddenError(err) || s.IsForbiddenError(err) {
-			log.Warnf("Forbidden: %v", err)
-			http.Error(w, err.Error(), http.StatusForbidden)
-		} else {
-			log.Warnf("Unauthorized: %v", err)
-			http.Error(w, err.Error(), http.StatusUnauthorized)
-		}
+
+	if code, ok := s.auth.ToHTTPResponse(err, w); ok {
+		log.WithField(logging.FieldResponseCode, code).Warn(err)
 		return
 	}
-	if s.auth.IsClientError(err) || s.IsClientError(err) {
-		log.Warnf("Bad request: %v", err)
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	if s.auth.IsNotFoundError(err) || s.IsNotFoundError(err) {
-		log.Warnf("Not found: %v", err)
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	if s.auth.IsNotImplementedError(err) || s.IsNotImplementedError(err) {
-		log.Warnf("Not implemented entity: %v", err)
-		http.Error(w, err.Error(), http.StatusNotImplemented)
-		return
-	}
-	log.Errorf("Internal error: %v", err)
+
+	log.WithField(logging.FieldResponseCode, http.StatusInternalServerError).
+		Error(err)
 	http.Error(w, internalErrorMessage, http.StatusInternalServerError)
 }
 
