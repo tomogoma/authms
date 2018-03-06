@@ -17,6 +17,11 @@ import (
 	"strconv"
 	"github.com/ttacon/libphonenumber"
 	"fmt"
+	"golang.org/x/text/unicode/norm"
+	"unicode"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/runes"
+	"github.com/badoux/checkmail"
 )
 
 type AuthStore interface {
@@ -709,8 +714,16 @@ func (a *Authentication) Login(loginType, identifier string, password []byte) (*
 		}
 		usr, passHB, err = a.db.UserByPhone(identifier)
 	case LoginTypeEmail:
+		identifier, err := normalizeValidEmail(identifier)
+		if err != nil {
+			return nil, errorBadCreds
+		}
 		usr, passHB, err = a.db.UserByEmail(identifier)
 	case LoginTypeUsername:
+		identifier, err := normalizeValidUsername(identifier)
+		if err != nil {
+			return nil, errors.Newf("normalize username: %v", err)
+		}
 		usr, passHB, err = a.db.UserByUsername(identifier)
 	case LoginTypeFacebook:
 		return a.loginFacebook(identifier)
@@ -819,6 +832,7 @@ func (a *Authentication) preparePrerequisiteGroups() ([]Group, error) {
 
 func (a *Authentication) usrIdentifierAvail(loginType, addr string, fetchErr error) error {
 	if fetchErr == nil {
+		// TODO change this to a 409 style Conflict error
 		return errors.NewClientf("(%s) %s not available", loginType, addr)
 	}
 	if !a.db.IsNotFoundError(fetchErr) {
@@ -1101,10 +1115,11 @@ func (a *Authentication) registerOther(regerLrgstGrp Group, userType, groupID, i
 }
 
 func (a *Authentication) regUsernameConditions(username string) (string, error) {
-	if username == "" {
-		return "", errors.NewClient("username cannot be empty")
+	username, err := normalizeValidUsername(username)
+	if err != nil {
+		return "", errors.NewClient(err)
 	}
-	_, _, err := a.db.UserByUsername(username)
+	_, _, err = a.db.UserByUsername(username)
 	return username, a.usrIdentifierAvail(LoginTypeUsername, username, err)
 }
 
@@ -1155,10 +1170,11 @@ func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *Us
 }
 
 func (a *Authentication) regEmailConditions(email string) (string, error) {
-	if email == "" {
-		return "", errors.NewClient("email address cannot be empty")
+	email, err := normalizeValidEmail(email)
+	if err != nil {
+		return "", errors.NewClient(err)
 	}
-	_, _, err := a.db.UserByEmail(email)
+	_, _, err = a.db.UserByEmail(email)
 	return email, a.usrIdentifierAvail(LoginTypeEmail, email, err)
 }
 
@@ -1212,12 +1228,8 @@ func (a *Authentication) updateUsername(usrID, newUsrName string) (*Username, er
 
 func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string) (*VerifLogin, error) {
 
-	newNum, err := formatValidPhone(newNum)
+	newNum, err := a.regPhoneConditions(newNum)
 	if err != nil {
-		return nil, errors.NewClient(err)
-	}
-	_, _, err = a.db.UserByPhone(newNum)
-	if err = a.usrIdentifierAvail(LoginTypePhone, newNum, err); err != nil {
 		return nil, err
 	}
 
@@ -1258,8 +1270,8 @@ func (a *Authentication) updatePhone(usrID string, old VerifLogin, newNum string
 
 func (a *Authentication) updateEmail(usrID string, old VerifLogin, newAddr string) (*VerifLogin, error) {
 
-	_, _, err := a.db.UserByEmail(newAddr)
-	if err = a.usrIdentifierAvail(LoginTypeEmail, newAddr, err); err != nil {
+	newAddr, err := a.regEmailConditions(newAddr)
+	if err != nil {
 		return nil, err
 	}
 
@@ -1578,6 +1590,38 @@ func inStrs(needle string, haystack []string) bool {
 		}
 	}
 	return false
+}
+
+type MnSet struct {
+}
+
+func (s MnSet) Contains(r rune) bool {
+	return unicode.Is(unicode.Mn, r) // Mn: nonspacing marks
+}
+
+func normalizeValidUsername(un string) (string, error) {
+	if un == "" {
+		return "", errors.Newf("username cannot be empty")
+	}
+	un = strings.ToLower(un)
+	t := transform.Chain(norm.NFD, runes.Remove(MnSet{}), norm.NFC)
+	un, _, err := transform.String(t, un)
+	return un, err
+}
+
+func normalizeValidEmail(addr string) (string, error) {
+	addr = strings.ToLower(addr)
+	if err := checkmail.ValidateFormat(addr); err != nil {
+		return "", errors.Newf("invalid email format: %v", err)
+	}
+	if err := checkmail.ValidateHost(addr); err != nil {
+		return "", errors.Newf("invalid email: %v", err)
+	}
+	i := strings.LastIndex(addr, "@")
+	if strings.Contains(addr[:i], "+") || strings.Contains(addr[:i], ".") {
+		return "", errors.Newf("The + and . characters are not allowed in email usernames")
+	}
+	return addr, nil
 }
 
 func formatValidPhone(n string) (string, error) {
