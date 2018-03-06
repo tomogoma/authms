@@ -833,8 +833,7 @@ func (a *Authentication) preparePrerequisiteGroups() ([]Group, error) {
 
 func (a *Authentication) usrIdentifierAvail(loginType, addr string, fetchErr error) error {
 	if fetchErr == nil {
-		// TODO change this to a 409 style Conflict error
-		return errors.NewClientf("(%s) %s not available", loginType, addr)
+		return errors.NewConflictf("(%s) %s not available", loginType, addr)
 	}
 	if !a.db.IsNotFoundError(fetchErr) {
 		return errors.Newf("user by %s: %v", loginType, fetchErr)
