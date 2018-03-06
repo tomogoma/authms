@@ -7,17 +7,21 @@ import (
 
 	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/model"
-	errors "github.com/tomogoma/go-typed-errors"
+	"github.com/tomogoma/go-typed-errors"
+	"github.com/tomogoma/authms/smtp"
 )
 
 type DBMock struct {
 	errors.NotFoundErrCheck
 
-	ExpInsGrpErr error
-	ExpGrpBNm    *model.Group
-	ExpGrpBNmErr error
-	ExpGrp       *model.Group
-	ExpGrpErr    error
+	ExpInsGrpErr    error
+	ExpGrpBNm       *model.Group
+	ExpGrpBNmErr    error
+	ExpGrp          *model.Group
+	ExpGrpErr       error
+	ExpGrps         []model.Group
+	ExpGrpsErr      error
+	ExpSetUsrGrpErr error
 
 	ExpInsUsrTypErr error
 	ExpUsrTypBNm    *model.UserType
@@ -37,6 +41,8 @@ type DBMock struct {
 	ExpUsrBFbErr    error
 	ExpUsrBDev      *model.User
 	ExpUsrBDevErr   error
+	ExpUsrs         []model.User
+	ExpUsrsErr      error
 
 	ExpupdPassErr    error
 	ExpupdPassAtmErr error
@@ -70,6 +76,8 @@ type DBMock struct {
 	ExpInsPhnTknAtmErr error
 	ExpPhnTkns         []model.DBToken
 	ExpPhnTknsErr      error
+	ExpDelPhnTknsErr   error
+	ExpSetPhnTknUsdErr error
 
 	ExpInsUsrMailErr    error
 	ExpInsUsrMailAtmErr error
@@ -82,11 +90,13 @@ type DBMock struct {
 	ExpInsMailTknAtmErr error
 	ExpMailTkns         []model.DBToken
 	ExpMailTknsErr      error
+	ExpDelMailTknsErr   error
+	ExpSetMailTknUsdErr error
 
 	ExpInsFbAtmErr error
 
 	ExpUpsSMTPConfErr error
-	ExpSMTPConf       model.SMTPConfig
+	ExpSMTPConf       smtp.Config
 	ExpSMTPConfErr    error
 
 	ExpHasUsrsErr error
@@ -144,6 +154,14 @@ func (db *DBMock) Group(string) (*model.Group, error) {
 	return db.ExpGrp, db.ExpGrpErr
 }
 
+func (db *DBMock) Groups(offset, count int64) ([]model.Group, error) {
+	return db.ExpGrps, db.ExpGrpsErr
+}
+
+func (db *DBMock) SetUserGroup(userID, groupID string) error {
+	return db.ExpSetUsrGrpErr
+}
+
 func (db *DBMock) InsertGroup(name string, acl float32) (*model.Group, error) {
 	if db.isInTx {
 		return nil, errors.Newf("direct db call while in tx")
@@ -178,11 +196,15 @@ func (db *DBMock) InsertUserType(name string) (*model.UserType, error) {
 	return &model.UserType{ID: currentID(), Name: name}, db.ExpInsUsrTypErr
 }
 
-func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, password []byte) (*model.User, error) {
+func (db *DBMock) InsertUserAtomic(tx *sql.Tx, t model.UserType, g model.Group, password []byte) (*model.User, error) {
 	if db.ExpInsUsrAtmErr != nil {
 		return nil, db.ExpInsUsrAtmErr
 	}
 	return &model.User{ID: currentID(), Type: t}, db.ExpInsUsrAtmErr
+}
+
+func (db *DBMock) Users(q model.UsersQuery, offset, count int64) ([]model.User, error) {
+	return db.ExpUsrs, db.ExpUsrsErr
 }
 
 func (db *DBMock) APIKeysByUserID(userID string, offset, count int64) ([]api.Key, error) {
@@ -267,6 +289,14 @@ func (db *DBMock) InsertUserPhone(userID, phone string, verified bool) (*model.V
 	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: phone, Verified: verified}, db.ExpInsUsrPhnErr
 }
 
+func (db *DBMock) DeletePhoneTokensAtomic(tx *sql.Tx, phone string) error {
+	return db.ExpDelPhnTknsErr
+}
+
+func (db *DBMock) SetPhoneTokenUsedAtomic(tx *sql.Tx, id string) error {
+	return db.ExpSetPhnTknUsdErr
+}
+
 func (db *DBMock) InsertUserEmail(userID, email string, verified bool) (*model.VerifLogin, error) {
 	if db.isInTx {
 		return nil, errors.Newf("direct db call while in tx")
@@ -275,6 +305,14 @@ func (db *DBMock) InsertUserEmail(userID, email string, verified bool) (*model.V
 		return nil, db.ExpInsUsrMailErr
 	}
 	return &model.VerifLogin{ID: currentID(), UserID: userID, Address: email, Verified: verified}, db.ExpInsUsrMailErr
+}
+
+func (db *DBMock) DeleteEmailTokensAtomic(tx *sql.Tx, email string) error {
+	return db.ExpDelMailTknsErr
+}
+
+func (db *DBMock) SetEmailTokenUsedAtomic(tx *sql.Tx, id string) error {
+	return db.ExpSetMailTknUsdErr
 }
 
 func (db *DBMock) InsertUserName(userID, username string) (*model.Username, error) {
