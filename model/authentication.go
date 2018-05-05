@@ -1461,29 +1461,29 @@ func (a *Authentication) getOrCreateUserType(name string) (*UserType, error) {
 func (a *Authentication) user(loginType, identifier string) (usr *User, passH []byte, err error) {
 	switch loginType {
 	case LoginTypePhone:
-		identifier, err := formatValidPhone(identifier)
+		identifier, err = formatValidPhone(identifier)
 		if err != nil {
 			return nil, nil, errors.NewClient(err)
 		}
 		usr, passH, err = a.db.UserByPhone(identifier)
 	case LoginTypeEmail:
-		identifier, err := normalizeValidEmail(identifier)
+		identifier, err = normalizeValidEmail(identifier)
 		if err != nil {
 			return nil, nil, errors.NewClient(err)
 		}
 		usr, passH, err = a.db.UserByEmail(identifier)
 	case LoginTypeUsername:
-		identifier, err := normalizeValidUsername(identifier)
+		identifier, err = normalizeValidUsername(identifier)
 		if err != nil {
 			return nil, nil, errors.NewClient(err)
 		}
 		usr, passH, err = a.db.UserByUsername(identifier)
 	case LoginTypeFacebook:
-		fbID, err := a.validateFbToken(identifier)
+		identifier, err = a.validateFbToken(identifier)
 		if err != nil {
 			return nil, nil, errors.NewForbidden("invalid facebook token")
 		}
-		usr, err = a.db.UserByFacebook(fbID)
+		usr, err = a.db.UserByFacebook(identifier)
 		passH = make([]byte, 0)
 	default:
 		return nil, nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
