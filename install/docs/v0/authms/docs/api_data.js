@@ -1230,6 +1230,68 @@ define({ "api": [
     }
   },
   {
+    "type": "POST",
+    "url": "/users/id",
+    "title": "get user ID",
+    "description": "<p>Get user's ID. See <a href=\"#api-Auth-Register\">Register</a> for loginType options.</p>",
+    "name": "UserID",
+    "version": "0.1.0",
+    "group": "Auth",
+    "header": {
+      "fields": {
+        "Header": [
+          {
+            "group": "Header",
+            "optional": false,
+            "field": "x-api-key",
+            "description": "<p>the api key</p>"
+          }
+        ]
+      }
+    },
+    "parameter": {
+      "fields": {
+        "JSON Body": [
+          {
+            "group": "JSON Body",
+            "type": "String",
+            "allowedValues": [
+              "usernames",
+              "emails",
+              "phones",
+              "facebook"
+            ],
+            "optional": false,
+            "field": "loginType",
+            "description": "<p>type of identifier in identifier field.</p>"
+          },
+          {
+            "group": "JSON Body",
+            "type": "String",
+            "optional": false,
+            "field": "identifier",
+            "description": "<p>loginType's identifier e.g. email address, phone, username etc.</p>"
+          }
+        ]
+      }
+    },
+    "success": {
+      "fields": {
+        "200": [
+          {
+            "group": "200",
+            "type": "String",
+            "optional": false,
+            "field": "userID",
+            "description": "<p>the unique ID of this user in the system.</p>"
+          }
+        ]
+      }
+    },
+    "filename": "handler/http/handler.go",
+    "groupTitle": "Auth"
+  },
+  {
     "type": "GET",
     "url": "/users/:userID/:loginType/verify/:OTP",
     "title": "Verify OTP",
