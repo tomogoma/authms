@@ -15,7 +15,7 @@ import (
 	"github.com/tomogoma/go-commons/auth/token"
 	configH "github.com/tomogoma/go-commons/config"
 	"github.com/tomogoma/go-commons/database/cockroach"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 )
 

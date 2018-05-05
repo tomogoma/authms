@@ -8,7 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 type AuthMock struct {

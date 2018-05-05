@@ -3,7 +3,7 @@ package config
 import (
 	"io/ioutil"
 	"gopkg.in/yaml.v2"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 func ReadYamlConfig(confFile string, conf interface{}) error {

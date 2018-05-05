@@ -11,7 +11,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 type contextKey string

@@ -8,7 +8,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 const (

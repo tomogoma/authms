@@ -14,7 +14,7 @@ import (
 	"github.com/tomogoma/authms/model"
 	"github.com/tomogoma/authms/proto/authms"
 	"github.com/tomogoma/go-commons/database/cockroach"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 )
 

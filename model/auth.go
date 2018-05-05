@@ -12,7 +12,7 @@ import (
 	"github.com/tomogoma/authms/generator"
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/proto/authms"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 	"golang.org/x/crypto/bcrypt"
 )
 

@@ -4,7 +4,7 @@ package token
 import (
 	"io/ioutil"
 	jwt "github.com/dgrijalva/jwt-go"
-	"github.com/tomogoma/go-commons/errors"
+	"github.com/tomogoma/go-typed-errors"
 )
 
 type KeyFiler interface {
