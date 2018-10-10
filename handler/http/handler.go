@@ -42,6 +42,7 @@ type Auth interface {
 
 	Users(JWT string, q model.UsersQuery, offset, count string) ([]model.User, error)
 	GetUserDetails(JWT, userID string) (*model.User, error)
+	UserID(loginType, identifier string) (string, error)
 	SetUserGroup(JWT, userID, groupID string) (*model.User, error)
 
 	Groups(JWT, offset, count string) ([]model.Group, error)
@@ -133,6 +134,10 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/groups").
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleGroups)))
+
+	r.PathPrefix("/users/id").
+		Methods(http.MethodPost).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleIDFetch)))
 
 	r.PathPrefix("/users/{" + keyUserID + "}/set_group/{" + keyGroupID + "}").
 		Methods(http.MethodPost).
@@ -483,8 +488,6 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
  *
  * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in Authorization header.
  *
- * @apiParam (URL Parameters) {String=usernames,emails,phones,facebook} loginType type of identifier in JSON Body
- *
  * @apiUse User
  *
  */
@@ -505,6 +508,36 @@ func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	usr, err := s.auth.Login(req.LT, req.Identifier, []byte(secret))
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
+}
+
+/**
+ * @api {POST} /users/id get user ID
+ * @apiDescription Get user's ID.
+ * See <a href="#api-Auth-Register">Register</a> for loginType options.
+ * @apiName UserID
+ * @apiVersion 0.1.0
+ * @apiGroup Auth
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (JSON Body) {String=usernames,emails,phones,facebook} loginType type of identifier in identifier field.
+ * @apiParam (JSON Body) {String} identifier loginType's identifier e.g. email address, phone, username etc.
+ *
+ * @apiSuccess (200) {String} userID the unique ID of this user in the system.
+ *
+ */
+func (s *handler) handleIDFetch(w http.ResponseWriter, r *http.Request) {
+	req := struct {
+		LT         string `json:"loginType"`
+		Identifier string `json:"identifier"`
+	}{}
+	if !s.unmarshalJSONOrRespondError(w, r, &req) {
+		return
+	}
+	usrID, err := s.auth.UserID(req.LT, req.Identifier)
+	s.respondOn(w, r, req, &struct {
+		UserID string `json:"userID,omitempty"`
+	}{UserID: usrID}, http.StatusOK, err)
 }
 
 /**

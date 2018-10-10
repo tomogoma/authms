@@ -700,46 +700,33 @@ func (a *Authentication) VerifyDBT(loginType, userID string, dbt []byte) (*Verif
 	return a.verifyDBT(loginType, userID, dbt)
 }
 
+func (a *Authentication) UserID(loginType, identifier string) (string, error) {
+	usr, _, err := a.user(loginType, identifier)
+	if err != nil {
+		if a.IsClientError(err) || a.IsNotFoundError(err) {
+			return "", err
+		}
+		return "", errors.Newf("get user by %s: %v", loginType, err)
+	}
+	return usr.ID, nil
+}
+
 // Login validates a user's credentials and returns the user's information
 // together with a JWT for subsequent requests to this and other micro-services.
 func (a *Authentication) Login(loginType, identifier string, password []byte) (*User, error) {
-	var usr *User
-	var passHB []byte
-	var err error
 
-	switch loginType {
-	case LoginTypePhone:
-		identifier, err := formatValidPhone(identifier)
-		if err != nil {
-			return nil, errorBadCreds
-		}
-		usr, passHB, err = a.db.UserByPhone(identifier)
-	case LoginTypeEmail:
-		identifier, err := normalizeValidEmail(identifier)
-		if err != nil {
-			return nil, errorBadCreds
-		}
-		usr, passHB, err = a.db.UserByEmail(identifier)
-	case LoginTypeUsername:
-		identifier, err := normalizeValidUsername(identifier)
-		if err != nil {
-			return nil, errors.Newf("normalize username: %v", err)
-		}
-		usr, passHB, err = a.db.UserByUsername(identifier)
-	case LoginTypeFacebook:
-		return a.loginFacebook(identifier)
-	default:
-		return nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
-	}
+	usr, passHB, err := a.user(loginType, identifier)
 	if err != nil {
-		if a.db.IsNotFoundError(err) {
+		if a.IsClientError(err) || a.IsNotFoundError(err) {
 			return nil, errorBadCreds
 		}
 		return nil, errors.Newf("get user by %s: %v", loginType, err)
 	}
 
-	if err := passwordValid(passHB, password); err != nil {
-		return nil, err
+	if loginType != LoginTypeFacebook {
+		if err := passwordValid(passHB, password); err != nil {
+			return nil, err
+		}
 	}
 
 	usr.JWT, err = a.jwter.Generate(newJWTClaim(usr.ID, usr.Group))
@@ -1466,22 +1453,47 @@ func (a *Authentication) getOrCreateUserType(name string) (*UserType, error) {
 	return ut, nil
 }
 
-func (a *Authentication) loginFacebook(fbToken string) (*User, error) {
-	if a.fbNilable == nil {
-		return nil, errorFbNotAvail
+// user fetches the user and password hash (if applicable) for the provided parameters.
+// The passH will be non-nil empty if not applicable and successful.
+// It returns a ClientError if the identifier is badly formatted, a NotFoundError if
+// none was found, a ForbiddenError if the loginType was was facebook and the token
+// was invalid or a general error if something went wrong during fetch.
+func (a *Authentication) user(loginType, identifier string) (usr *User, passH []byte, err error) {
+	switch loginType {
+	case LoginTypePhone:
+		identifier, err = formatValidPhone(identifier)
+		if err != nil {
+			return nil, nil, errors.NewClient(err)
+		}
+		usr, passH, err = a.db.UserByPhone(identifier)
+	case LoginTypeEmail:
+		identifier, err = normalizeValidEmail(identifier)
+		if err != nil {
+			return nil, nil, errors.NewClient(err)
+		}
+		usr, passH, err = a.db.UserByEmail(identifier)
+	case LoginTypeUsername:
+		identifier, err = normalizeValidUsername(identifier)
+		if err != nil {
+			return nil, nil, errors.NewClient(err)
+		}
+		usr, passH, err = a.db.UserByUsername(identifier)
+	case LoginTypeFacebook:
+		identifier, err = a.validateFbToken(identifier)
+		if err != nil {
+			return nil, nil, errors.NewForbidden("invalid facebook token")
+		}
+		usr, err = a.db.UserByFacebook(identifier)
+		passH = make([]byte, 0)
+	default:
+		return nil, nil, errors.NewClientf(loginTypeNotSupportedErrorF, loginType)
 	}
-	fbID, err := a.validateFbToken(fbToken)
-	if err != nil {
-		return nil, err
-	}
-	usr, err := a.db.UserByFacebook(fbID)
 	if err != nil {
 		if a.db.IsNotFoundError(err) {
-			return nil, errors.NewNotFound("facebook user not registered")
+			return nil, nil, errors.NewNotFound("user does not exist")
 		}
-		return nil, errors.Newf("get user by facebook ID: %v", err)
 	}
-	return usr, nil
+	return
 }
 
 func (a *Authentication) validateFbToken(fbToken string) (string, error) {
