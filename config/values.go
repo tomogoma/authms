@@ -41,6 +41,9 @@ type SMS struct {
 	Twilio         Twilio         `json:"twilio" yaml:"twilio"`
 	AfricasTalking AfricasTalking `json:"africasTalking" yaml:"africasTalking"`
 	MessageBird    MessageBird    `json:"messageBird" yaml:"messageBird"`
+	InvitationTpl  string         `json:"invitationTpl,omitempty" yaml:"invitationTpl,omitempty"`
+	ResetPWDTpl    string         `json:"resetPwdTpl,omitempty" yaml:"resetPwdTpl,omitempty"`
+	VerifyTpl      string         `json:"verifyTpl,omitempty" yaml:"verifyTpl,omitempty"`
 }
 
 type Facebook struct {
@@ -70,6 +73,9 @@ type SMTP struct {
 	TestEmail     string `json:"testEmail" yaml:"testEmail"`
 	CreatedAt     string `json:"createdAt,omitempty" yaml:"createdAt,omitempty"`
 	UpdatedAt     string `json:"updatedAt,omitempty" yaml:"updatedAt,omitempty"`
+	InvitationTpl string `json:"invitationTpl,omitempty" yaml:"invitationTpl,omitempty"`
+	ResetPWDTpl   string `json:"resetPwdTpl,omitempty" yaml:"resetPwdTpl,omitempty"`
+	VerifyTpl     string `json:"verifyTpl,omitempty" yaml:"verifyTpl,omitempty"`
 }
 
 type General struct {

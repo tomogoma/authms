@@ -161,6 +161,13 @@ SMTP:
   # testEmail the email address to be used for testing
   testEmail:
 
+  # invitationTpl is the template file to use while sending an invitation SMS.
+  invitationTpl:
+  # resetPwdTpl is the template file to use while sending reset password SMS.
+  resetPwdTpl:
+  # verifyTpl is the template file to use while sending a one time password (OTP) via SMS.
+  verifyTpl:
+
 
 # sms - configuration values for sending SMSes via an API.
 # The templates for different message types can be found in
@@ -177,6 +184,12 @@ sms:
   # startup and while running tests.
   testNumber:
 
+  # invitationTpl is the template file to use while sending an invitation SMS.
+  invitationTpl:
+  # resetPwdTpl is the template file to use while sending reset password SMS.
+  resetPwdTpl:
+  # verifyTpl is the template file to use while sending a one time password (OTP) via SMS.
+  verifyTpl:
 
   # twilio - configuration values for using twilio as the activeAPI
   # configuration values can be found in https://www.twilio.com/console

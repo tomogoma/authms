@@ -170,6 +170,25 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	emailCl := InstantiateSMTP(rdb, lg, conf.SMTP)
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
+	if conf.SMTP.InvitationTpl != "" {
+		authOpts = append(authOpts, model.WithEmailInviteTplt(template.ParseFiles(conf.SMTP.InvitationTpl)))
+	}
+	if conf.SMS.InvitationTpl != "" {
+		authOpts = append(authOpts, model.WithPhoneInviteTplt(template.ParseFiles(conf.SMS.InvitationTpl)))
+	}
+	if conf.SMTP.ResetPWDTpl != "" {
+		authOpts = append(authOpts, model.WithEmailResetPassTplt(template.ParseFiles(conf.SMTP.ResetPWDTpl)))
+	}
+	if conf.SMS.ResetPWDTpl != "" {
+		authOpts = append(authOpts, model.WithPhoneResetPassTplt(template.ParseFiles(conf.SMS.ResetPWDTpl)))
+	}
+	if conf.SMTP.VerifyTpl != "" {
+		authOpts = append(authOpts, model.WithEmailVerifyTplt(template.ParseFiles(conf.SMTP.VerifyTpl)))
+	}
+	if conf.SMS.VerifyTpl != "" {
+		authOpts = append(authOpts, model.WithPhoneVerifyTplt(template.ParseFiles(conf.SMS.VerifyTpl)))
+	}
+
 	srvcURL := path.Join(conf.Service.URL, config.WebRootURL())
 	authOpts = append(
 		authOpts,
