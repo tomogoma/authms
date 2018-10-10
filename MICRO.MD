@@ -50,7 +50,13 @@ used.
     - Lack or misconfiguration of this will not stop the micro-service
      from starting, but requests will yield internal server errors until
      a connection to the db is established.
+
 1. Start consul
+   ```
+   consul agent -dev
+   ```
+   More here: https://www.consul.io/intro/getting-started/agent.html
+
 1. **Recommended**: Start micro api with the proxy handler for access to the http API.
     ```
     micro api --handler=proxy
