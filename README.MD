@@ -28,7 +28,7 @@ yields
 
 Refer to the respective readme files for instructions:
 
-1. [Using micro](MICRO.MD)
+1. [Using micro or standalone service](MICRO.MD)
 2. [Deploy to Google AppEngine](cmd/gcloud/README.MD)
 
 ## Manual build
