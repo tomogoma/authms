@@ -11,17 +11,17 @@ import (
 
 	"reflect"
 
+	"fmt"
+	"github.com/badoux/checkmail"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/tomogoma/go-typed-errors"
-	"golang.org/x/crypto/bcrypt"
-	"strconv"
 	"github.com/ttacon/libphonenumber"
-	"fmt"
-	"golang.org/x/text/unicode/norm"
-	"unicode"
-	"golang.org/x/text/transform"
+	"golang.org/x/crypto/bcrypt"
 	"golang.org/x/text/runes"
-	"github.com/badoux/checkmail"
+	"golang.org/x/text/transform"
+	"golang.org/x/text/unicode/norm"
+	"strconv"
+	"unicode"
 )
 
 type AuthStore interface {
@@ -1152,8 +1152,11 @@ func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *Us
 		return nil
 	}
 	otpSt, err := a.genAndSendTokens(tx, actionType, LoginTypePhone, number, usr.ID)
+	if err != nil {
+		return err
+	}
 	usr.Phone.OTPStatus = *otpSt
-	return err
+	return nil
 }
 
 func (a *Authentication) regEmailConditions(email string) (string, error) {
@@ -1175,8 +1178,11 @@ func (a *Authentication) regEmail(tx *sql.Tx, actionType, address string, usr *U
 		return nil
 	}
 	otpSt, err := a.genAndSendTokens(tx, actionType, LoginTypeEmail, address, usr.ID)
+	if err != nil {
+		return err
+	}
 	usr.Email.OTPStatus = *otpSt
-	return err
+	return nil
 }
 
 func (a *Authentication) regFacebookConditions(fbToken string) (string, error) {
