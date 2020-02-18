@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"fmt"
 	"io/ioutil"
+	"net/url"
 	"os"
 
 	"html/template"
@@ -189,12 +190,15 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 		authOpts = append(authOpts, model.WithPhoneVerifyTplt(template.ParseFiles(conf.SMS.VerifyTpl)))
 	}
 
-	srvcURL := path.Join(conf.Service.URL, config.WebRootURL())
+	srvcURL, err := url.Parse(conf.Service.URL)
+	logging.LogFatalOnError(lg, err, "Parse service URL")
+	srvcURL.Path = path.Join(srvcURL.Path, config.WebRootURL())
+
 	authOpts = append(
 		authOpts,
 		model.WithAppName(conf.Service.AppName),
 		model.WithWebAppURL(conf.Service.WebAppURL),
-		model.WithServiceURL(srvcURL),
+		model.WithServiceURL(srvcURL.String()),
 		model.WithDevLockedToUser(conf.Authentication.LockDevsToUsers),
 		model.WithSelfRegAllowed(conf.Authentication.AllowSelfReg),
 		model.WithVerifyEmailHost(conf.Authentication.VerifyEmailHosts),
