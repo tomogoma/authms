@@ -18,22 +18,26 @@ func main() {
 
 	flag.Parse()
 
-	log := &logrus.Wrapper{}
-	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confPath, log)
+	logWrapper := &logrus.Wrapper{}
+	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confPath, logWrapper)
 
-	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, log,
-		conf.Service.WebAppURL, conf.Service.AllowedOrigins)
-	logging.LogFatalOnError(log, err, "Instantiate http Handler")
+	listenNSrvLg := logWrapper.WithField(logging.FieldAction, "Listen and serve")
 
 	srvURL, err := url.Parse(conf.Service.URL)
-	logging.LogFatalOnError(log, err, "parse service URL")
-
+	logging.LogFatalOnError(listenNSrvLg, err, "parse service URL")
 	port := ":" + srvURL.Port()
 	if len(port) == 1 {
 		port = ":8080"
 	}
+
+	listenNSrvLg.Infof("Will listen on '%s'", port)
+
+	httpHandler, err := httpInternal.NewHandler(authentication, APIGuard, listenNSrvLg,
+		conf.Service.WebAppURL, conf.Service.AllowedOrigins)
+	logging.LogFatalOnError(listenNSrvLg, err, "Instantiate http Handler")
+
 	logging.LogFatalOnError(
-		log,
+		listenNSrvLg,
 		http.ListenAndServe(port, httpHandler),
 		"Run server",
 	)
