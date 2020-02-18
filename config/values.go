@@ -57,6 +57,7 @@ type Auth struct {
 	Facebook           Facebook      `json:"facebook,omitempty" yaml:"facebook"`
 	BlackListFailCount int           `json:"blackListFailCount" yaml:"blackListFailCount"`
 	BlacklistWindow    time.Duration `json:"blacklistWindow" yaml:"blacklistWindow"`
+	VerifyEmailHosts   bool          `json:"verifyEmailHosts" yaml:"verifyEmailHosts"`
 }
 
 type JWT struct {

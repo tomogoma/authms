@@ -111,6 +111,10 @@ authentication:
   # with the same device.
   lockDevsToUsers: false
 
+  # verifyEmailHosts - is a boolean flag. Setting this to true enforces
+  # the verification that the email address being provided has a real
+  # mail server host.
+  verifyEmailHosts: true
 
   # facebook - configuration values for OAuth based authentication using facebook.
   # The values can be found in the app's dashboard in https://developers.facebook.com/apps

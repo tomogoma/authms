@@ -108,13 +108,14 @@ type Authentication struct {
 	errors.AllErrCheck
 	errors.ErrToHTTP
 	// mandatory parameters
-	db            AuthStore
-	jwter         JWTEr
-	passGen       SecureRandomByteser
-	numGen        SecureRandomByteser
-	urlTokenGen   SecureRandomByteser
-	lockDevToUser bool
-	allowSelfReg  bool
+	db              AuthStore
+	jwter           JWTEr
+	passGen         SecureRandomByteser
+	numGen          SecureRandomByteser
+	urlTokenGen     SecureRandomByteser
+	lockDevToUser   bool
+	allowSelfReg    bool
+	verifyEmailHost bool
 	// optional parameters
 	appNameEmptyable     string
 	fbNilable            FacebookCl
@@ -217,6 +218,7 @@ func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, 
 		numGen:               c.numGen,
 		urlTokenGen:          c.urlTokenGen,
 		allowSelfReg:         c.allowSelfReg,
+		verifyEmailHost:      c.verifyEmailHost,
 		lockDevToUser:        c.lockDevToUser,
 		appNameEmptyable:     c.appNameEmptyable,
 		fbNilable:            c.fbNilable,
@@ -857,7 +859,7 @@ func (a *Authentication) verifyDBT(loginType, userID string, dbt []byte) (*Verif
 		if a.db.IsNotFoundError(err) {
 			return nil, errors.NewNotFound(err)
 		}
-		return nil, errors.Newf("get user: %v", loginType, err)
+		return nil, errors.Newf("get %s user: %v", loginType, err)
 	}
 
 	tkn, err := a.dbTokenValid(usr.ID, dbt, tokensFetchFunc)
@@ -1160,7 +1162,7 @@ func (a *Authentication) regPhone(tx *sql.Tx, actionType, number string, usr *Us
 }
 
 func (a *Authentication) regEmailConditions(email string) (string, error) {
-	email, err := normalizeValidEmail(email)
+	email, err := normalizeValidEmail(email, a.verifyEmailHost)
 	if err != nil {
 		return "", errors.NewClient(err)
 	}
@@ -1473,7 +1475,7 @@ func (a *Authentication) user(loginType, identifier string) (usr *User, passH []
 		}
 		usr, passH, err = a.db.UserByPhone(identifier)
 	case LoginTypeEmail:
-		identifier, err = normalizeValidEmail(identifier)
+		identifier, err = normalizeValidEmail(identifier, a.verifyEmailHost)
 		if err != nil {
 			return nil, nil, errors.NewClient(err)
 		}
@@ -1627,13 +1629,15 @@ func normalizeValidUsername(un string) (string, error) {
 	return un, err
 }
 
-func normalizeValidEmail(addr string) (string, error) {
+func normalizeValidEmail(addr string, verifyHost bool) (string, error) {
 	addr = strings.ToLower(addr)
 	if err := checkmail.ValidateFormat(addr); err != nil {
 		return "", errors.Newf("invalid email format: %v", err)
 	}
-	if err := checkmail.ValidateHost(addr); err != nil {
-		return "", errors.Newf("invalid email: %v", err)
+	if verifyHost {
+		if err := checkmail.ValidateHost(addr); err != nil {
+			return "", errors.Newf("invalid email: %v", err)
+		}
 	}
 	i := strings.LastIndex(addr, "@")
 	if strings.Contains(addr[:i], "+") || strings.Contains(addr[:i], ".") {

@@ -197,6 +197,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 		model.WithServiceURL(srvcURL),
 		model.WithDevLockedToUser(conf.Authentication.LockDevsToUsers),
 		model.WithSelfRegAllowed(conf.Authentication.AllowSelfReg),
+		model.WithVerifyEmailHost(conf.Authentication.VerifyEmailHosts),
 	)
 
 	a, err := model.NewAuthentication(rdb, tg, authOpts...)

@@ -265,20 +265,28 @@ func WithEmailVerifyTplt(t *template.Template, parseErr error) Option {
 	}
 }
 
+func WithVerifyEmailHost(isToVerifyEmailHost bool) Option {
+	return func(c *authenticationConfig) error {
+		c.verifyEmailHost = isToVerifyEmailHost
+		return nil
+	}
+}
+
 type authenticationConfig struct {
 	// mandatory parameters
-	passGen       SecureRandomByteser
-	numGen        SecureRandomByteser
-	urlTokenGen   SecureRandomByteser
-	allowSelfReg  bool
-	lockDevToUser bool
+	passGen         SecureRandomByteser
+	numGen          SecureRandomByteser
+	urlTokenGen     SecureRandomByteser
+	allowSelfReg    bool
+	lockDevToUser   bool
+	verifyEmailHost bool
 	// optional parameters
 	appNameEmptyable     string
 	fbNilable            FacebookCl
 	smserNilable         SMSer
 	mailerNilable        Mailer
 	webAppURLNilable     *url.URL
-	serviceURLNilable     *url.URL
+	serviceURLNilable    *url.URL
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
@@ -289,6 +297,7 @@ type authenticationConfig struct {
 func (c *authenticationConfig) initializeValues() {
 	c.allowSelfReg = true
 	c.lockDevToUser = false
+	c.verifyEmailHost = true
 	c.loginTpActionTplts = map[string]map[string]*template.Template{
 		LoginTypePhone: make(map[string]*template.Template),
 		LoginTypeEmail: make(map[string]*template.Template),
