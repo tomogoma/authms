@@ -39,9 +39,13 @@ func InstantiateRoach(lg logging.Logger, conf crdb.Config) *db.Roach {
 	return rdb
 }
 
-func InstantiateJWTHandler(lg logging.Logger, tknKyF string) *token.Handler {
-	JWTKey, err := ioutil.ReadFile(tknKyF)
-	logging.LogFatalOnError(lg, err, "Read JWT key file")
+func InstantiateJWTHandler(lg logging.Logger, conf config.JWT) *token.Handler {
+	JWTKey := []byte(conf.TokenKey)
+	if len(JWTKey) == 0 {
+		var err error
+		JWTKey, err = ioutil.ReadFile(conf.TokenKeyFile)
+		logging.LogFatalOnError(lg, err, "Read JWT key file")
+	}
 	jwter, err := token.NewHandler(JWTKey)
 	logging.LogFatalOnError(lg, err, "Instantiate JWT handler")
 	return jwter
@@ -51,9 +55,13 @@ func InstantiateFacebook(conf config.Facebook) (*facebook.FacebookOAuth, error) 
 	if conf.ID < 1 {
 		return nil, nil
 	}
-	fbSecret, err := readFile(conf.SecretFilePath)
-	if err != nil {
-		return nil, fmt.Errorf("read facebook secret from file: %v", err)
+	fbSecret := conf.Secret
+	if len(fbSecret) == 0 {
+		var err error
+		fbSecret, err = readFile(conf.SecretFile)
+		if err != nil {
+			return nil, fmt.Errorf("read facebook secret from file: %v", err)
+		}
 	}
 	fb, err := facebook.New(conf.ID, fbSecret)
 	if err != nil {
@@ -70,29 +78,39 @@ func InstantiateSMSer(lg logging.Logger, conf config.SMS) (model.SMSer, error) {
 
 	lg.WithField(logging.FieldAction, "Instantiate SMS API").Infof("active SMS API is %s", conf.ActiveAPI)
 	var s model.SMSer
+	var err error
 	switch conf.ActiveAPI {
 	case config.SMSAPIAfricasTalking:
-		apiKey, err := readFile(conf.AfricasTalking.APIKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("read africa's talking API key: %v", err)
+		apiKey := conf.AfricasTalking.APIKey
+		if len(apiKey) == 0 {
+			apiKey, err = readFile(conf.AfricasTalking.APIKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("read africa's talking API key: %v", err)
+			}
 		}
 		s, err = africas_talking.NewSMSCl(conf.AfricasTalking.UserName, apiKey)
 		if err != nil {
 			return nil, fmt.Errorf("new africasTalking client: %v", err)
 		}
 	case config.SMSAPITwilio:
-		tkn, err := readFile(conf.Twilio.TokenKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("read twilio token: %v", err)
+		tkn := conf.Twilio.TokenKey
+		if len(tkn) == 0 {
+			tkn, err = readFile(conf.Twilio.TokenKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("read twilio token: %v", err)
+			}
 		}
 		s, err = twilio.NewSMSCl(conf.Twilio.ID, tkn, conf.Twilio.SenderPhone)
 		if err != nil {
 			return nil, fmt.Errorf("new twilio client: %v", err)
 		}
 	case config.SMSAPIMessageBird:
-		apiKey, err := readFile(conf.MessageBird.APIKeyFile)
-		if err != nil {
-			return nil, fmt.Errorf("read messageBird API key: %v", err)
+		apiKey := conf.MessageBird.APIKey
+		if len(apiKey) == 0 {
+			apiKey, err = readFile(conf.MessageBird.APIKeyFile)
+			if err != nil {
+				return nil, fmt.Errorf("read messageBird API key: %v", err)
+			}
 		}
 		s, err = messagebird.NewClient(conf.MessageBird.AccountName, apiKey)
 		if err != nil {
@@ -133,8 +151,11 @@ func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.M
 		return emailCl
 	}
 
-	pass, err := readFile(conf.PasswordFile)
-	logging.LogWarnOnError(lg, err, "Read SMTP password file")
+	pass := conf.Password
+	if len(pass) == 0 {
+		pass, err = readFile(conf.PasswordFile)
+		logging.LogWarnOnError(lg, err, "Read SMTP password file")
+	}
 
 	host := hostname()
 	err = emailCl.SetConfig(
@@ -159,10 +180,17 @@ func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.M
 
 func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
 
+	conf := &config.General{}
+
 	lg.WithField(logging.FieldAction, "Read config file").Info("started")
-	conf, err := config.ReadFile(confFile)
-	logging.LogFatalOnError(lg, err, "Read config file")
+	err := config.ReadFile(confFile, conf)
+	logging.LogWarnOnError(lg, err, "Read config file")
 	lg.WithField(logging.FieldAction, "Read config file").Info("complete")
+
+	lg.WithField(logging.FieldAction, "Read environment config values").Info("started")
+	err = config.ReadEnv(conf)
+	logging.LogWarnOnError(lg, err, "Read environment config values")
+	lg.WithField(logging.FieldAction, "Read environment config values").Info("complete")
 
 	rdb := InstantiateRoach(lg, conf.Database)
 
@@ -191,22 +219,39 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
 
 	if conf.SMTP.InvitationTpl != "" {
-		authOpts = append(authOpts, model.WithEmailInviteTplt(template.ParseFiles(conf.SMTP.InvitationTpl)))
+		authOpts = append(authOpts, model.WithEmailInviteTplt(template.New("SMTP.InvitationTpl").Parse(conf.SMTP.InvitationTpl)))
+	} else if conf.SMTP.InvitationTplFile != "" {
+		authOpts = append(authOpts, model.WithEmailInviteTplt(template.ParseFiles(conf.SMTP.InvitationTplFile)))
 	}
+
 	if conf.SMS.InvitationTpl != "" {
-		authOpts = append(authOpts, model.WithPhoneInviteTplt(template.ParseFiles(conf.SMS.InvitationTpl)))
+		authOpts = append(authOpts, model.WithPhoneInviteTplt(template.New("SMS.InvitationTpl").Parse(conf.SMS.InvitationTpl)))
+	} else if conf.SMS.InvitationTplFile != "" {
+		authOpts = append(authOpts, model.WithPhoneInviteTplt(template.ParseFiles(conf.SMS.InvitationTplFile)))
 	}
+
 	if conf.SMTP.ResetPWDTpl != "" {
-		authOpts = append(authOpts, model.WithEmailResetPassTplt(template.ParseFiles(conf.SMTP.ResetPWDTpl)))
+		authOpts = append(authOpts, model.WithEmailResetPassTplt(template.New("SMTP.ResetPWDTpl").Parse(conf.SMTP.ResetPWDTpl)))
+	} else if conf.SMTP.ResetPWDTplFile != "" {
+		authOpts = append(authOpts, model.WithEmailResetPassTplt(template.ParseFiles(conf.SMTP.ResetPWDTplFile)))
 	}
+
 	if conf.SMS.ResetPWDTpl != "" {
-		authOpts = append(authOpts, model.WithPhoneResetPassTplt(template.ParseFiles(conf.SMS.ResetPWDTpl)))
+		authOpts = append(authOpts, model.WithPhoneResetPassTplt(template.New("SMS.ResetPWDTpl").Parse(conf.SMS.ResetPWDTpl)))
+	} else if conf.SMS.ResetPWDTplFile != "" {
+		authOpts = append(authOpts, model.WithPhoneResetPassTplt(template.ParseFiles(conf.SMS.ResetPWDTplFile)))
 	}
+
 	if conf.SMTP.VerifyTpl != "" {
-		authOpts = append(authOpts, model.WithEmailVerifyTplt(template.ParseFiles(conf.SMTP.VerifyTpl)))
+		authOpts = append(authOpts, model.WithEmailVerifyTplt(template.New("SMTP.VerifyTpl").Parse(conf.SMTP.VerifyTpl)))
+	} else if conf.SMTP.VerifyTplFile != "" {
+		authOpts = append(authOpts, model.WithEmailVerifyTplt(template.ParseFiles(conf.SMTP.VerifyTplFile)))
 	}
+
 	if conf.SMS.VerifyTpl != "" {
-		authOpts = append(authOpts, model.WithPhoneVerifyTplt(template.ParseFiles(conf.SMS.VerifyTpl)))
+		authOpts = append(authOpts, model.WithPhoneVerifyTplt(template.New("SMS.VerifyTpl").Parse(conf.SMS.VerifyTpl)))
+	} else if conf.SMS.VerifyTplFile != "" {
+		authOpts = append(authOpts, model.WithPhoneVerifyTplt(template.ParseFiles(conf.SMS.VerifyTplFile)))
 	}
 
 	srvcURL, err := url.Parse(conf.Service.URL)
@@ -226,7 +271,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 		model.WithVerifyEmailHost(conf.Authentication.VerifyEmailHosts),
 	)
 
-	tg := InstantiateJWTHandler(lg, conf.Token.TokenKeyFile)
+	tg := InstantiateJWTHandler(lg, conf.Token)
 
 	a, err := model.NewAuthentication(rdb, tg, authOpts...)
 	logging.LogFatalOnError(lg, err, "Instantiate Auth Model")
