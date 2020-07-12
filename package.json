@@ -1,0 +1,28 @@
+{
+  "name": "authms",
+  "version": "1.0.0",
+  "description": "Authentication and authorization microservice",
+  "main": "index.js",
+  "dependencies": {
+    "apidoc": "^0.23.0"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tomogoma/authms.git"
+  },
+  "keywords": [
+    "authentication",
+    "authorization",
+    "auth"
+  ],
+  "author": "Tom Ogoma",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/tomogoma/authms/issues"
+  },
+  "homepage": "https://github.com/tomogoma/authms#readme"
+}
