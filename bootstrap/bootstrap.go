@@ -18,19 +18,24 @@ import (
 	"github.com/tomogoma/authms/sms/messagebird"
 	"github.com/tomogoma/authms/sms/twilio"
 	"github.com/tomogoma/authms/smtp"
-	"github.com/tomogoma/crdb"
 	token "github.com/tomogoma/jwt"
 	"path"
 )
 
-func InstantiateRoach(lg logging.Logger, conf crdb.Config) *db.Roach {
+func InstantiateRoach(lg logging.Logger, conf *config.General) *db.Roach {
 	lg.WithField(logging.FieldAction, "Initiate Cockroach DB connection").Info("started")
 	var opts []db.Option
-	if dsn := conf.FormatDSN(); dsn != "" {
+	dsn := conf.DatabaseURL
+	dbName := ""
+	if dsn == "" {
+		dsn = conf.Database.FormatDSN()
+		dbName = conf.Database.DBName
+	}
+	if dsn != "" {
 		opts = append(opts, db.WithDSN(dsn))
 	}
-	if dbn := conf.DBName; dbn != "" {
-		opts = append(opts, db.WithDBName(dbn))
+	if dbName != "" {
+		opts = append(opts, db.WithDBName(dbName))
 	}
 	rdb := db.NewRoach(opts...)
 	err := rdb.InitDBIfNot()
@@ -182,7 +187,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 
 	conf := readConfig(confFile, lg)
 
-	rdb := InstantiateRoach(lg, conf.Database)
+	rdb := InstantiateRoach(lg, conf)
 
 	lg.WithField(logging.FieldAction, "Set up OAuth options").Info("started")
 	var authOpts []model.Option

@@ -106,6 +106,7 @@ type General struct {
 	Token          JWT         `json:"token" yaml:"token"`
 	SMTP           SMTP        `json:"SMTP" yaml:"SMTP"`
 	SMS            SMS         `json:"sms" yaml:"sms"`
+	DatabaseURL    string      `json:"databaseURL" yaml:"databaseURL"`
 }
 
 func ReadFile(fName string, conf *General) error {
@@ -156,8 +157,13 @@ func ReadEnv(conf *General) error {
 	if err := env.Unmarshal(envSet, &conf.SMTP); err != nil {
 		return fmt.Errorf("read smtp config values: %v", err)
 	}
-	if err := unmarshalDBConf(envSet, &conf.Database); err != nil {
-		return fmt.Errorf("read database config values: %v", err)
+
+	if dbURL, exists := envSet[EnvKeyDatabaseURL]; exists {
+		conf.DatabaseURL = dbURL
+	} else {
+		if err := unmarshalDBConf(envSet, &conf.Database); err != nil {
+			return fmt.Errorf("read database config values: %v", err)
+		}
 	}
 
 	return nil
@@ -171,6 +177,7 @@ const (
 	EnvKeyDbName             = "DB_NAME"
 	EnvKeyDbSSLMode          = "DB_SSL_MODE"
 	EnvKeySrvcAllowedOrigins = "SRVC_ALLOWED_ORIGINS"
+	EnvKeyDatabaseURL        = "DATABASE_URL"
 )
 
 func unmarshalServcConf(conf *Service) (env.EnvSet, error) {
