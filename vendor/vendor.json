@@ -3,6 +3,12 @@
 	"ignore": "test",
 	"package": [
 		{
+			"checksumSHA1": "JDQyky9RzzEZGHYWcDFpzkROVaI=",
+			"path": "github.com/Netflix/go-env",
+			"revision": "5660fe1ab40ac7cf3ac10f11695f51ca8d4ae559",
+			"revisionTime": "2020-05-12T17:08:51Z"
+		},
+		{
 			"checksumSHA1": "Dj+/Vqmxb9pahbBFZ0P0HmUp3qI=",
 			"path": "github.com/badoux/checkmail",
 			"revision": "d0a759655d62bcdc95c50a0676f3e9702ed59453",
