@@ -24,7 +24,7 @@ type Service struct {
 	AppName        string   `json:"appName" yaml:"appName" env:"SRVC_APP_NAME"`
 	WebAppURL      string   `json:"webAppURL" yaml:"webAppURL" env:"SRVC_WEB_APP_URL"`
 	URL            string   `json:"URL" yaml:"URL" env:"SRVC_URL"`
-	Port           int      `json:"port" yaml:"port" env:"SRVC_PORT"`
+	Port           *int     `json:"port" yaml:"port" env:"SRVC_PORT"`
 }
 
 type Twilio struct {

@@ -192,6 +192,12 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	logging.LogWarnOnError(lg, err, "Read environment config values")
 	lg.WithField(logging.FieldAction, "Read environment config values").Info("complete")
 
+	if conf.Service.Port == nil {
+		port := 8080
+		lg.WithField(logging.FieldAction, "Set default Port").Infof("No port config found fallback to %d", port)
+		conf.Service.Port = &port
+	}
+
 	rdb := InstantiateRoach(lg, conf.Database)
 
 	lg.WithField(logging.FieldAction, "Set up OAuth options").Info("started")
