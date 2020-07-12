@@ -180,23 +180,7 @@ func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.M
 
 func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
 
-	conf := &config.General{}
-
-	lg.WithField(logging.FieldAction, "Read config file").Info("started")
-	err := config.ReadFile(confFile, conf)
-	logging.LogWarnOnError(lg, err, "Read config file")
-	lg.WithField(logging.FieldAction, "Read config file").Info("complete")
-
-	lg.WithField(logging.FieldAction, "Read environment config values").Info("started")
-	err = config.ReadEnv(conf)
-	logging.LogWarnOnError(lg, err, "Read environment config values")
-	lg.WithField(logging.FieldAction, "Read environment config values").Info("complete")
-
-	if conf.Service.Port == nil {
-		port := 8080
-		lg.WithField(logging.FieldAction, "Set default Port").Infof("No port config found fallback to %d", port)
-		conf.Service.Port = &port
-	}
+	conf := readConfig(confFile, lg)
 
 	rdb := InstantiateRoach(lg, conf.Database)
 
@@ -294,6 +278,31 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	srvcConfLg.Info("completed")
 
 	return *conf, a, g, rdb, tg, sms, emailCl
+}
+
+func readConfig(confFile string, lg logging.Logger) *config.General {
+
+	conf := &config.General{}
+
+	if len(confFile) > 0 {
+		lg.WithField(logging.FieldAction, "Read config file").Info("started")
+		err := config.ReadFile(confFile, conf)
+		logging.LogWarnOnError(lg, err, "Read config file")
+		lg.WithField(logging.FieldAction, "Read config file").Info("complete")
+	}
+
+	lg.WithField(logging.FieldAction, "Read environment config values").Info("started")
+	err := config.ReadEnv(conf)
+	logging.LogWarnOnError(lg, err, "Read environment config values")
+	lg.WithField(logging.FieldAction, "Read environment config values").Info("complete")
+
+	if conf.Service.Port == nil {
+		port := 8080
+		lg.WithField(logging.FieldAction, "Set default Port").Infof("No port config found fallback to %d", port)
+		conf.Service.Port = &port
+	}
+
+	return conf
 }
 
 func hostname() string {
