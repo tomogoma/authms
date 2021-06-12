@@ -3,6 +3,7 @@ package http
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"strings"
@@ -39,6 +40,7 @@ type Auth interface {
 	VerifyDBT(loginType, forAddr string, dbt []byte) (*model.VerifLogin, error)
 
 	Login(loginType, identifier string, password []byte) (*model.User, error)
+	FirebaseAuthToken(ctx context.Context, JWT string) (string, error)
 
 	Users(JWT string, q model.UsersQuery, offset, count string) ([]model.User, error)
 	GetUserDetails(JWT, userID string) (*model.User, error)
@@ -50,6 +52,36 @@ type Auth interface {
 
 type Guard interface {
 	APIKeyValid(key string) (string, error)
+}
+
+type RequiredParams struct {
+	Auth   Auth
+	Guard  Guard
+	Logger logging.Logger
+}
+
+func (rp RequiredParams) Validate() error {
+	errs := ""
+	concatStr := ", "
+	if rp.Auth == nil {
+		errs += fmt.Sprintf("Auth was nil%s", concatStr)
+	}
+	if rp.Guard == nil {
+		errs += fmt.Sprintf("Guard was nil%s", concatStr)
+	}
+	if rp.Logger == nil {
+		errs += fmt.Sprintf("Logger was nil%s", concatStr)
+	}
+	if errs != "" {
+		errs = strings.Trim(errs, concatStr)
+		return errors.New(errs)
+	}
+	return nil
+}
+
+type OptionalParams struct {
+	WebappUrl      string
+	AllowedOrigins []string
 }
 
 type handler struct {
@@ -89,25 +121,24 @@ const (
 	valDevice = "device"
 )
 
-func NewHandler(a Auth, g Guard, l logging.Logger, webAppURL string, allowedOrigins []string) (http.Handler, error) {
-	if a == nil {
-		return nil, errors.New("Auth was nil")
-	}
-	if g == nil {
-		return nil, errors.New("Guard was nil")
-	}
-	if l == nil {
-		return nil, errors.New("Logger was nil")
+func NewHandler(rp RequiredParams, op OptionalParams) (http.Handler, error) {
+	if err := rp.Validate(); err == nil {
+		return nil, err
 	}
 
 	r := mux.NewRouter().PathPrefix(config.WebRootURL()).Subrouter()
-	handler{auth: a, guard: g, logger: l, webAppURL: webAppURL}.handleRoute(r)
+	handler{
+		auth:      rp.Auth,
+		guard:     rp.Guard,
+		logger:    rp.Logger,
+		webAppURL: op.WebappUrl,
+	}.handleRoute(r)
 
 	headersOk := handlers.AllowedHeaders([]string{
 		"X-Requested-With", "Accept", "Content-Type", "Content-Length",
 		"Accept-Encoding", "X-CSRF-Token", "Authorization", "X-api-key",
 	})
-	originsOk := handlers.AllowedOrigins(allowedOrigins)
+	originsOk := handlers.AllowedOrigins(op.AllowedOrigins)
 	methodsOk := handlers.AllowedMethods([]string{"GET", "HEAD", "POST", "PUT", "OPTIONS"})
 
 	return handlers.CORS(headersOk, originsOk, methodsOk)(r), nil
@@ -151,6 +182,10 @@ func (s handler) handleRoute(r *mux.Router) {
 		Methods(http.MethodGet).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUserDetails)))
 
+	r.PathPrefix("/firebase-authentications").
+		Methods(http.MethodGet).
+		HandlerFunc(s.prepLogger(s.guardRoute(s.handleGenerateFirebaseAuthToken)))
+
 	r.PathPrefix("/users/{" + keyUserID + "}").
 		Methods(http.MethodPost).
 		HandlerFunc(s.prepLogger(s.guardRoute(s.handleUpdate)))
@@ -174,7 +209,7 @@ func (s handler) handleRoute(r *mux.Router) {
 	r.PathPrefix("/" + config.DocsPath).
 		Handler(http.FileServer(http.Dir(config.DefaultDocsDir())))
 
-	r.NotFoundHandler = http.HandlerFunc(s.prepLogger(s.notFoundHandler))
+	r.NotFoundHandler = s.prepLogger(s.notFoundHandler)
 }
 
 func (s handler) prepLogger(next http.HandlerFunc) http.HandlerFunc {
@@ -292,7 +327,7 @@ func (s *handler) handleStatus(w http.ResponseWriter, r *http.Request) {
  *
  * @apiSuccess {Object[]} json-body JSON array of <a href="#api-Objects-User">users</a>
  *
- */
+*/
 func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	req := struct {
@@ -338,7 +373,7 @@ func (s *handler) handleUsers(w http.ResponseWriter, r *http.Request) {
  *
  * @apiUse User
  *
- */
+*/
 func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		UserID string `json:"userID"`
@@ -349,6 +384,24 @@ func (s *handler) handleUserDetails(w http.ResponseWriter, r *http.Request) {
 	}
 	usr, err := s.auth.GetUserDetails(req.JWT, req.UserID)
 	s.respondOn(w, r, req, NewUser(usr), http.StatusOK, err)
+}
+
+/**
+ * @api {get} /firebase-authentications Firebase Authentication Token
+ * @apiName FirebaseAuthentications
+ * @apiVersion 0.2.0
+ * @apiGroup Auth
+ * @apiPermission owner
+ *
+ * @apiHeader x-api-key the api key
+ *
+ * @apiParam (URL Query Parameters) {String} token The JWT provided during auth.
+ *
+ */
+func (s *handler) handleGenerateFirebaseAuthToken(w http.ResponseWriter, r *http.Request) {
+	jwt := r.URL.Query().Get(keyToken)
+	tkn, err := s.auth.FirebaseAuthToken(r.Context(), jwt)
+	s.respondOn(w, r, nil, tkn, http.StatusOK, err)
 }
 
 /**
@@ -490,7 +543,7 @@ func (s *handler) handleRegistration(w http.ResponseWriter, r *http.Request) {
  *
  * @apiUse User
  *
- */
+*/
 func (s *handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 	req := struct {
 		LT         string `json:"loginType"`
@@ -804,6 +857,7 @@ func (s *handler) respondOn(w http.ResponseWriter, r *http.Request, reqData inte
 	return i
 }
 
+//goland:noinspection GoUnusedParameter
 func (s handler) notFoundHandler(w http.ResponseWriter, r *http.Request) {
 	http.Error(w, "Nothing to see here", http.StatusNotFound)
 }

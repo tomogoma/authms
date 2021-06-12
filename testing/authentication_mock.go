@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"context"
 	"github.com/tomogoma/authms/model"
 	errors "github.com/tomogoma/go-typed-errors"
 )
@@ -48,6 +49,9 @@ type AuthenticationMock struct {
 
 	ExpCanRegFirst    bool
 	ExpCanRegFirstErr error
+
+	ExpFirebaseAuthToken    string
+	ExpFirebaseAuthTokenErr error
 }
 
 func (a *AuthenticationMock) CanRegisterFirst() (bool, error) {
@@ -68,6 +72,10 @@ func (a *AuthenticationMock) RegisterSelfByLockedPhone(userType, devID, number s
 
 func (a *AuthenticationMock) RegisterOther(JWT, newLoginType, userType, id, groupID string) (*model.User, error) {
 	return a.ExpRegOtherUser, a.ExpRegOtherErr
+}
+
+func (a *AuthenticationMock) FirebaseAuthToken(ctx context.Context, JWT string) (string, error) {
+	return a.ExpFirebaseAuthToken, a.ExpFirebaseAuthTokenErr
 }
 
 func (a *AuthenticationMock) UpdateIdentifier(JWT, loginType, newId string) (*model.User, error) {

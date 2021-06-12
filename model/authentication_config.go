@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"firebase.google.com/go/auth"
 	"html/template"
 	"reflect"
 
@@ -169,6 +170,14 @@ func WithResetPassSubject(s string) Option {
 	}
 }
 
+// WithFirebaseAuthClient sets the firebase auth client to be used for firebase auth operations.
+func WithFirebaseAuthClient(cl *auth.Client) Option {
+	return func(c *authenticationConfig) error {
+		c.firebaseAuthCl = cl
+		return nil
+	}
+}
+
 // WithPhoneInviteTplt sets the message template to be used when composing SMS
 // invite messages.
 // TODO define valid template values
@@ -290,6 +299,7 @@ type authenticationConfig struct {
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
+	firebaseAuthCl       *auth.Client
 	// tail values optional depending on need/type for communication
 	loginTpActionTplts map[string]map[string]*template.Template
 }

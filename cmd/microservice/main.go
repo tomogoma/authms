@@ -6,6 +6,7 @@ import (
 
 	"github.com/micro/go-micro"
 	"github.com/micro/go-web"
+	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/bootstrap"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/handler/http"
@@ -13,7 +14,6 @@ import (
 	"github.com/tomogoma/authms/logging"
 	"github.com/tomogoma/authms/logging/logrus"
 	_ "github.com/tomogoma/authms/logging/standard"
-	"github.com/tomogoma/authms/api"
 )
 
 func main() {
@@ -21,18 +21,21 @@ func main() {
 	confFile := flag.String("conf", config.DefaultConfPath(), "location of config file")
 	flag.Parse()
 	log := &logrus.Wrapper{}
-	conf, authentication, APIGuard, _, _, _, _ := bootstrap.Instantiate(*confFile, log)
+	boot := bootstrap.Instantiate(*confFile, log)
 
 	serverRPCQuitCh := make(chan error)
-	rpcSrv, err := rpc.NewHandler(APIGuard, authentication)
+	rpcSrv, err := rpc.NewHandler(boot.Guard, boot.Authentication)
 	logging.LogFatalOnError(log, err, "Instantate RPC handler")
-	go serveRPC(conf.Service, rpcSrv, serverRPCQuitCh)
+	go serveRPC(boot.Conf.Service, rpcSrv, serverRPCQuitCh)
 
 	serverHttpQuitCh := make(chan error)
-	httpHandler, err := http.NewHandler(authentication, APIGuard, log,
-		conf.Service.WebAppURL, conf.Service.AllowedOrigins)
+	httpHandler, err := http.NewHandler(
+		http.RequiredParams{Auth: boot.Authentication, Guard: boot.Guard, Logger: log},
+		http.OptionalParams{WebappUrl: boot.Conf.Service.WebAppURL,
+			AllowedOrigins: boot.Conf.Service.AllowedOrigins},
+	)
 	logging.LogFatalOnError(log, err, "Instantiate HTTP handler")
-	go serveHttp(conf.Service, httpHandler, serverHttpQuitCh)
+	go serveHttp(boot.Conf.Service, httpHandler, serverHttpQuitCh)
 
 	select {
 	case err = <-serverHttpQuitCh:

@@ -1,6 +1,8 @@
 package bootstrap
 
 import (
+	"context"
+	"firebase.google.com/go/auth"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -8,6 +10,7 @@ import (
 
 	"html/template"
 
+	firebase "firebase.google.com/go"
 	"github.com/tomogoma/authms/api"
 	"github.com/tomogoma/authms/config"
 	"github.com/tomogoma/authms/db"
@@ -136,6 +139,18 @@ func InstantiateSMSer(lg logging.Logger, conf config.SMS) (model.SMSer, error) {
 	return s, nil
 }
 
+func instantiateFirebaseAuth() (*auth.Client, error) {
+	app, err := firebase.NewApp(context.Background(), nil)
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating firebase app: %v", err)
+	}
+	client, err := app.Auth(context.Background())
+	if err != nil {
+		return nil, fmt.Errorf("error instantiating firebase client Authenticator: %v", err)
+	}
+	return client, nil
+}
+
 func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.Mailer {
 
 	lg.WithField(logging.FieldAction, "Instantiate email API").Info("started")
@@ -183,7 +198,17 @@ func InstantiateSMTP(rdb *db.Roach, lg logging.Logger, conf config.SMTP) *smtp.M
 	return emailCl
 }
 
-func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Authentication, *api.Guard, *db.Roach, model.JWTEr, model.SMSer, *smtp.Mailer) {
+type Boot struct {
+	Conf           config.General
+	Authentication *model.Authentication
+	Guard          *api.Guard
+	Roach          *db.Roach
+	JWTEr          model.JWTEr
+	SMSer          model.SMSer
+	Mailer         *smtp.Mailer
+}
+
+func Instantiate(confFile string, lg logging.Logger) Boot {
 
 	conf := readConfig(confFile, lg)
 
@@ -209,6 +234,11 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 		authOpts = append(authOpts, model.WithSMSCl(sms))
 	}
 	lg.WithField(logging.FieldAction, "Instantiate SMS API").Info("completed")
+
+	lg.WithField(logging.FieldAction, "Instantiate Fireabase App").Infof("")
+	frbz, err := instantiateFirebaseAuth()
+	logging.LogWarnOnError(lg, err, "Instantiate Firebase App")
+	model.WithFirebaseAuthClient(frbz)
 
 	emailCl := InstantiateSMTP(rdb, lg, conf.SMTP)
 	authOpts = append(authOpts, model.WithEmailCl(emailCl))
@@ -282,7 +312,7 @@ func Instantiate(confFile string, lg logging.Logger) (config.General, *model.Aut
 	srvcConfLg.Infof("Verifies Email Hosts: '%t'", conf.Authentication.VerifyEmailHosts)
 	srvcConfLg.Info("completed")
 
-	return *conf, a, g, rdb, tg, sms, emailCl
+	return Boot{*conf, a, g, rdb, tg, sms, emailCl}
 }
 
 func readConfig(confFile string, lg logging.Logger) *config.General {

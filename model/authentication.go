@@ -3,6 +3,8 @@ package model
 import (
 	"bytes"
 	"database/sql"
+	"firebase.google.com/go/auth"
+	"golang.org/x/net/context"
 	"html/template"
 	"net/url"
 	"path"
@@ -126,6 +128,7 @@ type Authentication struct {
 	invSubjEmptyable     string
 	verSubjEmptyable     string
 	resPassSubjEmptyable string
+	firebaseAuthCl       *auth.Client
 	// tail values optional depending on need/type for communication
 	loginTpActionTplts map[string]map[string]*template.Template
 }
@@ -230,6 +233,7 @@ func NewAuthentication(db AuthStore, j JWTEr, opts ...Option) (*Authentication, 
 		verSubjEmptyable:     c.verSubjEmptyable,
 		resPassSubjEmptyable: c.resPassSubjEmptyable,
 		loginTpActionTplts:   c.loginTpActionTplts,
+		firebaseAuthCl:       c.firebaseAuthCl,
 	}, nil
 }
 
@@ -594,6 +598,22 @@ func (a *Authentication) SetPassword(loginType, forAddr string, dbt, pass []byte
 		return nil
 	})
 	return addr, err
+}
+
+// FirebaseAuthToken generates a fresh firebase auth token for the user in the provided jwt.
+//
+// This method has the drawback that the generated token will not expire at the same time as the
+// jwt even if jwt is just about to expire.
+func (a *Authentication) FirebaseAuthToken(ctx context.Context, jwt string) (string, error) {
+	clms := new(JWTClaim)
+	if _, err := a.jwter.Validate(jwt, clms); err != nil {
+		return "", err
+	}
+	tkn, err := a.firebaseAuthCl.CustomToken(ctx, clms.UsrID)
+	if err != nil {
+		return "", errors.Newf("unable to generate custom token: %v", err)
+	}
+	return tkn, nil
 }
 
 // SendVerCode sends a verification code to toAddr to verify the
